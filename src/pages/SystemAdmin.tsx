@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import AccessDeniedCard from '@/components/system-admin/AccessDeniedCard';
 import AddAdminForm from '@/components/system-admin/AddAdminForm';
-import AdminList, { SystemAdmin } from '@/components/system-admin/AdminList';
+import AdminList from '@/components/system-admin/AdminList';
+import type { SystemAdmin } from '@/components/system-admin/AdminList';
 
 const SystemAdmin: React.FC = () => {
   const [admins, setAdmins] = useState<SystemAdmin[]>([]);
