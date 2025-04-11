@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -152,31 +151,6 @@ const OrganizationSetup: React.FC = () => {
       navigate('/');
     }
   }, [organizations, navigate, canCreateOrg]);
-
-  if (!canCreateOrg) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
-              Permission Denied
-            </CardTitle>
-            <CardDescription className="text-center">
-              You don't have permission to create new organizations
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button 
-              onClick={() => navigate('/')}
-              className="w-full"
-            >
-              Return to Dashboard
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">

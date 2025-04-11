@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   BarChart3, 
@@ -31,10 +31,11 @@ const Header = () => {
   const [user, setUser] = useState<{ name: string; email: string; avatarUrl: string | null } | null>(null);
   
   // Fetch user data on component mount
-  useState(() => {
+  useEffect(() => {
     const fetchUserData = async () => {
       const { data } = await supabase.auth.getUser();
       if (data?.user) {
+        // Use the RPC function to get profile data
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
