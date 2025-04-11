@@ -1,4 +1,3 @@
-
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Package2, FileText, Layers } from "lucide-react";
@@ -13,7 +12,6 @@ const PageLayout = ({ children }: PageLayoutProps) => {
     <div className="min-h-screen flex flex-col">
       <Header />
       <div className="flex-1 flex flex-col md:flex-row">
-        {/* Sidebar */}
         <div className="bg-secondary w-full md:w-[220px] py-4 overflow-y-auto">
           <nav className="px-4 py-2">
             <ul className="space-y-1">
@@ -45,7 +43,6 @@ const PageLayout = ({ children }: PageLayoutProps) => {
           </nav>
         </div>
         
-        {/* Main content */}
         <main className="flex-1 py-6 px-4 overflow-y-auto">
           <div className="container mx-auto max-w-7xl">
             {children}
@@ -55,7 +52,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
       <footer className="py-4 bg-secondary">
         <div className="container mx-auto max-w-7xl px-4">
           <p className="text-center text-sm text-muted-foreground">
-            BarcodeX Inventory Management &copy; {new Date().getFullYear()}
+            StockFlow Inventory Management &copy; {new Date().getFullYear()}
           </p>
         </div>
       </footer>

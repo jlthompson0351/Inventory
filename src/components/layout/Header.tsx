@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -40,7 +39,7 @@ const Header = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <Package className="h-8 w-8 text-primary" />
-              <span className="ml-2 text-xl font-bold text-gray-900">BarcodeX</span>
+              <span className="ml-2 text-xl font-bold text-gray-900">StockFlow</span>
             </Link>
           </div>
 
@@ -108,7 +107,7 @@ const Header = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Package className="h-8 w-8 text-primary" />
-                <span className="ml-2 text-xl font-bold">BarcodeX</span>
+                <span className="ml-2 text-xl font-bold">StockFlow</span>
               </div>
               <button
                 type="button"
