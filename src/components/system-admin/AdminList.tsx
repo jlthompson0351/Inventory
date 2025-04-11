@@ -127,7 +127,7 @@ const AdminList: React.FC<AdminListProps> = ({
                 <div key={admin.id} className="flex items-center justify-between p-2 border rounded-md">
                   <div className="flex items-center gap-2">
                     {admin.role === 'super_admin' && (
-                      <Shield className="h-4 w-4 text-amber-500" title="Super Admin" />
+                      <Shield className="h-4 w-4 text-amber-500" aria-label="Super Admin" />
                     )}
                     <div>
                       <p className="font-medium">{admin.email}</p>
@@ -151,7 +151,7 @@ const AdminList: React.FC<AdminListProps> = ({
                       variant="outline" 
                       size="icon" 
                       disabled
-                      title={admin.user_id === currentUserId ? "Cannot remove yourself" : "Cannot remove super admin"}
+                      aria-label={admin.user_id === currentUserId ? "Cannot remove yourself" : "Cannot remove super admin"}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

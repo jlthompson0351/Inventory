@@ -62,7 +62,13 @@ const SystemAdmin: React.FC = () => {
       console.error('Error fetching system admins:', error);
       toast.error('Failed to load admin users');
     } else if (data) {
-      setAdmins(data);
+      // Transform the data to match the SystemAdmin type
+      const transformedData: SystemAdmin[] = data.map((admin) => ({
+        ...admin,
+        role: admin.role as 'admin' | 'super_admin'
+      }));
+      
+      setAdmins(transformedData);
     }
     
     setLoading(false);
