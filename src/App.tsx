@@ -18,38 +18,69 @@ import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import OrganizationSetup from "./pages/OrganizationSetup";
+import { useEffect, useState } from "react";
+import { supabase } from "./integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/organization-setup" element={<OrganizationSetup />} />
-          
-          {/* Protected routes with layout */}
-          <Route path="/" element={<PageLayout><Dashboard /></PageLayout>} />
-          <Route path="/inventory" element={<PageLayout><Inventory /></PageLayout>} />
-          <Route path="/inventory/new" element={<PageLayout><NewItem /></PageLayout>} />
-          <Route path="/inventory/scan" element={<PageLayout><BarcodeScanner /></PageLayout>} />
-          <Route path="/forms" element={<PageLayout><Forms /></PageLayout>} />
-          <Route path="/forms/new" element={<PageLayout><FormBuilder /></PageLayout>} />
-          <Route path="/forms/:id" element={<PageLayout><FormDetail /></PageLayout>} />
-          <Route path="/asset-types" element={<PageLayout><AssetTypes /></PageLayout>} />
-          <Route path="/reports" element={<PageLayout><Reports /></PageLayout>} />
-          <Route path="/reports/new" element={<PageLayout><ReportBuilder /></PageLayout>} />
-          <Route path="/reports/:id" element={<PageLayout><ReportBuilder /></PageLayout>} />
-          
-          {/* Catch-all route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  // Check auth state on initial load
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+      setIsLoading(false);
+    };
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    checkUser();
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (isLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+            <Route path="/organization-setup" element={<OrganizationSetup />} />
+            
+            {/* Protected routes with layout */}
+            <Route path="/" element={user ? <PageLayout><Dashboard /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/inventory" element={user ? <PageLayout><Inventory /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/inventory/new" element={user ? <PageLayout><NewItem /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/inventory/scan" element={user ? <PageLayout><BarcodeScanner /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/forms" element={user ? <PageLayout><Forms /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/forms/new" element={user ? <PageLayout><FormBuilder /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/forms/:id" element={user ? <PageLayout><FormDetail /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/asset-types" element={user ? <PageLayout><AssetTypes /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+            
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
