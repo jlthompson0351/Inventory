@@ -27,7 +27,7 @@ const OrganizationSetup: React.FC = () => {
         return;
       }
 
-      // Check if user is a system admin (can create orgs) or if they're creating their first org
+      // Check if user is creating their first org (anyone can create their first org)
       const { data: existingOrgs, error: orgsError } = await supabase
         .from('organization_members')
         .select('organization_id')
@@ -39,15 +39,17 @@ const OrganizationSetup: React.FC = () => {
         return;
       }
       
-      // If user has no organizations yet, they can create their first one
-      // OR if they are a system admin, they can create multiple orgs
-      const { data: systemRole, error: roleError } = await supabase
+      // Check if user is a system admin (can create multiple orgs)
+      const { data: systemRoles, error: roleError } = await supabase
         .from('system_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
       
-      const isSystemAdmin = systemRole?.role === 'admin';
+      if (roleError) {
+        console.error('Error checking system roles:', roleError);
+      }
+      
+      const isSystemAdmin = systemRoles && systemRoles.length > 0 && systemRoles[0]?.role === 'admin';
       const isFirstOrg = !existingOrgs || existingOrgs.length === 0;
       
       setCanCreateOrg(isSystemAdmin || isFirstOrg);
