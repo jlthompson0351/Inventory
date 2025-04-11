@@ -11,6 +11,10 @@ import NewItem from "./pages/NewItem";
 import BarcodeScanner from "./pages/BarcodeScanner";
 import Forms from "./pages/Forms";
 import FormBuilder from "./pages/FormBuilder";
+import FormDetail from "./pages/FormDetail";
+import AssetTypes from "./pages/AssetTypes";
+import Reports from "./pages/Reports";
+import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +36,11 @@ const App = () => (
           <Route path="/inventory/scan" element={<PageLayout><BarcodeScanner /></PageLayout>} />
           <Route path="/forms" element={<PageLayout><Forms /></PageLayout>} />
           <Route path="/forms/new" element={<PageLayout><FormBuilder /></PageLayout>} />
+          <Route path="/forms/:id" element={<PageLayout><FormDetail /></PageLayout>} />
+          <Route path="/asset-types" element={<PageLayout><AssetTypes /></PageLayout>} />
+          <Route path="/reports" element={<PageLayout><Reports /></PageLayout>} />
+          <Route path="/reports/new" element={<PageLayout><ReportBuilder /></PageLayout>} />
+          <Route path="/reports/:id" element={<PageLayout><ReportBuilder /></PageLayout>} />
           
           {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />
