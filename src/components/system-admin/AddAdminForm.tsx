@@ -6,19 +6,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 
 interface AddAdminFormProps {
   onAdminAdded: () => void;
+  currentUserIsSuperAdmin: boolean;
 }
 
-const AddAdminForm: React.FC<AddAdminFormProps> = ({ onAdminAdded }) => {
+const AddAdminForm: React.FC<AddAdminFormProps> = ({ onAdminAdded, currentUserIsSuperAdmin }) => {
   const [userEmail, setUserEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userEmail.trim()) {
       toast.error('Please enter an email address');
+      return;
+    }
+
+    // Only super admins can create other super admins
+    if (isSuperAdmin && !currentUserIsSuperAdmin) {
+      toast.error('You do not have permission to create super admins');
       return;
     }
 
@@ -40,29 +49,59 @@ const AddAdminForm: React.FC<AddAdminFormProps> = ({ onAdminAdded }) => {
       // Check if the user is already an admin
       const { data: existingRole } = await supabase
         .from('system_roles')
-        .select('id')
+        .select('id, role')
         .eq('user_id', foundUserId);
       
       if (existingRole && existingRole.length > 0) {
+        const currentRole = existingRole[0].role;
+        
+        if (currentRole === 'super_admin') {
+          toast.error('This user is already a super admin');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (currentRole === 'admin' && isSuperAdmin) {
+          // Upgrade regular admin to super admin
+          const { error: updateError } = await supabase
+            .from('system_roles')
+            .update({ role: 'super_admin' })
+            .eq('id', existingRole[0].id);
+            
+          if (updateError) {
+            toast.error('Failed to upgrade to super admin');
+            console.error('Error upgrading admin:', updateError);
+          } else {
+            toast.success(`${userEmail} has been upgraded to a super admin`);
+            setUserEmail('');
+            onAdminAdded();
+          }
+          
+          setIsSubmitting(false);
+          return;
+        }
+        
         toast.error('This user is already a system admin');
         setIsSubmitting(false);
         return;
       }
       
-      // Add the user as a system admin
+      // Add the user as a system admin with the appropriate role
       const { error: insertError } = await supabase
         .from('system_roles')
         .insert({
           user_id: foundUserId,
-          role: 'admin'
+          role: isSuperAdmin && currentUserIsSuperAdmin ? 'super_admin' : 'admin'
         });
       
       if (insertError) {
         toast.error('Failed to add system admin');
         console.error('Error adding admin:', insertError);
       } else {
-        toast.success(`${userEmail} has been added as a system admin`);
+        const roleType = isSuperAdmin && currentUserIsSuperAdmin ? 'super admin' : 'admin';
+        toast.success(`${userEmail} has been added as a system ${roleType}`);
         setUserEmail('');
+        setIsSuperAdmin(false);
         onAdminAdded();
       }
     } catch (error) {
@@ -102,6 +141,20 @@ const AddAdminForm: React.FC<AddAdminFormProps> = ({ onAdminAdded }) => {
                 {isSubmitting ? 'Adding...' : 'Add Admin'}
               </Button>
             </div>
+            
+            {/* Super Admin toggle - only visible to super admins */}
+            {currentUserIsSuperAdmin && (
+              <div className="flex items-center space-x-2 mt-2">
+                <Switch
+                  id="super-admin"
+                  checked={isSuperAdmin}
+                  onCheckedChange={setIsSuperAdmin}
+                />
+                <Label htmlFor="super-admin">
+                  Add as Super Admin (cannot be removed by regular admins)
+                </Label>
+              </div>
+            )}
           </div>
         </form>
       </CardContent>

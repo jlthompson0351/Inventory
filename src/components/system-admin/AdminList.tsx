@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -20,7 +20,7 @@ import {
 export type SystemAdmin = {
   id: string;
   user_id: string;
-  role: 'admin';
+  role: 'admin' | 'super_admin';
   email: string | null;
   created_at: string;
 };
@@ -29,9 +29,17 @@ interface AdminListProps {
   admins: SystemAdmin[];
   loading: boolean;
   onAdminRemoved: () => void;
+  currentUserId: string | null;
+  currentUserIsSuperAdmin: boolean;
 }
 
-const AdminList: React.FC<AdminListProps> = ({ admins, loading, onAdminRemoved }) => {
+const AdminList: React.FC<AdminListProps> = ({ 
+  admins, 
+  loading, 
+  onAdminRemoved, 
+  currentUserId,
+  currentUserIsSuperAdmin
+}) => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [adminToRemove, setAdminToRemove] = useState<{ id: string; email: string } | null>(null);
 
@@ -43,20 +51,33 @@ const AdminList: React.FC<AdminListProps> = ({ admins, loading, onAdminRemoved }
   const handleRemoveAdmin = async () => {
     if (!adminToRemove) return;
 
-    // Get current user to prevent self-deletion
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Find the admin to check if it's the current user
-    const admin = admins.find(admin => admin.id === adminToRemove.id);
-    
-    if (admin?.user_id === user?.id) {
-      toast.error("You cannot remove yourself as a system admin");
-      setConfirmDialogOpen(false);
-      setAdminToRemove(null);
-      return;
-    }
-    
     try {
+      // Find the admin to check if it's the current user or a super_admin
+      const admin = admins.find(admin => admin.id === adminToRemove.id);
+      
+      if (!admin) {
+        toast.error("Admin not found");
+        setConfirmDialogOpen(false);
+        setAdminToRemove(null);
+        return;
+      }
+      
+      // Prevent removing yourself
+      if (admin.user_id === currentUserId) {
+        toast.error("You cannot remove yourself as a system admin");
+        setConfirmDialogOpen(false);
+        setAdminToRemove(null);
+        return;
+      }
+      
+      // Prevent regular admins from removing super_admins
+      if (admin.role === 'super_admin' && !currentUserIsSuperAdmin) {
+        toast.error("Only super admins can remove other super admins");
+        setConfirmDialogOpen(false);
+        setAdminToRemove(null);
+        return;
+      }
+      
       const { error } = await supabase
         .from('system_roles')
         .delete()
@@ -78,6 +99,17 @@ const AdminList: React.FC<AdminListProps> = ({ admins, loading, onAdminRemoved }
     }
   };
 
+  // Function to check if an admin can be removed
+  const canRemoveAdmin = (admin: SystemAdmin) => {
+    // Super admins can remove any admin except themselves
+    if (currentUserIsSuperAdmin) {
+      return admin.user_id !== currentUserId;
+    }
+    
+    // Regular admins can only remove other regular admins, not super admins
+    return admin.role !== 'super_admin' && admin.user_id !== currentUserId;
+  };
+
   return (
     <>
       <Card className="w-full max-w-xl">
@@ -93,17 +125,37 @@ const AdminList: React.FC<AdminListProps> = ({ admins, loading, onAdminRemoved }
             <div className="space-y-2">
               {admins.map((admin) => (
                 <div key={admin.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <div>
-                    <p className="font-medium">{admin.email}</p>
-                    <p className="text-sm text-gray-500">Added: {new Date(admin.created_at).toLocaleDateString()}</p>
+                  <div className="flex items-center gap-2">
+                    {admin.role === 'super_admin' && (
+                      <Shield className="h-4 w-4 text-amber-500" title="Super Admin" />
+                    )}
+                    <div>
+                      <p className="font-medium">{admin.email}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm text-gray-500">
+                          {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'} • Added: {new Date(admin.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={() => openRemoveDialog(admin.id, admin.email || '')}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {canRemoveAdmin(admin) ? (
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={() => openRemoveDialog(admin.id, admin.email || '')}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      disabled
+                      title={admin.user_id === currentUserId ? "Cannot remove yourself" : "Cannot remove super admin"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
