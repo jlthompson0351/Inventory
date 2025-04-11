@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useOrganization } from '@/hooks/useOrganization';
@@ -7,12 +7,54 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 
 const OrganizationSetup: React.FC = () => {
   const [orgName, setOrgName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canCreateOrg, setCanCreateOrg] = useState(false);
   const { createOrganization, organizations } = useOrganization();
   const navigate = useNavigate();
+
+  // Check if user can create organizations
+  useEffect(() => {
+    const checkUserPermissions = async () => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+
+      // Check if user is a system admin (can create orgs) or if they're creating their first org
+      const { data: existingOrgs, error: orgsError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id);
+      
+      if (orgsError) {
+        console.error('Error checking organizations:', orgsError);
+        toast.error('Error checking permissions');
+        return;
+      }
+      
+      // If user has no organizations yet, they can create their first one
+      // OR if they are a system admin, they can create multiple orgs
+      const { data: systemRole, error: roleError } = await supabase
+        .from('system_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      
+      const isSystemAdmin = systemRole?.role === 'admin';
+      const isFirstOrg = !existingOrgs || existingOrgs.length === 0;
+      
+      setCanCreateOrg(isSystemAdmin || isFirstOrg);
+    };
+    
+    checkUserPermissions();
+  }, [navigate]);
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,12 +80,37 @@ const OrganizationSetup: React.FC = () => {
     }
   };
 
-  // If user already has organizations, redirect to dashboard
-  React.useEffect(() => {
-    if (organizations && organizations.length > 0) {
+  // If user already has organizations and isn't a system admin, redirect to dashboard
+  useEffect(() => {
+    if (organizations && organizations.length > 0 && !canCreateOrg) {
       navigate('/');
     }
-  }, [organizations, navigate]);
+  }, [organizations, navigate, canCreateOrg]);
+
+  if (!canCreateOrg) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              Permission Denied
+            </CardTitle>
+            <CardDescription className="text-center">
+              You don't have permission to create new organizations
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button 
+              onClick={() => navigate('/')}
+              className="w-full"
+            >
+              Return to Dashboard
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 p-4">
