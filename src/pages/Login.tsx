@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -43,32 +43,42 @@ const Login = () => {
     });
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      });
       
-      // Demo login - in a real app this would validate with Supabase
-      if (loginData.email && loginData.password) {
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
         toast({
           title: "Login Successful",
           description: "Welcome to BarcodeX Inventory Management",
         });
-        navigate("/");
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Please enter valid credentials",
-        });
+        navigate("/"); // Let App.tsx handle redirects
       }
-    }, 1500);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: "An unexpected error occurred",
+      });
+      console.error("Login error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
@@ -83,14 +93,48 @@ const Login = () => {
       return;
     }
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      toast({
-        title: "Registration Successful",
-        description: "Account created successfully. You can now log in.",
+    try {
+      // Register the user with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: registerData.email,
+        password: registerData.password,
+        options: {
+          data: {
+            name: registerData.name,
+          },
+        },
       });
-    }, 1500);
+      
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Registration Failed",
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: "Registration Successful",
+          description: "Account created successfully. Check your email for confirmation.",
+        });
+        
+        // Clear the form
+        setRegisterData({
+          name: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Registration Failed",
+        description: "An unexpected error occurred",
+      });
+      console.error("Registration error:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
