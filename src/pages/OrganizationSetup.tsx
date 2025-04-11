@@ -8,13 +8,35 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import OrganizationAvatar from '@/components/common/OrganizationAvatar';
 
 const OrganizationSetup: React.FC = () => {
   const [orgName, setOrgName] = useState('');
+  const [orgAvatar, setOrgAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [canCreateOrg, setCanCreateOrg] = useState(false);
   const { createOrganization, organizations } = useOrganization();
   const navigate = useNavigate();
+
+  // Handle file change for avatar upload
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      setOrgAvatar(null);
+      setAvatarPreview(null);
+      return;
+    }
+    
+    const file = e.target.files[0];
+    setOrgAvatar(file);
+    
+    // Create a preview URL
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreview(objectUrl);
+    
+    // Clean up the preview URL when the component unmounts
+    return () => URL.revokeObjectURL(objectUrl);
+  };
 
   // Check if user can create organizations
   useEffect(() => {
@@ -58,6 +80,35 @@ const OrganizationSetup: React.FC = () => {
     checkUserPermissions();
   }, [navigate]);
 
+  const uploadOrgAvatar = async (orgId: string): Promise<string | null> => {
+    if (!orgAvatar) return null;
+    
+    try {
+      const fileExt = orgAvatar.name.split('.').pop();
+      const filePath = `org-${orgId}-${Math.random()}.${fileExt}`;
+      
+      // Upload the file to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('org-avatars')
+        .upload(filePath, orgAvatar);
+      
+      if (uploadError) {
+        throw uploadError;
+      }
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('org-avatars')
+        .getPublicUrl(filePath);
+        
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading organization avatar:', error);
+      toast.error("Could not upload organization logo");
+      return null;
+    }
+  };
+
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -71,6 +122,19 @@ const OrganizationSetup: React.FC = () => {
       const newOrg = await createOrganization(orgName);
       
       if (newOrg) {
+        // If avatar is provided, upload it and update the organization
+        if (orgAvatar) {
+          const avatarUrl = await uploadOrgAvatar(newOrg.id);
+          
+          if (avatarUrl) {
+            // Update organization with avatar URL
+            await supabase
+              .from('organizations')
+              .update({ avatar_url: avatarUrl })
+              .eq('id', newOrg.id);
+          }
+        }
+        
         toast.success(`Organization "${newOrg.name}" created successfully`);
         navigate('/');
       }
@@ -136,6 +200,26 @@ const OrganizationSetup: React.FC = () => {
                 onChange={(e) => setOrgName(e.target.value)}
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="organization-avatar">Organization Logo</Label>
+              <div className="flex justify-center mb-4">
+                <OrganizationAvatar 
+                  src={avatarPreview} 
+                  name={orgName} 
+                  size="lg" 
+                />
+              </div>
+              <Input 
+                id="organization-avatar"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Upload a logo for your organization (optional)
+              </p>
             </div>
           </CardContent>
           <CardFooter>

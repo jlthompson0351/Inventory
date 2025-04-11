@@ -19,6 +19,7 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import OrganizationSetup from "./pages/OrganizationSetup";
 import SystemAdmin from "./pages/SystemAdmin";
+import Profile from "./pages/Profile";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 
@@ -75,6 +76,7 @@ const App = () => {
             <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
             <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
             <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/profile" element={user ? <PageLayout><Profile /></PageLayout> : <Navigate to="/login" />} />
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
