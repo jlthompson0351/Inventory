@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Package, EyeOff, Eye } from "lucide-react";
@@ -54,22 +53,17 @@ const Login = () => {
       });
       
       if (error) {
-        toast({
-          title: "Login Failed",
+        toast.error("Login Failed", {
           description: error.message,
-          variant: "destructive",
         });
       } else {
-        toast({
-          title: "Login Successful",
+        toast.success("Login Successful", {
           description: "Welcome to BarcodeX Inventory Management",
         });
         navigate("/"); // Let App.tsx handle redirects
       }
     } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
+      toast.error("Login Failed", {
         description: "An unexpected error occurred",
       });
       console.error("Login error:", err);
@@ -85,9 +79,7 @@ const Login = () => {
     // Validate passwords match
     if (registerData.password !== registerData.confirmPassword) {
       setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
+      toast.error("Registration Failed", {
         description: "Passwords do not match",
       });
       return;
@@ -106,14 +98,11 @@ const Login = () => {
       });
       
       if (error) {
-        toast({
-          variant: "destructive",
-          title: "Registration Failed",
+        toast.error("Registration Failed", {
           description: error.message,
         });
       } else {
-        toast({
-          title: "Registration Successful",
+        toast.success("Registration Successful", {
           description: "Account created successfully. Check your email for confirmation.",
         });
         
@@ -126,9 +115,7 @@ const Login = () => {
         });
       }
     } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
+      toast.error("Registration Failed", {
         description: "An unexpected error occurred",
       });
       console.error("Registration error:", err);
