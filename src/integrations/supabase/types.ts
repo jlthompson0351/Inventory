@@ -9,7 +9,388 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      asset_formulas: {
+        Row: {
+          asset_type_id: string | null
+          created_at: string
+          formula: string
+          id: string
+          inventory_item_id: string | null
+          organization_id: string
+          source_field: string
+          target_field: string
+          updated_at: string
+        }
+        Insert: {
+          asset_type_id?: string | null
+          created_at?: string
+          formula: string
+          id?: string
+          inventory_item_id?: string | null
+          organization_id: string
+          source_field: string
+          target_field: string
+          updated_at?: string
+        }
+        Update: {
+          asset_type_id?: string | null
+          created_at?: string
+          formula?: string
+          id?: string
+          inventory_item_id?: string | null
+          organization_id?: string
+          source_field?: string
+          target_field?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_formulas_asset_type_id_fkey"
+            columns: ["asset_type_id"]
+            isOneToOne: false
+            referencedRelation: "asset_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_formulas_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_formulas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_responses: {
+        Row: {
+          created_at: string
+          form_id: string
+          id: string
+          inventory_item_id: string | null
+          organization_id: string
+          response_data: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          id?: string
+          inventory_item_id?: string | null
+          organization_id: string
+          response_data: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          id?: string
+          inventory_item_id?: string | null
+          organization_id?: string
+          response_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_responses_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_responses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forms: {
+        Row: {
+          created_at: string
+          description: string | null
+          form_data: Json
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          form_data: Json
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          form_data?: Json
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forms_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_items: {
+        Row: {
+          asset_type_id: string | null
+          barcode: string | null
+          created_at: string
+          description: string | null
+          id: string
+          location: string | null
+          name: string
+          organization_id: string
+          quantity: number
+          sku: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          asset_type_id?: string | null
+          barcode?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          organization_id: string
+          quantity?: number
+          sku?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          asset_type_id?: string | null
+          barcode?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          organization_id?: string
+          quantity?: number
+          sku?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_asset_type_id_fkey"
+            columns: ["asset_type_id"]
+            isOneToOne: false
+            referencedRelation: "asset_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          organization_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          organization_id: string
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          organization_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          report_config: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          report_config: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          report_config?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
