@@ -18,6 +18,7 @@ import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import OrganizationSetup from "./pages/OrganizationSetup";
+import SystemAdmin from "./pages/SystemAdmin";
 import { useEffect, useState } from "react";
 import { supabase } from "./integrations/supabase/client";
 
@@ -60,6 +61,7 @@ const App = () => {
           <Routes>
             <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
             <Route path="/organization-setup" element={<OrganizationSetup />} />
+            <Route path="/system-admin" element={user ? <SystemAdmin /> : <Navigate to="/login" />} />
             
             {/* Protected routes with layout */}
             <Route path="/" element={user ? <PageLayout><Dashboard /></PageLayout> : <Navigate to="/login" />} />
