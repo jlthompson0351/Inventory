@@ -420,7 +420,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_system_admins: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          user_id: string
+          role: string
+          email: string
+          created_at: string
+        }[]
+      }
+      get_user_id_by_email: {
+        Args: { email_input: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

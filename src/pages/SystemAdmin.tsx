@@ -9,11 +9,12 @@ import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// Define a more explicit type for SystemAdmin
 type SystemAdmin = {
   id: string;
   user_id: string;
-  role: string;
-  email?: string; // Email from auth.users joined
+  role: 'admin';
+  email: string | null; 
   created_at: string;
 };
 
@@ -39,9 +40,10 @@ const SystemAdmin: React.FC = () => {
       const { data: systemRole, error } = await supabase
         .from('system_roles')
         .select('role')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .single();
       
-      const isAdmin = systemRole && systemRole.length > 0 && systemRole[0]?.role === 'admin';
+      const isAdmin = systemRole?.role === 'admin';
       setCurrentUserIsAdmin(isAdmin);
 
       if (!isAdmin) {
@@ -59,10 +61,8 @@ const SystemAdmin: React.FC = () => {
   const fetchSystemAdmins = async () => {
     setLoading(true);
     
-    // This query joins with auth.users, but it doesn't directly expose the auth.users table
-    // It uses a Postgres function for that, which is more secure
-    const { data, error } = await supabase
-      .rpc('get_system_admins');
+    // Use the RPC function to get system admins
+    const { data, error } = await supabase.rpc('get_system_admins');
     
     if (error) {
       console.error('Error fetching system admins:', error);
@@ -85,21 +85,22 @@ const SystemAdmin: React.FC = () => {
       setIsSubmitting(true);
       
       // First get the user_id from the email
-      const { data: userData, error: userError } = await supabase
+      const { data: userData } = await supabase
         .rpc('get_user_id_by_email', { email_input: userEmail.trim() });
       
-      if (userError || !userData) {
+      if (!userData || userData.length === 0) {
         toast.error('User not found with that email');
-        console.error('Error finding user:', userError);
         setIsSubmitting(false);
         return;
       }
+      
+      const foundUserId = userData[0].user_id;
       
       // Check if the user is already an admin
       const { data: existingRole } = await supabase
         .from('system_roles')
         .select('id')
-        .eq('user_id', userData.user_id);
+        .eq('user_id', foundUserId);
       
       if (existingRole && existingRole.length > 0) {
         toast.error('This user is already a system admin');
@@ -111,7 +112,7 @@ const SystemAdmin: React.FC = () => {
       const { error: insertError } = await supabase
         .from('system_roles')
         .insert({
-          user_id: userData.user_id,
+          user_id: foundUserId,
           role: 'admin'
         });
       
