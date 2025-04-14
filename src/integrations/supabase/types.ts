@@ -294,6 +294,50 @@ export type Database = {
           },
         ]
       }
+      organization_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          organization_id: string
+          role: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by: string
+          organization_id: string
+          role: string
+          token: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          organization_id?: string
+          role?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           created_at: string
@@ -447,6 +491,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { invitation_token: string }
+        Returns: string
+      }
+      create_invitation: {
+        Args: { org_id: string; email_address: string; member_role: string }
+        Returns: string
+      }
+      delete_invitation: {
+        Args: { invitation_id: string }
+        Returns: boolean
+      }
+      get_invitation_by_token: {
+        Args: { token_input: string }
+        Returns: {
+          id: string
+          organization_id: string
+          email: string
+          role: string
+          invited_by: string
+          expires_at: string
+          accepted_at: string
+        }[]
+      }
+      get_organization_invitations: {
+        Args: { org_id: string }
+        Returns: {
+          id: string
+          email: string
+          role: string
+          created_at: string
+          expires_at: string
+        }[]
+      }
       get_system_admins: {
         Args: Record<PropertyKey, never>
         Returns: {

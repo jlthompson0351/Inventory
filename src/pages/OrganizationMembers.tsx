@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Shield, Trash2, AlertCircle } from 'lucide-react';
+import { PendingInvitation } from '@/types/invitation';
 
 interface Member {
   id: string;
@@ -20,18 +20,10 @@ interface Member {
   full_name: string | null;
 }
 
-interface Invitation {
-  id: string;
-  email: string;
-  role: string;
-  created_at: string;
-  expires_at: string;
-}
-
 const OrganizationMembers = () => {
   const { currentOrganization } = useOrganization();
   const [members, setMembers] = useState<Member[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [newInviteRole, setNewInviteRole] = useState('member');
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +76,7 @@ const OrganizationMembers = () => {
     if (!currentOrganization) return;
 
     try {
-      // Use the function to fetch invitations
+      // Use the function to fetch invitations using RPC
       const { data, error } = await supabase
         .rpc('get_organization_invitations', { org_id: currentOrganization.id });
 
@@ -110,7 +102,7 @@ const OrganizationMembers = () => {
 
     setIsSubmitting(true);
     try {
-      // Use the function to create an invitation
+      // Use the function to create an invitation using RPC
       const { data, error } = await supabase
         .rpc('create_invitation', {
           org_id: currentOrganization.id,
@@ -134,7 +126,7 @@ const OrganizationMembers = () => {
 
   const deleteInvitation = async (invitationId: string) => {
     try {
-      // Use the function to delete an invitation
+      // Use the function to delete an invitation using RPC
       const { data, error } = await supabase
         .rpc('delete_invitation', { invitation_id: invitationId });
 

@@ -7,21 +7,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Building, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
+import { Invitation } from '@/types/invitation';
 
-interface Invitation {
-  id: string;
-  organization_id: string;
+interface InvitationWithOrgName extends Invitation {
   organizationName: string;
-  email: string;
-  role: string;
-  expires_at: string;
 }
 
 const InvitationAccept = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [invitation, setInvitation] = useState<InvitationWithOrgName | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
@@ -35,27 +31,29 @@ const InvitationAccept = () => {
       }
 
       try {
-        // Call the function to get invitation by token
+        // Call the function to get invitation by token using RPC
         const { data: invitationData, error: invitationError } = await supabase
-          .rpc('get_invitation_by_token', { token_input: token })
-          .single();
+          .rpc('get_invitation_by_token', { token_input: token });
         
-        if (invitationError || !invitationData) {
+        if (invitationError || !invitationData || invitationData.length === 0) {
           console.error('Error fetching invitation:', invitationError);
           setError('Invitation not found');
           setLoading(false);
           return;
         }
 
+        // Since we're getting an array back from the RPC function, get the first item
+        const invitationItem = invitationData[0];
+
         // Check if the invitation has expired
-        if (new Date(invitationData.expires_at) < new Date()) {
+        if (new Date(invitationItem.expires_at) < new Date()) {
           setError('This invitation has expired');
           setLoading(false);
           return;
         }
 
         // Check if the invitation has already been accepted
-        if (invitationData.accepted_at) {
+        if (invitationItem.accepted_at) {
           setError('This invitation has already been accepted');
           setLoading(false);
           return;
@@ -65,16 +63,12 @@ const InvitationAccept = () => {
         const { data: orgData } = await supabase
           .from('organizations')
           .select('name')
-          .eq('id', invitationData.organization_id)
+          .eq('id', invitationItem.organization_id)
           .single();
 
         setInvitation({
-          id: invitationData.id,
-          organization_id: invitationData.organization_id,
-          organizationName: orgData?.name || 'Unknown Organization',
-          email: invitationData.email,
-          role: invitationData.role,
-          expires_at: invitationData.expires_at
+          ...invitationItem,
+          organizationName: orgData?.name || 'Unknown Organization'
         });
       } catch (error) {
         console.error('Error fetching invitation:', error);
@@ -101,7 +95,7 @@ const InvitationAccept = () => {
         return;
       }
 
-      // Call the accept_invitation function
+      // Call the accept_invitation function using RPC
       const { data, error } = await supabase
         .rpc('accept_invitation', { invitation_token: token });
 
