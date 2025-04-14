@@ -8,7 +8,8 @@ import {
   Settings, 
   Menu, 
   X, 
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ const Header = () => {
   
   // Get user data (in a real app this would come from an auth context)
   const [user, setUser] = useState<{ name: string; email: string; avatarUrl: string | null } | null>(null);
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   
   // Fetch user data on component mount
   useEffect(() => {
@@ -42,6 +44,15 @@ const Header = () => {
           .eq('id', data.user.id)
           .single();
           
+        // Check if user is a system admin
+        const { data: systemRole } = await supabase
+          .from('system_roles')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .single();
+        
+        setIsSystemAdmin(!!systemRole && ['admin', 'super_admin'].includes(systemRole.role));
+        
         setUser({
           name: profileData?.full_name || data.user.user_metadata?.name || "User",
           email: data.user.email || "",
@@ -112,6 +123,14 @@ const Header = () => {
                     <span>Profile Settings</span>
                   </Link>
                 </DropdownMenuItem>
+                {isSystemAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/system-admin">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>System Administration</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -175,6 +194,16 @@ const Header = () => {
                     <Settings className="h-5 w-5 mr-2" />
                     Profile Settings
                   </Link>
+                  {isSystemAdmin && (
+                    <Link
+                      to="/system-admin"
+                      className="flex items-center -mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Shield className="h-5 w-5 mr-2" />
+                      System Administration
+                    </Link>
+                  )}
                   <button
                     className="flex w-full items-center -mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50 mt-2"
                     onClick={handleLogout}

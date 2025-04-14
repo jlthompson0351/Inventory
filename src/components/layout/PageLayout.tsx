@@ -1,7 +1,7 @@
 
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Package2, FileText, Layers } from "lucide-react";
+import { Package2, FileText, Layers, Settings as SettingsIcon } from "lucide-react";
 import Header from "./Header";
 import OrganizationSwitcher from "@/components/organization/OrganizationSwitcher";
 
@@ -42,6 +42,12 @@ const PageLayout = ({ children }: PageLayoutProps) => {
                 <Link to="/reports" className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-primary/10 text-sm font-medium">
                   <FileText className="w-4 h-4" />
                   Reports
+                </Link>
+              </li>
+              <li className="mt-6 pt-6 border-t border-muted">
+                <Link to="/organization/settings" className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-primary/10 text-sm font-medium">
+                  <SettingsIcon className="w-4 h-4" />
+                  Organization Settings
                 </Link>
               </li>
             </ul>
