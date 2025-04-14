@@ -17,3 +17,7 @@ export interface PendingInvitation {
   created_at: string;
   expires_at: string;
 }
+
+export interface InvitationWithOrgName extends Invitation {
+  organizationName: string;
+}
