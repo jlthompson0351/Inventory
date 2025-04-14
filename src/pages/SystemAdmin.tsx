@@ -1,14 +1,16 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import AccessDeniedCard from '@/components/system-admin/AccessDeniedCard';
 import AddAdminForm from '@/components/system-admin/AddAdminForm';
 import AdminList, { type SystemAdmin } from '@/components/system-admin/AdminList';
+import SystemStats from '@/components/system-admin/SystemStats';
+import SystemSettings from '@/components/system-admin/SystemSettings';
+import SystemLogs from '@/components/system-admin/SystemLogs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Database, ServerCog, Shield, Users } from 'lucide-react';
 
@@ -19,14 +21,11 @@ const SystemAdmin: React.FC = () => {
   const [currentUserIsSuperAdmin, setCurrentUserIsSuperAdmin] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("admins");
-  const navigate = useNavigate();
-
-  // System stats
-  const [stats, setStats] = useState({
+  const [systemStats, setSystemStats] = useState({
     organizationsCount: 0,
-    usersCount: 0,
-    loading: true
+    usersCount: 0
   });
+  const navigate = useNavigate();
 
   // Check if current user is system admin on load
   useEffect(() => {
@@ -93,8 +92,6 @@ const SystemAdmin: React.FC = () => {
   };
 
   const fetchSystemStats = async () => {
-    setStats(prev => ({ ...prev, loading: true }));
-    
     try {
       // Get organizations count
       const { count: orgsCount, error: orgsError } = await supabase
@@ -110,15 +107,13 @@ const SystemAdmin: React.FC = () => {
         
       if (usersError) throw usersError;
       
-      setStats({
+      setSystemStats({
         organizationsCount: orgsCount || 0,
-        usersCount: usersCount || 0,
-        loading: false
+        usersCount: usersCount || 0
       });
     } catch (error) {
       console.error('Error fetching system stats:', error);
       toast.error('Failed to load system statistics');
-      setStats(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -186,68 +181,16 @@ const SystemAdmin: React.FC = () => {
 
             <TabsContent value="stats">
               {currentUserIsSuperAdmin && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>System Statistics</CardTitle>
-                    <CardDescription>Overview of system usage and metrics</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {stats.loading ? (
-                      <div className="space-y-2">
-                        <p>Loading statistics...</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="border rounded-lg p-4">
-                          <p className="text-sm text-muted-foreground">Total Organizations</p>
-                          <h3 className="text-3xl font-bold">{stats.organizationsCount}</h3>
-                        </div>
-                        <div className="border rounded-lg p-4">
-                          <p className="text-sm text-muted-foreground">Total Users</p>
-                          <h3 className="text-3xl font-bold">{stats.usersCount}</h3>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex justify-end mt-4">
-                      <Button variant="outline" onClick={fetchSystemStats}>
-                        Refresh Stats
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <SystemStats initialStats={systemStats} />
               )}
             </TabsContent>
 
             <TabsContent value="settings">
-              {currentUserIsSuperAdmin && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>System Settings</CardTitle>
-                    <CardDescription>Configure global system settings</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      System settings configuration will be available in a future update.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              {currentUserIsSuperAdmin && <SystemSettings />}
             </TabsContent>
 
             <TabsContent value="logs">
-              {currentUserIsSuperAdmin && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>System Logs</CardTitle>
-                    <CardDescription>Review system activity and error logs</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      System logs viewer will be available in a future update.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              {currentUserIsSuperAdmin && <SystemLogs />}
             </TabsContent>
           </Tabs>
         </CardContent>
