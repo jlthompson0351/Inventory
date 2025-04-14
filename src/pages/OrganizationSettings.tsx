@@ -1,17 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import OrganizationAvatar from '@/components/common/OrganizationAvatar';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building, MailIcon, Paintbrush, Settings } from 'lucide-react';
+import { uploadOrgAvatar } from '@/services/organizationService';
+import GeneralSettingsTab from '@/components/organization/tabs/GeneralSettingsTab';
+import PlaceholderTab from '@/components/organization/tabs/PlaceholderTab';
 
 const OrganizationSettings = () => {
   const { currentOrganization, updateOrganization } = useOrganization();
@@ -29,50 +25,6 @@ const OrganizationSettings = () => {
       setAvatarPreview(currentOrganization.avatarUrl || null);
     }
   }, [currentOrganization]);
-
-  // Handle file change for avatar upload
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) {
-      setOrgAvatar(null);
-      return;
-    }
-    
-    const file = e.target.files[0];
-    setOrgAvatar(file);
-    
-    // Create a preview URL
-    const objectUrl = URL.createObjectURL(file);
-    setAvatarPreview(objectUrl);
-    
-    return () => URL.revokeObjectURL(objectUrl);
-  };
-
-  const uploadOrgAvatar = async (orgId: string, file: File): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `org-${orgId}-${Math.random()}.${fileExt}`;
-      
-      // Upload the file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('org-avatars')
-        .upload(filePath, file);
-      
-      if (uploadError) {
-        throw uploadError;
-      }
-      
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('org-avatars')
-        .getPublicUrl(filePath);
-        
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading organization avatar:', error);
-      toast.error("Could not upload organization logo");
-      return null;
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,9 +72,9 @@ const OrganizationSettings = () => {
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">No Organization Selected</h2>
           <p className="text-muted-foreground mb-4">Please select or create an organization.</p>
-          <Button onClick={() => navigate('/organization-setup')}>
+          <button onClick={() => navigate('/organization-setup')}>
             Create Organization
-          </Button>
+          </button>
         </div>
       </div>
     );
@@ -153,107 +105,38 @@ const OrganizationSettings = () => {
         </TabsList>
 
         <TabsContent value="general">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>General Settings</CardTitle>
-              <CardDescription>Update your organization's basic information</CardDescription>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="org-name">Organization Name</Label>
-                  <Input 
-                    id="org-name"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="Enter organization name"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="org-description">Organization Description (Optional)</Label>
-                  <Textarea 
-                    id="org-description"
-                    value={orgDescription}
-                    onChange={(e) => setOrgDescription(e.target.value)}
-                    placeholder="Enter a brief description of your organization"
-                    className="min-h-[100px]"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="org-avatar">Organization Logo</Label>
-                  <div className="flex justify-center mb-4">
-                    <OrganizationAvatar 
-                      src={avatarPreview} 
-                      name={orgName} 
-                      size="lg" 
-                    />
-                  </div>
-                  <Input 
-                    id="org-avatar"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Upload a logo for your organization (optional)
-                  </p>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Save Changes"}
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+          <GeneralSettingsTab
+            orgName={orgName}
+            setOrgName={setOrgName}
+            orgDescription={orgDescription}
+            setOrgDescription={setOrgDescription}
+            avatarPreview={avatarPreview}
+            setAvatarPreview={setAvatarPreview}
+            setOrgAvatar={setOrgAvatar}
+            handleSubmit={handleSubmit}
+            isSubmitting={isSubmitting}
+          />
         </TabsContent>
         
         <TabsContent value="appearance">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>Appearance Settings</CardTitle>
-              <CardDescription>Customize how your organization looks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Appearance customization will be available in a future update.
-              </p>
-            </CardContent>
-          </Card>
+          <PlaceholderTab 
+            title="Appearance Settings" 
+            description="Customize how your organization looks" 
+          />
         </TabsContent>
         
         <TabsContent value="notifications">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>Manage how you receive notifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Notification preferences will be available in a future update.
-              </p>
-            </CardContent>
-          </Card>
+          <PlaceholderTab 
+            title="Notification Settings" 
+            description="Manage how you receive notifications" 
+          />
         </TabsContent>
         
         <TabsContent value="advanced">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle>Advanced Settings</CardTitle>
-              <CardDescription>Manage advanced organization options</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Advanced settings will be available in a future update.
-              </p>
-            </CardContent>
-          </Card>
+          <PlaceholderTab 
+            title="Advanced Settings" 
+            description="Manage advanced organization options" 
+          />
         </TabsContent>
       </Tabs>
     </div>
