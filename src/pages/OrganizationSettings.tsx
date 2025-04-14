@@ -3,19 +3,24 @@ import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import OrganizationAvatar from '@/components/common/OrganizationAvatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Building, MailIcon, Paintbrush, Settings } from 'lucide-react';
 
 const OrganizationSettings = () => {
   const { currentOrganization, updateOrganization } = useOrganization();
   const [orgName, setOrgName] = useState('');
+  const [orgDescription, setOrgDescription] = useState('');
   const [orgAvatar, setOrgAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -127,54 +132,130 @@ const OrganizationSettings = () => {
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
       
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>General Settings</CardTitle>
-          <CardDescription>Update your organization's basic information</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="org-name">Organization Name</Label>
-              <Input 
-                id="org-name"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                placeholder="Enter organization name"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="org-avatar">Organization Logo</Label>
-              <div className="flex justify-center mb-4">
-                <OrganizationAvatar 
-                  src={avatarPreview} 
-                  name={orgName} 
-                  size="lg" 
-                />
-              </div>
-              <Input 
-                id="org-avatar"
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-              />
-              <p className="text-xs text-muted-foreground">
-                Upload a logo for your organization (optional)
+      <Tabs defaultValue="general" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6 grid grid-cols-2 md:grid-cols-4 w-full max-w-2xl mx-auto">
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            <span className="hidden sm:inline">General</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Paintbrush className="h-4 w-4" />
+            <span className="hidden sm:inline">Appearance</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <MailIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Notifications</span>
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Advanced</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle>General Settings</CardTitle>
+              <CardDescription>Update your organization's basic information</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="org-name">Organization Name</Label>
+                  <Input 
+                    id="org-name"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Enter organization name"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="org-description">Organization Description (Optional)</Label>
+                  <Textarea 
+                    id="org-description"
+                    value={orgDescription}
+                    onChange={(e) => setOrgDescription(e.target.value)}
+                    placeholder="Enter a brief description of your organization"
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="org-avatar">Organization Logo</Label>
+                  <div className="flex justify-center mb-4">
+                    <OrganizationAvatar 
+                      src={avatarPreview} 
+                      name={orgName} 
+                      size="lg" 
+                    />
+                  </div>
+                  <Input 
+                    id="org-avatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Upload a logo for your organization (optional)
+                  </p>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="appearance">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle>Appearance Settings</CardTitle>
+              <CardDescription>Customize how your organization looks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Appearance customization will be available in a future update.
               </p>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Changes"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="notifications">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Manage how you receive notifications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Notification preferences will be available in a future update.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="advanced">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle>Advanced Settings</CardTitle>
+              <CardDescription>Manage advanced organization options</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Advanced settings will be available in a future update.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
