@@ -35,9 +35,12 @@ const InvitationAccept = () => {
       }
 
       try {
-        // Fetch invitation - using plain SQL since TypeScript types don't know about the new table yet
+        // Use plain SQL query to fetch invitation since TypeScript doesn't know about our new function yet
         const { data: invitationData, error: invitationError } = await supabase
-          .rpc('get_invitation_by_token', { token_input: token });
+          .from('organization_invitations')
+          .select('id, organization_id, email, role, expires_at, accepted_at')
+          .eq('token', token)
+          .single();
         
         if (invitationError || !invitationData) {
           console.error('Error fetching invitation:', invitationError);
@@ -100,11 +103,10 @@ const InvitationAccept = () => {
         return;
       }
 
-      // Call a stored procedure to accept invitation
-      const { data, error } = await supabase
-        .rpc('accept_invitation', {
-          invitation_token: token
-        });
+      // Using raw SQL query through RPC since TypeScript doesn't know about our new function
+      const { data, error } = await supabase.rpc('accept_invitation', {
+        invitation_token: token
+      });
 
       if (error) {
         throw error;

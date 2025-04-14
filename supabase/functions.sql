@@ -115,7 +115,7 @@ BEGIN
 END;
 $$;
 
--- Accept invitation function (renamed from accept_organization_invitation to avoid conflicts)
+-- Accept invitation function
 CREATE OR REPLACE FUNCTION public.accept_invitation(invitation_token TEXT)
 RETURNS UUID
 LANGUAGE plpgsql

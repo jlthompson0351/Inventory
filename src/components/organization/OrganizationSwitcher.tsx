@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Building, ChevronDown, LogOut, Plus, Settings, Users } from 'lucide-react';
+import { Building, ChevronDown, Plus, Settings, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { 
   DropdownMenu, 
