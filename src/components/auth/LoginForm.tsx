@@ -43,7 +43,7 @@ const LoginForm = () => {
         });
       } else {
         toast.success("Login Successful", {
-          description: "Welcome to BarcodeX Inventory Management",
+          description: "Welcome to StockFlow Inventory Management",
         });
         navigate("/"); // Let App.tsx handle redirects
       }
