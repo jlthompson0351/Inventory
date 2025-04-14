@@ -84,13 +84,9 @@ const OrganizationMembers = () => {
     if (!currentOrganization) return;
 
     try {
-      // Fetch invitations directly from the table
+      // Use the function to fetch invitations
       const { data, error } = await supabase
-        .from('organization_invitations')
-        .select('id, email, role, created_at, expires_at')
-        .eq('organization_id', currentOrganization.id)
-        .is('accepted_at', null)
-        .gt('expires_at', new Date().toISOString());
+        .rpc('get_organization_invitations', { org_id: currentOrganization.id });
 
       if (error) throw error;
       
@@ -114,33 +110,13 @@ const OrganizationMembers = () => {
 
     setIsSubmitting(true);
     try {
-      // Generate a random token
-      const token = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      
-      // Set expiration date (30 days from now)
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 30);
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) throw new Error("Not authenticated");
-      
-      // Insert directly into the invitation table
+      // Use the function to create an invitation
       const { data, error } = await supabase
-        .from('organization_invitations')
-        .insert({
-          organization_id: currentOrganization.id,
-          email: newInviteEmail,
-          role: newInviteRole,
-          invited_by: user.id,
-          token: token,
-          expires_at: expirationDate.toISOString()
-        })
-        .select()
-        .single();
+        .rpc('create_invitation', {
+          org_id: currentOrganization.id,
+          email_address: newInviteEmail,
+          member_role: newInviteRole
+        });
 
       if (error) throw error;
 
@@ -158,11 +134,9 @@ const OrganizationMembers = () => {
 
   const deleteInvitation = async (invitationId: string) => {
     try {
-      // Delete directly from the invitations table
-      const { error } = await supabase
-        .from('organization_invitations')
-        .delete()
-        .eq('id', invitationId);
+      // Use the function to delete an invitation
+      const { data, error } = await supabase
+        .rpc('delete_invitation', { invitation_id: invitationId });
 
       if (error) throw error;
 
