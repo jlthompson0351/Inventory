@@ -6,7 +6,10 @@ import {
   Package2, 
   FileText, 
   Settings as SettingsIcon, 
-  Users 
+  Users,
+  Home,
+  Layers,
+  LayoutTemplate
 } from "lucide-react";
 import Header from "./Header";
 import OrganizationSwitcher from "@/components/organization/OrganizationSwitcher";
@@ -29,10 +32,10 @@ interface PageLayoutProps {
 }
 
 const PageLayout = ({ children }: PageLayoutProps) => {
-  const navigationItems = [
+  const mainNavigationItems = [
     {
       title: "Dashboard",
-      icon: <BarChart3 className="w-4 h-4" />,
+      icon: <Home className="w-4 h-4" />,
       path: "/",
     },
     {
@@ -45,6 +48,11 @@ const PageLayout = ({ children }: PageLayoutProps) => {
       icon: <FileText className="w-4 h-4" />,
       path: "/forms",
     },
+    {
+      title: "Asset Types",
+      icon: <Layers className="w-4 h-4" />,
+      path: "/asset-types",
+    }
   ];
 
   const organizationItems = [
@@ -57,7 +65,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
       title: "Organization Settings",
       icon: <SettingsIcon className="w-4 h-4" />,
       path: "/organization/settings",
-    },
+    }
   ];
 
   return (
@@ -76,7 +84,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {navigationItems.map((item) => (
+                    {mainNavigationItems.map((item) => (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
                           asChild
