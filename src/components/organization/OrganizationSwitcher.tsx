@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Building, ChevronDown, LogOut, Plus, Settings, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +28,6 @@ const OrganizationSwitcher = () => {
     setIsLoading(true);
     try {
       await selectOrganization(orgId);
-      // Force a refresh of organizations data
       await fetchOrganizations();
     } finally {
       setIsLoading(false);
@@ -85,7 +83,7 @@ const OrganizationSwitcher = () => {
           >
             <div className="flex items-center gap-2">
               <OrganizationAvatar 
-                size="xs" 
+                size="sm" 
                 name={org.name} 
                 src={org.avatarUrl} 
               />

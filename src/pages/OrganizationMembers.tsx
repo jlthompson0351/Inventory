@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,12 +84,9 @@ const OrganizationMembers = () => {
     if (!currentOrganization) return;
 
     try {
+      // Use a stored procedure to get invitations
       const { data, error } = await supabase
-        .from('organization_invitations')
-        .select('*')
-        .eq('organization_id', currentOrganization.id)
-        .is('accepted_at', null)
-        .gt('expires_at', new Date().toISOString());
+        .rpc('get_organization_invitations', { org_id: currentOrganization.id });
 
       if (error) throw error;
       setInvitations(data || []);
@@ -113,26 +109,12 @@ const OrganizationMembers = () => {
 
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Create expiration date (30 days from now)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-
-      // Generate a random token
-      const token = nanoid(32);
-
-      // Create the invitation
-      const { error } = await supabase
-        .from('organization_invitations')
-        .insert({
-          organization_id: currentOrganization.id,
-          email: newInviteEmail,
-          role: newInviteRole,
-          invited_by: user.id,
-          token: token,
-          expires_at: expiresAt.toISOString()
+      // Use a stored procedure to create invitation
+      const { data, error } = await supabase
+        .rpc('create_invitation', {
+          org_id: currentOrganization.id,
+          email_address: newInviteEmail,
+          member_role: newInviteRole
         });
 
       if (error) throw error;
@@ -151,10 +133,9 @@ const OrganizationMembers = () => {
 
   const deleteInvitation = async (invitationId: string) => {
     try {
+      // Use a stored procedure to delete invitation
       const { error } = await supabase
-        .from('organization_invitations')
-        .delete()
-        .eq('id', invitationId);
+        .rpc('delete_invitation', { invitation_id: invitationId });
 
       if (error) throw error;
 
