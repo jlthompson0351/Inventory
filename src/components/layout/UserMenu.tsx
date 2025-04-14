@@ -5,7 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { 
   Settings, 
   LogOut,
-  Shield
+  Shield,
+  User,
+  Sliders
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -82,8 +84,14 @@ const UserMenu = () => {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/profile">
-            <Settings className="mr-2 h-4 w-4" />
+            <User className="mr-2 h-4 w-4" />
             <span>Profile Settings</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/app-settings">
+            <Sliders className="mr-2 h-4 w-4" />
+            <span>App Settings</span>
           </Link>
         </DropdownMenuItem>
         {isSystemAdmin && (

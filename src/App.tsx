@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import OrganizationSetup from "./pages/OrganizationSetup";
 import SystemAdmin from "./pages/SystemAdmin";
 import Profile from "./pages/Profile";
+import AppSettings from "./pages/AppSettings";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import InvitationAccept from "./pages/InvitationAccept";
@@ -81,6 +82,7 @@ const App = () => {
             <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
             <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
             <Route path="/profile" element={user ? <PageLayout><Profile /></PageLayout> : <Navigate to="/login" />} />
+            <Route path="/app-settings" element={user ? <PageLayout><AppSettings /></PageLayout> : <Navigate to="/login" />} />
             
             {/* Organization management routes */}
             <Route path="/organization/settings" element={user ? <PageLayout><OrganizationSettings /></PageLayout> : <Navigate to="/login" />} />
