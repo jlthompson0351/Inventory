@@ -1,7 +1,9 @@
+
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Package2, FileText, Layers } from "lucide-react";
 import Header from "./Header";
+import OrganizationSwitcher from "@/components/organization/OrganizationSwitcher";
 
 interface PageLayoutProps {
   children: ReactNode;
@@ -13,6 +15,9 @@ const PageLayout = ({ children }: PageLayoutProps) => {
       <Header />
       <div className="flex-1 flex flex-col md:flex-row">
         <div className="bg-secondary w-full md:w-[220px] py-4 overflow-y-auto">
+          <div className="px-4 mb-4">
+            <OrganizationSwitcher />
+          </div>
           <nav className="px-4 py-2">
             <ul className="space-y-1">
               <li>
