@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 const Dashboard = () => {
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="p-6">
