@@ -1,219 +1,143 @@
-
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { 
-  Package, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Plus, 
-  ArrowUpDown, 
-  Download, 
-  Barcode
-} from "lucide-react";
+import { useOrganization } from "@/hooks/useOrganization";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Plus, Filter, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import AssetList from "@/components/inventory/AssetList";
+import { getInventoryItems } from "@/services/inventoryService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Mock inventory data
-const mockInventory = [
-  { id: 1, name: "Laptop", sku: "TECH-001", category: "Electronics", quantity: 12, value: 1200, status: "In Stock" },
-  { id: 2, name: "Office Chair", sku: "FURN-022", category: "Furniture", quantity: 5, value: 120, status: "Low Stock" },
-  { id: 3, name: "Desk Lamp", sku: "FURN-015", category: "Furniture", quantity: 20, value: 30, status: "In Stock" },
-  { id: 4, name: "Monitor", sku: "TECH-005", category: "Electronics", quantity: 8, value: 250, status: "In Stock" },
-  { id: 5, name: "Keyboard", sku: "TECH-008", category: "Electronics", quantity: 4, value: 50, status: "Low Stock" },
-  { id: 6, name: "Projector", sku: "TECH-012", category: "Electronics", quantity: 0, value: 800, status: "Out of Stock" },
-  { id: 7, name: "Filing Cabinet", sku: "FURN-034", category: "Furniture", quantity: 3, value: 150, status: "Low Stock" },
-];
-
-const Inventory = () => {
+// Basic minimal Inventory page
+export default function Inventory() {
+  const { currentOrganization, isLoading } = useOrganization();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [inventory] = useState(mockInventory);
+  const [activeView, setActiveView] = useState("assets");
 
-  // Filter inventory based on search term
-  const filteredInventory = inventory.filter((item) =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  console.log("Inventory.tsx minimal version rendering");
+  console.log("- isLoading:", isLoading);
+  console.log("- currentOrganization:", currentOrganization);
 
-  // Function to get status badge color
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "In Stock":
-        return <Badge className="bg-green-500">{status}</Badge>;
-      case "Low Stock":
-        return <Badge className="bg-amber-500">{status}</Badge>;
-      case "Out of Stock":
-        return <Badge className="bg-red-500">{status}</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+  const handleAddInventory = () => {
+    navigate("/inventory/add");
   };
 
-  // Function to export CSV
-  const exportCsv = () => {
-    const headers = ["Name", "SKU", "Category", "Quantity", "Value", "Status"];
-    const data = inventory.map(item => [
-      item.name,
-      item.sku,
-      item.category,
-      item.quantity.toString(),
-      item.value.toString(),
-      item.status
-    ]);
-    
-    const csvContent = [
-      headers.join(","),
-      ...data.map(row => row.join(","))
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "inventory.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleBrowseAssets = () => {
+    navigate("/inventory/browse-assets");
   };
-  
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading Inventory...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Please wait while we fetch your inventory data.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!currentOrganization) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No Organization Selected</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Please select an organization to view inventory.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+    <div>
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground">Manage your inventory items</p>
+          <p className="text-muted-foreground">
+            Inventory for {currentOrganization.name}
+          </p>
         </div>
-        <div className="flex space-x-2 mt-4 sm:mt-0">
-          <Button asChild>
-            <Link to="/inventory/scan">
-              <Barcode className="mr-2 h-4 w-4" />
-              Scan
-            </Link>
+        <div className="flex gap-2">
+          <Button onClick={handleAddInventory}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Inventory
           </Button>
-          <Button asChild>
-            <Link to="/inventory/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Link>
+          <Button variant="outline" onClick={handleBrowseAssets}>
+            Browse Assets
           </Button>
         </div>
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
-            <div className="relative w-full sm:w-auto flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search inventory..."
-                className="pl-8 w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle>Inventory Items</CardTitle>
+              <CardDescription>
+                This is a minimal working version of the Inventory page.
+              </CardDescription>
             </div>
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-2">
+              <div className="relative w-full sm:w-64">
+                <Input
+                  placeholder="Search inventory..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+                <div className="absolute left-2.5 top-2.5">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
               <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
+                <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button variant="outline" size="sm" onClick={exportCsv}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
+              <Button variant="outline" size="sm">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
               </Button>
             </div>
           </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">ID</TableHead>
-                  <TableHead>
-                    <div className="flex items-center">
-                      Item Name
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </div>
-                  </TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInventory.length > 0 ? (
-                  filteredInventory.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.id}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <Package className="mr-2 h-4 w-4 text-muted-foreground" />
-                          <Link to={`/inventory/${item.id}`} className="hover:text-primary hover:underline">
-                            {item.name}
-                          </Link>
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.sku}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.value}</TableCell>
-                      <TableCell>{getStatusBadge(item.status)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Link to={`/inventory/${item.id}`} className="flex w-full">
-                                View details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>Edit item</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      No results found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeView} onValueChange={setActiveView}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="assets">Assets</TabsTrigger>
+              <TabsTrigger value="inventory">Inventory Items</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="assets">
+              <AssetList organizationId={currentOrganization.id} />
+            </TabsContent>
+            
+            <TabsContent value="inventory">
+              <p className="text-muted-foreground text-center p-6">
+                This is a minimal working version of the Inventory page.
+                <br />
+                Organization ID: {currentOrganization.id}
+              </p>
+              
+              <div className="border border-dashed rounded-md p-8 text-center mt-4">
+                <h3 className="font-medium mb-2">No Inventory Items Found</h3>
+                <p className="text-muted-foreground mb-4">
+                  Get started by adding inventory items to your assets.
+                </p>
+                <Button onClick={handleAddInventory}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Inventory
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default Inventory;
+}

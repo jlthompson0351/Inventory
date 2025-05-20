@@ -1,69 +1,111 @@
-# Welcome to your Lovable project
+# BarcodeX Inventory Builder
 
-## Project info
+A comprehensive inventory management system built with React, TypeScript, and Supabase.
 
-**URL**: https://lovable.dev/projects/48d02981-4e70-49d8-919b-5c7f6468c30f
+## Key Features
 
-## How can I edit this code?
+- Dynamic Form Builder with formula support
+- Asset Type Management
+- Inventory Tracking
+- Organization Management with hierarchical structures
+- User Authentication and Authorization
+- File Upload Management
 
-There are several ways of editing your application.
+## Technology Stack
 
-**Use Lovable**
+- **Frontend**: React, TypeScript, Shadcn UI, Vite
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **State Management**: React Hooks
+- **Styling**: TailwindCSS
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/48d02981-4e70-49d8-919b-5c7f6468c30f) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js (v16+)
+- npm or bun
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository:
+   ```
+   git clone [repository-url]
+   cd barcodex-inventory-builder
+   ```
 
-Follow these steps:
+2. Install dependencies:
+   ```
+   npm install
+   # or
+   bun install
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Start the development server:
+   ```
+   npm run dev
+   # or
+   bun run dev
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Open your browser and navigate to `http://localhost:8080`
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Project Structure
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+- `src/components`: UI components organized by feature
+- `src/hooks`: Custom React hooks for state management
+- `src/pages`: Page components
+- `src/services`: API services and data operations
+- `src/lib`: Utilities and helper functions
+- `src/types`: TypeScript type definitions
+- `src/integrations`: Third-party integrations (Supabase)
+
+## Features
+
+### Form Builder
+
+The Form Builder allows users to create dynamic forms with various field types including:
+- Text fields
+- Number fields
+- Dropdowns
+- Checkboxes
+- Radio buttons
+- Formula fields (with mathematical expressions)
+- File upload fields
+
+Forms can include conditional logic to show/hide fields based on user input.
+
+### Formula Evaluator
+
+The built-in formula evaluator allows for safe evaluation of mathematical expressions:
+
+- Supports basic operations: +, -, *, /, %, ^
+- Supports functions: min, max, abs, round, floor, ceil, sqrt, pow
+- Variables can reference other fields in the form
+- Secure implementation without using eval() or Function()
+
+### Asset Management
+
+- Create and manage asset types
+- Define custom forms for each asset type
+- Track assets with customizable fields
+- Generate reports on asset status and inventory
+
+### Organization Management
+
+- Create hierarchical organization structures
+- Manage user roles and permissions
+- Share assets and forms across organizations
+
+## Development
+
+### Generating Supabase Types
+
+To update TypeScript definitions from your Supabase schema:
+
+```
+npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/database.types.ts
 ```
 
-**Edit a file directly in GitHub**
+## License
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/48d02981-4e70-49d8-919b-5c7f6468c30f) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This project is licensed under the MIT License - see the LICENSE file for details.

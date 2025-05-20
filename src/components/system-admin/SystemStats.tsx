@@ -1,86 +1,114 @@
-
-import React, { useState } from 'react';
-import { Database } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Activity, Database, Users, Building } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-interface SystemStatsProps {
-  initialStats?: {
-    organizationsCount: number;
-    usersCount: number;
-  };
+interface SystemStats {
+  organizationsCount: number;
+  usersCount: number;
+  assetsCount: number;
+  formsCount: number;
+  activeUsers?: number;
+  newOrganizations?: number;
 }
 
-const SystemStats: React.FC<SystemStatsProps> = ({ initialStats }) => {
-  const [stats, setStats] = useState({
-    organizationsCount: initialStats?.organizationsCount || 0,
-    usersCount: initialStats?.usersCount || 0,
-    loading: false
-  });
+interface SystemStatsProps {
+  initialStats: SystemStats;
+}
 
-  const fetchSystemStats = async () => {
-    setStats(prev => ({ ...prev, loading: true }));
-    
+export default function SystemStats({ initialStats }: SystemStatsProps) {
+  const [stats, setStats] = useState<SystemStats>(initialStats);
+  const [loading, setLoading] = useState(false);
+
+  const fetchDetailedStats = async () => {
+    setLoading(true);
     try {
-      // Get organizations count
-      const { count: orgsCount, error: orgsError } = await supabase
-        .from('organizations')
-        .select('*', { count: 'exact', head: true });
-
-      if (orgsError) throw orgsError;
+      // Get active users in last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
-      // Get users count (through profiles as we can't directly query auth.users)
-      const { count: usersCount, error: usersError } = await supabase
+      const { count: activeUsers } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
-        
-      if (usersError) throw usersError;
-      
-      setStats({
-        organizationsCount: orgsCount || 0,
-        usersCount: usersCount || 0,
-        loading: false
-      });
+        .select('*', { count: 'exact', head: true })
+        .gt('last_sign_in', thirtyDaysAgo.toISOString());
+
+      // Get organizations created in last 30 days
+      const { count: newOrgs } = await supabase
+        .from('organizations')
+        .select('*', { count: 'exact', head: true })
+        .gt('created_at', thirtyDaysAgo.toISOString());
+
+      setStats(prev => ({
+        ...prev,
+        activeUsers: activeUsers || 0,
+        newOrganizations: newOrgs || 0
+      }));
     } catch (error) {
-      console.error('Error fetching system stats:', error);
-      toast.error('Failed to load system statistics');
-      setStats(prev => ({ ...prev, loading: false }));
+      console.error('Error fetching detailed stats:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>System Statistics</CardTitle>
-        <CardDescription>Overview of system usage and metrics</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {stats.loading ? (
-          <div className="space-y-2">
-            <p>Loading statistics...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">Total Organizations</p>
-              <h3 className="text-3xl font-bold">{stats.organizationsCount}</h3>
-            </div>
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">Total Users</p>
-              <h3 className="text-3xl font-bold">{stats.usersCount}</h3>
-            </div>
-          </div>
-        )}
-        <div className="flex justify-end mt-4">
-          <Button variant="outline" onClick={fetchSystemStats}>
-            Refresh Stats
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+  useEffect(() => {
+    fetchDetailedStats();
+  }, []);
 
-export default SystemStats;
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>System Statistics</CardTitle>
+          <CardDescription>
+            Detailed statistics about system usage and resources
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total Organizations</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.organizationsCount}</p>
+              {stats.newOrganizations !== undefined && (
+                <p className="text-sm text-muted-foreground">
+                  +{stats.newOrganizations} in last 30 days
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total Users</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.usersCount}</p>
+              {stats.activeUsers !== undefined && (
+                <p className="text-sm text-muted-foreground">
+                  {stats.activeUsers} active in last 30 days
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total Assets</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.assetsCount}</p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total Forms</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.formsCount}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { 
@@ -31,6 +30,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { getFormAssetTypeLinks } from '@/services/assetTypeService';
+import { useOrganization } from '@/hooks/useOrganization';
 
 // Mock form templates data
 const formTemplates = [
@@ -107,6 +108,7 @@ const FormDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentOrganization } = useOrganization();
   
   const [form, setForm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -115,6 +117,8 @@ const FormDetail = () => {
   const [fields, setFields] = useState<any[]>([]);
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<string[]>([]);
   const [availableAssetTypes] = useState(assetTypes);
+  const [assetTypeLinks, setAssetTypeLinks] = useState<any[]>([]);
+  const [loadingAssetTypeLinks, setLoadingAssetTypeLinks] = useState(false);
   
   // Load form data
   useEffect(() => {
@@ -139,6 +143,16 @@ const FormDetail = () => {
       }
     }
   }, [id, navigate, toast]);
+  
+  useEffect(() => {
+    if (id && currentOrganization?.id) {
+      setLoadingAssetTypeLinks(true);
+      getFormAssetTypeLinks(id, currentOrganization.id)
+        .then(setAssetTypeLinks)
+        .catch(() => setAssetTypeLinks([]))
+        .finally(() => setLoadingAssetTypeLinks(false));
+    }
+  }, [id, currentOrganization]);
   
   const handleSave = () => {
     // In a real app, this would update the form in the database
@@ -249,6 +263,24 @@ const FormDetail = () => {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
+            {/* Asset type badges */}
+            {loadingAssetTypeLinks ? (
+              <div className="text-xs text-muted-foreground mb-1">Loading asset types...</div>
+            ) : assetTypeLinks.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1">
+                {assetTypeLinks.map(link => (
+                  <span
+                    key={link.asset_type_id + link.purpose}
+                    className="px-2 py-0.5 rounded text-xs font-medium"
+                    style={{ backgroundColor: link.asset_type_color || '#e5e7eb', color: '#222' }}
+                    title={link.purpose ? `Purpose: ${link.purpose}` : ''}
+                  >
+                    {link.asset_type_name}
+                    {link.purpose ? ` (${link.purpose})` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
             {isEditMode ? (
               <Input 
                 value={formName} 

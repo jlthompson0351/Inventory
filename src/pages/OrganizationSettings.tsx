@@ -1,13 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, MailIcon, Paintbrush, Settings } from 'lucide-react';
+import { Building, MailIcon, Paintbrush, Settings, GitBranch } from 'lucide-react';
 import { uploadOrgAvatar } from '@/services/organizationService';
 import GeneralSettingsTab from '@/components/organization/tabs/GeneralSettingsTab';
 import PlaceholderTab from '@/components/organization/tabs/PlaceholderTab';
+import AdminSettingsTab from '@/components/organization/tabs/AdminSettingsTab';
+import HierarchyPlanTab from '@/components/organization/tabs/HierarchyPlanTab';
 
 const OrganizationSettings = () => {
   const { currentOrganization, updateOrganization } = useOrganization();
@@ -85,10 +86,14 @@ const OrganizationSettings = () => {
       <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
       
       <Tabs defaultValue="general" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 grid grid-cols-2 md:grid-cols-4 w-full max-w-2xl mx-auto">
+        <TabsList className="mb-6 grid grid-cols-2 md:grid-cols-5 w-full max-w-3xl mx-auto">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Building className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
+          </TabsTrigger>
+          <TabsTrigger value="hierarchy" className="flex items-center gap-2">
+            <GitBranch className="h-4 w-4" />
+            <span className="hidden sm:inline">Hierarchy</span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Paintbrush className="h-4 w-4" />
@@ -118,6 +123,12 @@ const OrganizationSettings = () => {
           />
         </TabsContent>
         
+        <TabsContent value="hierarchy">
+          {currentOrganization && 
+            <HierarchyPlanTab organizationId={currentOrganization.id} />
+          }
+        </TabsContent>
+        
         <TabsContent value="appearance">
           <PlaceholderTab 
             title="Appearance Settings" 
@@ -133,10 +144,7 @@ const OrganizationSettings = () => {
         </TabsContent>
         
         <TabsContent value="advanced">
-          <PlaceholderTab 
-            title="Advanced Settings" 
-            description="Manage advanced organization options" 
-          />
+          <AdminSettingsTab organizationId={currentOrganization.id} />
         </TabsContent>
       </Tabs>
     </div>

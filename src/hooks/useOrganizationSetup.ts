@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -22,6 +21,8 @@ export const useOrganizationSetup = () => {
         return;
       }
 
+      console.log('Checking permissions for user:', user.id);
+
       // Check if user is creating their first org (anyone can create their first org)
       const { data: existingOrgs, error: orgsError } = await supabase
         .from('organization_members')
@@ -33,6 +34,9 @@ export const useOrganizationSetup = () => {
         toast.error('Error checking permissions');
         return;
       }
+
+      const isFirstOrg = !existingOrgs || existingOrgs.length === 0;
+      console.log('Is first org?', isFirstOrg);
       
       // Check if user is a system admin (can create multiple orgs)
       const { data: systemRoles, error: roleError } = await supabase
@@ -44,8 +48,22 @@ export const useOrganizationSetup = () => {
         console.error('Error checking system roles:', roleError);
       }
       
-      const isSystemAdmin = systemRoles && systemRoles.length > 0 && systemRoles[0]?.role === 'admin';
-      const isFirstOrg = !existingOrgs || existingOrgs.length === 0;
+      // Check for both 'admin' and 'super_admin' roles
+      const isSystemAdmin = systemRoles && systemRoles.length > 0 && 
+        (systemRoles[0]?.role === 'admin' || systemRoles[0]?.role === 'super_admin');
+      
+      console.log('System roles:', systemRoles);
+      console.log('Is system admin?', isSystemAdmin);
+      
+      // DEVELOPMENT BYPASS: Allow all users to create organizations
+      // Remove this in production
+      const devBypassEnabled = false;
+      
+      if (devBypassEnabled) {
+        console.log('Development bypass enabled: All users can create organizations');
+        setCanCreateOrg(true);
+        return;
+      }
       
       setCanCreateOrg(isSystemAdmin || isFirstOrg);
     };

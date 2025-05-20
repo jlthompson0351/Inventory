@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Barcode, Camera, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,22 +14,47 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { createInventoryItem, InventoryItemInsert } from "@/services/inventoryService";
+import { getAssetTypes, AssetType } from "@/services/assetTypeService";
 
 const NewItem = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentOrganization } = useAuth();
   
   const [loading, setLoading] = useState(false);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     barcode: "",
     sku: "",
-    category: "",
-    quantity: "",
-    unitPrice: "",
+    asset_type_id: "",
+    quantity: "1",
     description: "",
-    location: ""
+    location: "",
+    status: "in_stock"
   });
+
+  useEffect(() => {
+    const fetchAssetTypes = async () => {
+      if (!currentOrganization?.id) return;
+      
+      try {
+        const data = await getAssetTypes(currentOrganization.id);
+        setAssetTypes(data);
+      } catch (error) {
+        console.error("Failed to fetch asset types:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load asset types. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchAssetTypes();
+  }, [currentOrganization?.id, toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -48,34 +72,63 @@ const NewItem = () => {
   };
 
   const handleScanBarcode = () => {
-    // In a real app, this would trigger the barcode scanner
-    // For demo purposes, we'll simulate a barcode scan
-    setTimeout(() => {
-      setFormData({
-        ...formData,
-        barcode: "978020137962"
-      });
-      
-      toast({
-        title: "Barcode Scanned",
-        description: "Barcode 978020137962 has been scanned successfully.",
-      });
-    }, 1000);
+    // This would trigger an actual barcode scanner or camera
+    toast({
+      title: "Barcode Scanner",
+      description: "This would open a barcode scanner in a real implementation.",
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentOrganization?.id) {
+      toast({
+        title: "Error",
+        description: "No organization selected. Please select an organization first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Prepare item data
+      const itemData: InventoryItemInsert = {
+        name: formData.name,
+        barcode: formData.barcode || null,
+        sku: formData.sku || null,
+        asset_type_id: formData.asset_type_id || null,
+        quantity: parseInt(formData.quantity),
+        description: formData.description || null,
+        location: formData.location || null,
+        status: formData.status,
+        organization_id: currentOrganization.id
+      };
+      
+      // Create the item
+      const newItem = await createInventoryItem(itemData);
+      
+      if (newItem) {
+        toast({
+          title: "Item Created",
+          description: `${formData.name} has been added to inventory.`,
+        });
+        navigate("/inventory");
+      } else {
+        throw new Error("Failed to create item");
+      }
+    } catch (error) {
+      console.error("Error creating item:", error);
       toast({
-        title: "Item Created",
-        description: `${formData.name} has been added to inventory.`,
+        title: "Error",
+        description: "Failed to create item. Please try again.",
+        variant: "destructive",
       });
-      navigate("/inventory");
-    }, 1500);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -130,32 +183,36 @@ const NewItem = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="sku">SKU/Item Code*</Label>
+                  <Label htmlFor="sku">SKU/Item Code</Label>
                   <Input
                     id="sku"
                     name="sku"
                     placeholder="Enter SKU"
                     value={formData.sku}
                     onChange={handleChange}
-                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category*</Label>
+                  <Label htmlFor="asset_type_id">Category*</Label>
                   <Select 
-                    value={formData.category} 
-                    onValueChange={(value) => handleSelectChange("category", value)}
+                    value={formData.asset_type_id}
+                    onValueChange={(value) => handleSelectChange("asset_type_id", value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="electronics">Electronics</SelectItem>
-                      <SelectItem value="furniture">Furniture</SelectItem>
-                      <SelectItem value="office">Office Supplies</SelectItem>
-                      <SelectItem value="equipment">Equipment</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {assetTypes.map(type => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                      {assetTypes.length === 0 && (
+                        <SelectItem value="no_asset_types" disabled>
+                          No asset types available
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -175,18 +232,20 @@ const NewItem = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unitPrice">Unit Price*</Label>
-                  <Input
-                    id="unitPrice"
-                    name="unitPrice"
-                    type="number"
-                    placeholder="Enter price"
-                    value={formData.unitPrice}
-                    onChange={handleChange}
-                    min="0"
-                    step="0.01"
-                    required
-                  />
+                  <Label htmlFor="status">Status*</Label>
+                  <Select 
+                    value={formData.status}
+                    onValueChange={(value) => handleSelectChange("status", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_stock">In Stock</SelectItem>
+                      <SelectItem value="low_stock">Low Stock</SelectItem>
+                      <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -292,29 +351,29 @@ const NewItem = () => {
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold mb-2">Calculated Values</h2>
+              <h2 className="text-lg font-semibold mb-2">Item Summary</h2>
               <div className="space-y-2">
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-muted-foreground">Total Value:</span>
-                  <span className="font-medium">
-                    ${
-                      formData.quantity && formData.unitPrice
-                        ? (
-                            parseFloat(formData.quantity) *
-                            parseFloat(formData.unitPrice)
-                          ).toFixed(2)
-                        : "0.00"
-                    }
-                  </span>
-                </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">Status:</span>
                   <span className="font-medium">
-                    {parseInt(formData.quantity) > 0
-                      ? parseInt(formData.quantity) < 5
-                        ? "Low Stock"
-                        : "In Stock"
-                      : "Out of Stock"}
+                    {formData.status === "in_stock" ? "In Stock" : 
+                     formData.status === "low_stock" ? "Low Stock" : 
+                     formData.status === "out_of_stock" ? "Out of Stock" : 
+                     formData.status}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Quantity:</span>
+                  <span className="font-medium">
+                    {formData.quantity || "0"}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="font-medium">
+                    {formData.asset_type_id ? 
+                      assetTypes.find(t => t.id === formData.asset_type_id)?.name || "Unknown" : 
+                      "None"}
                   </span>
                 </div>
               </div>

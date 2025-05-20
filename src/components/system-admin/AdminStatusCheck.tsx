@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 const AdminStatusCheck: React.FC = () => {
   const [isChecking, setIsChecking] = useState(false);
@@ -13,44 +12,22 @@ const AdminStatusCheck: React.FC = () => {
     isSuperAdmin: boolean;
     email?: string;
   } | null>(null);
+  const { user, userRoles } = useAuth();
 
   const checkAdminStatus = async () => {
     setIsChecking(true);
     try {
-      // First get the current user
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         toast.error('You need to be logged in to check admin status');
         setIsChecking(false);
         return;
       }
 
-      // Query the system_roles table
-      const { data: systemRole, error } = await supabase
-        .from('system_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (error) {
-        console.error('Error checking admin status:', error);
-        if (error.code === 'PGRST116') { // No rows returned
-          setAdminStatus({
-            isAdmin: false,
-            isSuperAdmin: false,
-            email: user.email
-          });
-        } else {
-          toast.error('Error checking admin status');
-        }
-      } else {
-        setAdminStatus({
-          isAdmin: !!systemRole && ['admin', 'super_admin'].includes(systemRole.role),
-          isSuperAdmin: !!systemRole && systemRole.role === 'super_admin',
-          email: user.email
-        });
-      }
+      setAdminStatus({
+        isAdmin: userRoles.isSystemAdmin || userRoles.isSuperAdmin,
+        isSuperAdmin: userRoles.isSuperAdmin,
+        email: user.email
+      });
     } catch (error) {
       console.error('Error:', error);
       toast.error('An unexpected error occurred');
@@ -112,4 +89,4 @@ const AdminStatusCheck: React.FC = () => {
   );
 };
 
-export default AdminStatusCheck;
+export { AdminStatusCheck };

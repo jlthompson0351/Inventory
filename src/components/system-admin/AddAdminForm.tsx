@@ -1,165 +1,113 @@
-
-import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { UserPlus } from 'lucide-react';
 
 interface AddAdminFormProps {
-  onAdminAdded: () => void;
-  currentUserIsSuperAdmin: boolean;
+  onAdminAdded?: () => void;
+  isSuperAdmin?: boolean;
 }
 
-const AddAdminForm: React.FC<AddAdminFormProps> = ({ onAdminAdded, currentUserIsSuperAdmin }) => {
-  const [userEmail, setUserEmail] = useState('');
+export default function AddAdminForm({ onAdminAdded, isSuperAdmin = false }: AddAdminFormProps) {
+  const [email, setEmail] = useState('');
+  const [isSuperAdminRole, setIsSuperAdminRole] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  const handleAddAdmin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userEmail.trim()) {
-      toast.error('Please enter an email address');
-      return;
-    }
-
-    // Only super admins can create other super admins
-    if (isSuperAdmin && !currentUserIsSuperAdmin) {
-      toast.error('You do not have permission to create super admins');
-      return;
-    }
+    setIsSubmitting(true);
 
     try {
-      setIsSubmitting(true);
-      
-      // First get the user_id from the email
-      const { data: userData } = await supabase
-        .rpc('get_user_id_by_email', { email_input: userEmail.trim() });
-      
-      if (!userData || userData.length === 0) {
-        toast.error('User not found with that email');
-        setIsSubmitting(false);
+      // First check if the user exists
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userError) {
+        toast.error('User not found with this email');
         return;
       }
-      
-      const foundUserId = userData[0].user_id;
-      
-      // Check if the user is already an admin
-      const { data: existingRole } = await supabase
+
+      // Add the user to system_roles table
+      const { error: roleError } = await supabase
         .from('system_roles')
-        .select('id, role')
-        .eq('user_id', foundUserId);
-      
-      if (existingRole && existingRole.length > 0) {
-        const currentRole = existingRole[0].role;
-        
-        if (currentRole === 'super_admin') {
-          toast.error('This user is already a super admin');
-          setIsSubmitting(false);
-          return;
-        }
-        
-        if (currentRole === 'admin' && isSuperAdmin) {
-          // Upgrade regular admin to super admin
-          const { error: updateError } = await supabase
-            .from('system_roles')
-            .update({ role: 'super_admin' })
-            .eq('id', existingRole[0].id);
-            
-          if (updateError) {
-            toast.error('Failed to upgrade to super admin');
-            console.error('Error upgrading admin:', updateError);
-          } else {
-            toast.success(`${userEmail} has been upgraded to a super admin`);
-            setUserEmail('');
-            onAdminAdded();
+        .insert([
+          {
+            user_id: userData.id,
+            role: isSuperAdminRole ? 'super_admin' : 'admin',
+            assigned_by: (await supabase.auth.getUser()).data.user?.id
           }
-          
-          setIsSubmitting(false);
-          return;
-        }
-        
-        toast.error('This user is already a system admin');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Add the user as a system admin with the appropriate role
-      const { error: insertError } = await supabase
-        .from('system_roles')
-        .insert({
-          user_id: foundUserId,
-          role: isSuperAdmin && currentUserIsSuperAdmin ? 'super_admin' : 'admin'
-        });
-      
-      if (insertError) {
-        toast.error('Failed to add system admin');
-        console.error('Error adding admin:', insertError);
-      } else {
-        const roleType = isSuperAdmin && currentUserIsSuperAdmin ? 'super admin' : 'admin';
-        toast.success(`${userEmail} has been added as a system ${roleType}`);
-        setUserEmail('');
-        setIsSuperAdmin(false);
-        onAdminAdded();
-      }
+        ]);
+
+      if (roleError) throw roleError;
+
+      toast.success('Admin role assigned successfully');
+      setEmail('');
+      setIsSuperAdminRole(false);
+      onAdminAdded?.();
     } catch (error) {
       console.error('Error adding admin:', error);
-      toast.error('An error occurred');
+      toast.error('Failed to assign admin role');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-xl">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">
-          System Administrators
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UserPlus className="h-5 w-5" />
+          Add New Admin
         </CardTitle>
         <CardDescription>
-          Manage users with system-wide administrative privileges
+          Assign admin privileges to an existing user
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleAddAdmin} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="user-email">Add New System Admin</Label>
-            <div className="flex gap-2">
-              <Input 
-                id="user-email"
-                placeholder="Enter user email" 
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Adding...' : 'Add Admin'}
-              </Button>
-            </div>
-            
-            {/* Super Admin toggle - only visible to super admins */}
-            {currentUserIsSuperAdmin && (
-              <div className="flex items-center space-x-2 mt-2">
-                <Switch
-                  id="super-admin"
-                  checked={isSuperAdmin}
-                  onCheckedChange={setIsSuperAdmin}
-                />
-                <Label htmlFor="super-admin">
-                  Add as Super Admin (cannot be removed by regular admins)
-                </Label>
-              </div>
-            )}
+            <Label htmlFor="email">User Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="user@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <p className="text-sm text-muted-foreground">
+              The user must have an existing account
+            </p>
           </div>
+
+          {isSuperAdmin && (
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Super Admin</Label>
+                <p className="text-sm text-muted-foreground">
+                  Grant super admin privileges
+                </p>
+              </div>
+              <Switch
+                checked={isSuperAdminRole}
+                onCheckedChange={setIsSuperAdminRole}
+              />
+            </div>
+          )}
+
+          <Button type="submit" disabled={isSubmitting || !email}>
+            {isSubmitting ? 'Adding...' : 'Add Admin'}
+          </Button>
         </form>
       </CardContent>
     </Card>
   );
-};
-
-export default AddAdminForm;
+}

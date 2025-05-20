@@ -1,663 +1,104 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+import { Database } from '@/types/database.types';
 
-export type Database = {
-  public: {
-    Tables: {
-      asset_formulas: {
-        Row: {
-          asset_type_id: string | null
-          created_at: string
-          formula: string
-          id: string
-          inventory_item_id: string | null
-          organization_id: string
-          source_field: string
-          target_field: string
-          updated_at: string
-        }
-        Insert: {
-          asset_type_id?: string | null
-          created_at?: string
-          formula: string
-          id?: string
-          inventory_item_id?: string | null
-          organization_id: string
-          source_field: string
-          target_field: string
-          updated_at?: string
-        }
-        Update: {
-          asset_type_id?: string | null
-          created_at?: string
-          formula?: string
-          id?: string
-          inventory_item_id?: string | null
-          organization_id?: string
-          source_field?: string
-          target_field?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_formulas_asset_type_id_fkey"
-            columns: ["asset_type_id"]
-            isOneToOne: false
-            referencedRelation: "asset_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asset_formulas_inventory_item_id_fkey"
-            columns: ["inventory_item_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asset_formulas_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      asset_types: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          organization_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          organization_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          organization_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "asset_types_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      form_responses: {
-        Row: {
-          created_at: string
-          form_id: string
-          id: string
-          inventory_item_id: string | null
-          organization_id: string
-          response_data: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          form_id: string
-          id?: string
-          inventory_item_id?: string | null
-          organization_id: string
-          response_data: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          form_id?: string
-          id?: string
-          inventory_item_id?: string | null
-          organization_id?: string
-          response_data?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "form_responses_form_id_fkey"
-            columns: ["form_id"]
-            isOneToOne: false
-            referencedRelation: "forms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_responses_inventory_item_id_fkey"
-            columns: ["inventory_item_id"]
-            isOneToOne: false
-            referencedRelation: "inventory_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "form_responses_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      forms: {
-        Row: {
-          created_at: string
-          description: string | null
-          form_data: Json
-          id: string
-          name: string
-          organization_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          form_data: Json
-          id?: string
-          name: string
-          organization_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          form_data?: Json
-          id?: string
-          name?: string
-          organization_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "forms_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      inventory_items: {
-        Row: {
-          asset_type_id: string | null
-          barcode: string | null
-          created_at: string
-          description: string | null
-          id: string
-          location: string | null
-          name: string
-          organization_id: string
-          quantity: number
-          sku: string | null
-          status: string | null
-          updated_at: string
-        }
-        Insert: {
-          asset_type_id?: string | null
-          barcode?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          location?: string | null
-          name: string
-          organization_id: string
-          quantity?: number
-          sku?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Update: {
-          asset_type_id?: string | null
-          barcode?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          location?: string | null
-          name?: string
-          organization_id?: string
-          quantity?: number
-          sku?: string | null
-          status?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_items_asset_type_id_fkey"
-            columns: ["asset_type_id"]
-            isOneToOne: false
-            referencedRelation: "asset_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_items_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      locations: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          organization_id: string
-          parent_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          organization_id: string
-          parent_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          organization_id?: string
-          parent_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "locations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "locations_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organization_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          invited_by: string
-          organization_id: string
-          role: string
-          token: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          invited_by: string
-          organization_id: string
-          role: string
-          token: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          organization_id?: string
-          role?: string
-          token?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_invitations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organization_members: {
-        Row: {
-          created_at: string
-          id: string
-          is_primary: boolean
-          organization_id: string
-          role: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          organization_id: string
-          role: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-          organization_id?: string
-          role?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organizations: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      reports: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          organization_id: string
-          report_config: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          organization_id: string
-          report_config: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          organization_id?: string
-          report_config?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reports_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      system_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      accept_invitation: {
-        Args: { invitation_token: string }
-        Returns: string
-      }
-      create_invitation: {
-        Args: { org_id: string; email_address: string; member_role: string }
-        Returns: string
-      }
-      delete_invitation: {
-        Args: { invitation_id: string }
-        Returns: boolean
-      }
-      get_invitation_by_token: {
-        Args: { token_input: string }
-        Returns: {
-          id: string
-          organization_id: string
-          email: string
-          role: string
-          invited_by: string
-          expires_at: string
-          accepted_at: string
-        }[]
-      }
-      get_organization_invitations: {
-        Args: { org_id: string }
-        Returns: {
-          id: string
-          email: string
-          role: string
-          created_at: string
-          expires_at: string
-        }[]
-      }
-      get_system_admins: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          id: string
-          user_id: string
-          role: string
-          email: string
-          created_at: string
-        }[]
-      }
-      get_user_id_by_email: {
-        Args: { email_input: string }
-        Returns: {
-          user_id: string
-        }[]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+export type Tables = Database['public']['Tables'];
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+export type TablesInsert<T extends keyof Tables> = Tables[T]['Insert'];
+export type TablesUpdate<T extends keyof Tables> = Tables[T]['Update'];
+export type TablesRow<T extends keyof Tables> = Tables[T]['Row'];
 
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+// Convenience types for specific tables
+export type InventoryItemRow = TablesRow<'inventory_items'>;
+export type InventoryItemInsert = TablesInsert<'inventory_items'>;
+export type InventoryItemUpdate = TablesUpdate<'inventory_items'>;
 
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+export type AssetTypeRow = TablesRow<'asset_types'>;
+export type AssetTypeInsert = TablesInsert<'asset_types'>;
+export type AssetTypeUpdate = TablesUpdate<'asset_types'>;
 
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+export type OrganizationRow = TablesRow<'organizations'>;
+export type OrganizationInsert = TablesInsert<'organizations'>;
+export type OrganizationUpdate = TablesUpdate<'organizations'>;
 
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+export type UserOrganizationRow = TablesRow<'user_organizations'>;
+export type UserOrganizationInsert = TablesInsert<'user_organizations'>;
+export type UserOrganizationUpdate = TablesUpdate<'user_organizations'>;
 
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+export type InventoryPriceHistoryRow = TablesRow<'inventory_price_history'>;
+export type InventoryPriceHistoryInsert = TablesInsert<'inventory_price_history'>;
+export type InventoryPriceHistoryUpdate = TablesUpdate<'inventory_price_history'>;
 
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const
+// Form types with explicit ID field
+export type FormRow = TablesRow<'forms'> & { id: string };
+export type FormInsert = TablesInsert<'forms'>;
+export type FormUpdate = TablesUpdate<'forms'>;
+
+export type FormCategoryRow = TablesRow<'form_categories'> & { id: string };
+export type FormCategoryInsert = TablesInsert<'form_categories'>;
+export type FormCategoryUpdate = TablesUpdate<'form_categories'>;
+
+export type FormCategoryMappingRow = TablesRow<'form_category_mappings'> & { id: string };
+export type FormCategoryMappingInsert = TablesInsert<'form_category_mappings'>;
+export type FormCategoryMappingUpdate = TablesUpdate<'form_category_mappings'>;
+
+export type FormValidationRuleRow = TablesRow<'form_validation_rules'> & { id: string };
+export type FormValidationRuleInsert = TablesInsert<'form_validation_rules'>;
+export type FormValidationRuleUpdate = TablesUpdate<'form_validation_rules'>;
+
+export type FormFieldDependencyRow = TablesRow<'form_field_dependencies'> & { id: string };
+export type FormFieldDependencyInsert = TablesInsert<'form_field_dependencies'>;
+export type FormFieldDependencyUpdate = TablesUpdate<'form_field_dependencies'>;
+
+// Organization Member types
+export type OrganizationMemberRow = TablesRow<'organization_members'>;
+export type OrganizationMemberInsert = TablesInsert<'organization_members'>;
+export type OrganizationMemberUpdate = TablesUpdate<'organization_members'>;
+
+// Location types
+export type LocationRow = TablesRow<'locations'>;
+export type LocationInsert = TablesInsert<'locations'>;
+export type LocationUpdate = TablesUpdate<'locations'>;
+
+// Report types
+export type ReportRow = TablesRow<'reports'>;
+export type ReportInsert = TablesInsert<'reports'>;
+export type ReportUpdate = TablesUpdate<'reports'>;
+
+// System role types
+export type SystemRoleRow = TablesRow<'system_roles'>;
+export type SystemRoleInsert = TablesInsert<'system_roles'>;
+export type SystemRoleUpdate = TablesUpdate<'system_roles'>;
+
+// Organization invitation types
+export type OrganizationInvitationRow = TablesRow<'organization_invitations'>;
+export type OrganizationInvitationInsert = TablesInsert<'organization_invitations'>;
+export type OrganizationInvitationUpdate = TablesUpdate<'organization_invitations'>;
+
+// Form response types
+export type FormResponseRow = TablesRow<'form_responses'>;
+export type FormResponseInsert = TablesInsert<'form_responses'>;
+export type FormResponseUpdate = TablesUpdate<'form_responses'>;
+
+// Asset formula types
+export type AssetFormulaRow = TablesRow<'asset_formulas'>;
+export type AssetFormulaInsert = TablesInsert<'asset_formulas'>;
+export type AssetFormulaUpdate = TablesUpdate<'asset_formulas'>;
+
+// System log types
+export type SystemLogRow = TablesRow<'system_logs'>;
+export type SystemLogInsert = TablesInsert<'system_logs'>;
+export type SystemLogUpdate = TablesUpdate<'system_logs'>;
+
+// Inventory event types
+export type InventoryEventType =
+  | 'intake'
+  | 'addition'
+  | 'audit'
+  | 'adjustment'
+  | 'removal'
+  | 'transfer'
+  | 'disposal'
+  | 'deleted';
+
+export type InventoryHistoryRow = TablesRow<'inventory_history'> & { event_type: InventoryEventType };
+export type InventoryHistoryInsert = TablesInsert<'inventory_history'> & { event_type: InventoryEventType };
+export type InventoryHistoryUpdate = TablesUpdate<'inventory_history'> & { event_type?: InventoryEventType };

@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { 
   ChevronLeft, 
   Save, 
@@ -12,7 +11,10 @@ import {
   FileSpreadsheet,
   MoveVertical,
   Filter,
-  SortAsc
+  SortAsc,
+  Trash,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,44 +47,28 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/hooks/useAuth";
+import { getAssetTypes } from "@/services/assetTypeService";
+import { ReportConfig, createReport, updateReport, getReport, executeReport } from "@/services/reportService";
+import { supabase } from "@/integrations/supabase/client";
+import { getMappedFieldsForReporting } from '@/services/mappedFieldService';
 
-// Mock data
-const assetTypes = [
-  { id: "1", name: "General" },
-  { id: "2", name: "Equipment" },
-  { id: "3", name: "Furniture" },
-  { id: "4", name: "Machinery" },
-  { id: "5", name: "IT Assets" },
-  { id: "6", name: "Vehicles" }
-];
-
-const formFields = [
-  { id: "field1", name: "Item Name", type: "text" },
-  { id: "field2", name: "SKU/Item Code", type: "text" },
-  { id: "field3", name: "Category", type: "select" },
-  { id: "field4", name: "Quantity", type: "number" },
-  { id: "field5", name: "Unit Price", type: "number" },
-  { id: "field6", name: "Total Value", type: "formula" },
-  { id: "field7", name: "Location", type: "text" },
-  { id: "field8", name: "Purchase Date", type: "date" },
-  { id: "field9", name: "Last Inspection", type: "date" },
-  { id: "field10", name: "Status", type: "select" }
-];
-
-// Example inventory data for preview
-const inventoryData = [
-  { id: 1, name: "Laptop", sku: "TECH-001", category: "Electronics", quantity: 12, price: 1200, total: 14400, location: "Main Office", purchaseDate: "2023-05-10", status: "In Stock" },
-  { id: 2, name: "Office Chair", sku: "FURN-022", category: "Furniture", quantity: 5, price: 120, total: 600, location: "Warehouse", purchaseDate: "2023-03-15", status: "Low Stock" },
-  { id: 3, name: "Desk Lamp", sku: "FURN-015", category: "Furniture", quantity: 20, price: 30, total: 600, location: "Storage", purchaseDate: "2023-04-22", status: "In Stock" },
-  { id: 4, name: "Monitor", sku: "TECH-005", category: "Electronics", quantity: 8, price: 250, total: 2000, location: "Main Office", purchaseDate: "2023-06-05", status: "In Stock" },
-  { id: 5, name: "Keyboard", sku: "TECH-008", category: "Electronics", quantity: 4, price: 50, total: 200, location: "Storage", purchaseDate: "2023-01-30", status: "Low Stock" }
+// Available subjects for reports
+const availableSubjects = [
+  { id: "inventory_items", name: "Inventory Items" },
+  { id: "assets", name: "Assets" },
+  { id: "form_submissions", name: "Form Submissions" }
 ];
 
 const ReportBuilder = () => {
   const { toast } = useToast();
+  const { currentOrganization } = useAuth();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   
-  const [reportName, setReportName] = useState("New Inventory Report");
+  const [reportName, setReportName] = useState("New Report");
   const [description, setDescription] = useState("");
+  const [subject, setSubject] = useState("inventory_items");
   const [selectedColumns, setSelectedColumns] = useState([
     "name", "sku", "category", "quantity", "price", "total"
   ]);
@@ -90,6 +76,85 @@ const ReportBuilder = () => {
   const [activeTab, setActiveTab] = useState("columns");
   const [filterRules, setFilterRules] = useState<any[]>([]);
   const [sortRules, setSortRules] = useState<any[]>([]);
+  const [assetTypes, setAssetTypes] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formFields, setFormFields] = useState<any[]>([]);
+  const [fieldSearch, setFieldSearch] = useState("");
+  
+  useEffect(() => {
+    const fetchAssetTypes = async () => {
+      if (!currentOrganization?.id) return;
+      
+      try {
+        const data = await getAssetTypes(supabase, currentOrganization.id);
+        setAssetTypes(data);
+      } catch (error) {
+        console.error("Failed to fetch asset types:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load asset types. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchAssetTypes();
+  }, [currentOrganization?.id, toast]);
+
+  useEffect(() => {
+    // If editing an existing report, load report data
+    const fetchReportData = async () => {
+      if (!id) return;
+      
+      setIsLoading(true);
+      try {
+        const report = await getReport(id);
+        if (report) {
+          setReportName(report.name);
+          setDescription(report.description || "");
+          setSubject(report.report_config.subject || "inventory_items");
+          setSelectedColumns(report.report_config.columns || []);
+          setFilterRules(report.report_config.filters || []);
+          setSortRules(report.report_config.sorts || []);
+          setSelectedAssetTypes(report.report_config.assetTypes || []);
+          
+          // Generate preview
+          const previewResults = await executeReport(report, 10);
+          setPreviewData(previewResults);
+        }
+      } catch (error) {
+        console.error("Failed to fetch report:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load report. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchReportData();
+  }, [id, toast]);
+  
+  useEffect(() => {
+    const fetchFields = async () => {
+      if (!currentOrganization?.id) return;
+      try {
+        const fields = await getMappedFieldsForReporting(currentOrganization.id);
+        setFormFields(fields);
+      } catch (error) {
+        console.error('Failed to fetch mapped fields for reporting:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load fields for reporting. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    };
+    fetchFields();
+  }, [currentOrganization?.id, toast]);
   
   const handleColumnToggle = (columnId: string) => {
     if (selectedColumns.includes(columnId)) {
@@ -160,57 +225,182 @@ const ReportBuilder = () => {
     setSortRules(newSortRules);
   };
   
-  const saveReport = () => {
-    // In a real app, this would save the report configuration to the backend
-    toast({
-      title: "Report Saved",
-      description: "Your report has been saved successfully."
-    });
+  const saveReport = async () => {
+    if (!currentOrganization?.id) {
+      toast({
+        title: "Error",
+        description: "Organization ID is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Prepare report config
+    const reportConfig: ReportConfig = {
+      subject,
+      columns: selectedColumns,
+      filters: filterRules.map(({ id, ...rest }) => rest),
+      sorts: sortRules.map(({ id, ...rest }) => rest),
+      assetTypes: selectedAssetTypes
+    };
+    
+    setIsLoading(true);
+    try {
+      if (id) {
+        // Update existing report
+        await updateReport(id, {
+          name: reportName,
+          description,
+          report_config: reportConfig
+        });
+        toast({
+          title: "Report Updated",
+          description: "Your report has been updated successfully."
+        });
+      } else {
+        // Create new report
+        await createReport({
+          name: reportName,
+          description,
+          report_config: reportConfig,
+          organization_id: currentOrganization.id
+        });
+        toast({
+          title: "Report Created",
+          description: "Your report has been created successfully."
+        });
+      }
+      navigate('/reports');
+    } catch (error) {
+      console.error("Failed to save report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const exportCsv = () => {
-    // In a real app, this would fetch data based on the report configuration
-    // and generate a CSV file for download
+  const generatePreview = async () => {
+    if (!currentOrganization?.id) return;
     
-    // For this example, we'll use the mock data and selected columns
-    const headers = formFields
-      .filter(field => selectedColumns.includes(field.id))
-      .map(field => field.name);
+    // Prepare temporary report for preview
+    const tempReport = {
+      id: id || 'preview',
+      name: reportName,
+      description,
+      report_config: {
+        subject,
+        columns: selectedColumns,
+        filters: filterRules.map(({ id, ...rest }) => rest),
+        sorts: sortRules.map(({ id, ...rest }) => rest),
+        assetTypes: selectedAssetTypes
+      },
+      organization_id: currentOrganization.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
     
-    const dataRows = inventoryData.map(item => {
-      const row: any = {};
-      if (selectedColumns.includes("name")) row.name = item.name;
-      if (selectedColumns.includes("sku")) row.sku = item.sku;
-      if (selectedColumns.includes("category")) row.category = item.category;
-      if (selectedColumns.includes("quantity")) row.quantity = item.quantity;
-      if (selectedColumns.includes("price")) row.price = item.price;
-      if (selectedColumns.includes("total")) row.total = item.total;
-      if (selectedColumns.includes("location")) row.location = item.location;
-      if (selectedColumns.includes("purchaseDate")) row.purchaseDate = item.purchaseDate;
-      if (selectedColumns.includes("status")) row.status = item.status;
-      return Object.values(row).join(",");
-    });
+    setIsLoading(true);
+    try {
+      const results = await executeReport(tempReport, 10);
+      setPreviewData(results);
+    } catch (error) {
+      console.error("Failed to generate preview:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const exportCsv = async () => {
+    if (!currentOrganization?.id) return;
     
-    const csvContent = [
-      headers.join(","),
-      ...dataRows
-    ].join("\n");
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${reportName.replace(/\s+/g, "_")}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Prepare temporary report for export
+    const tempReport = {
+      id: id || 'export',
+      name: reportName,
+      description,
+      report_config: {
+        subject,
+        columns: selectedColumns,
+        filters: filterRules.map(({ id, ...rest }) => rest),
+        sorts: sortRules.map(({ id, ...rest }) => rest),
+        assetTypes: selectedAssetTypes
+      },
+      organization_id: currentOrganization.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
     
     toast({
-      title: "CSV Exported",
-      description: "Your report has been exported to CSV successfully."
+      title: "Preparing Export",
+      description: "Please wait while we export your report..."
     });
+    
+    try {
+      const results = await executeReport(tempReport);
+      
+      // Extract headers based on report configuration
+      const headers = selectedColumns.map(col => {
+        const field = formFields.find(f => f.id === col);
+        return field ? field.field_label : col;
+      });
+      
+      // Convert results to CSV data
+      const data = results.map(item => {
+        return selectedColumns.map(col => {
+          // Handle nested data with dot notation
+          if (col.includes('.')) {
+            const [parent, child] = col.split('.');
+            return item[parent]?.[child] || '';
+          }
+          return item[col] || '';
+        });
+      });
+      
+      const csvContent = [
+        headers.join(","),
+        ...data.map(row => row.join(","))
+      ].join("\n");
+      
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `${reportName.replace(/\s+/g, "_")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Export Complete",
+        description: "Your report has been exported successfully."
+      });
+    } catch (error) {
+      console.error("Error generating CSV:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export report. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
+  
+  // Group fields by form
+  const fieldsByForm = formFields.reduce((acc, field) => {
+    const form = field.form_name || "Other";
+    if (!acc[form]) acc[form] = [];
+    acc[form].push(field);
+    return acc;
+  }, {} as Record<string, any[]>);
   
   return (
     <div className="animate-fade-in">
@@ -240,7 +430,7 @@ const ReportBuilder = () => {
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
-          <Button onClick={saveReport}>
+          <Button onClick={saveReport} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
             Save Report
           </Button>
@@ -249,6 +439,34 @@ const ReportBuilder = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="mb-4">
+                <Label htmlFor="subject-selector" className="text-lg font-semibold mb-2 block">
+                  Report Subject
+                </Label>
+                <Select 
+                  value={subject} 
+                  onValueChange={setSubject}
+                >
+                  <SelectTrigger id="subject-selector" className="w-full">
+                    <SelectValue placeholder="Select a report subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSubjects.map((subj) => (
+                      <SelectItem key={subj.id} value={subj.id}>
+                        {subj.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select the primary data source for your report
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          
           <Card>
             <CardContent className="p-6">
               <Tabs defaultValue="columns" value={activeTab} onValueChange={setActiveTab}>
@@ -261,217 +479,251 @@ const ReportBuilder = () => {
                 
                 <TabsContent value="columns">
                   <h2 className="text-xl font-semibold mb-4">Select Columns to Include</h2>
-                  <div className="border rounded-md p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {formFields.map((field) => (
-                        <div key={field.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`column-${field.id}`}
-                            checked={selectedColumns.includes(field.id)}
-                            onCheckedChange={() => handleColumnToggle(field.id)}
-                          />
-                          <Label htmlFor={`column-${field.id}`}>
-                            {field.name}
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({field.type})
-                            </span>
-                          </Label>
+                  <Input
+                    placeholder="Search fields..."
+                    value={fieldSearch}
+                    onChange={e => setFieldSearch(e.target.value)}
+                    className="mb-2"
+                  />
+                  <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
+                    {Object.entries(fieldsByForm).map(([form, fields]) => {
+                      const filtered = fields.filter(f =>
+                        f.field_label.toLowerCase().includes(fieldSearch.toLowerCase())
+                      );
+                      if (filtered.length === 0) return null;
+                      return (
+                        <div key={form} className="mb-4">
+                          <div className="font-semibold text-sm mb-2 text-blue-700">{form}</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {filtered.map(field => (
+                              <div key={field.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`column-${field.id}`}
+                                  checked={selectedColumns.includes(field.id)}
+                                  onCheckedChange={() => handleColumnToggle(field.id)}
+                                />
+                                <Label htmlFor={`column-${field.id}`}>{field.field_label}
+                                  <span className="text-xs text-muted-foreground ml-1">({field.field_type})</span>
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="filters">
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Filter Rules</h2>
-                    <Button size="sm" onClick={addFilterRule}>
+                    <h2 className="text-xl font-semibold">Filter Criteria</h2>
+                    <Button onClick={addFilterRule} size="sm" variant="outline">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Filter
                     </Button>
                   </div>
                   
-                  {filterRules.length === 0 ? (
-                    <div className="text-center py-8 border rounded-md">
-                      <Filter className="w-12 h-12 mx-auto text-muted-foreground opacity-50 mb-2" />
-                      <p className="text-muted-foreground">No filters have been added yet.</p>
-                      <p className="text-sm text-muted-foreground">
-                        Click "Add Filter" to start filtering your report data.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filterRules.map((rule) => (
-                        <div key={rule.id} className="border rounded-md p-4">
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className="font-medium">Filter Rule</h3>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="text-destructive h-7 w-7"
-                              onClick={() => removeFilterRule(rule.id)}
+                  <Input
+                    placeholder="Search fields..."
+                    value={fieldSearch}
+                    onChange={e => setFieldSearch(e.target.value)}
+                    className="mb-2"
+                  />
+                  
+                  <div className="space-y-4">
+                    {filterRules.map((rule) => (
+                      <div key={rule.id} className="border rounded-md p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="font-medium">Filter Condition</h3>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => removeFilterRule(rule.id)}
+                          >
+                            <Trash className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`filter-field-${rule.id}`}>Field</Label>
+                            <Select
+                              value={rule.field}
+                              onValueChange={(value) => updateFilterRule(rule.id, "field", value)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <SelectTrigger id={`filter-field-${rule.id}`}>
+                                <SelectValue placeholder="Select a field" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(fieldsByForm).map(([form, fields]) => (
+                                  <>
+                                    <div className="px-2 py-1 text-xs text-blue-700 font-semibold">{form}</div>
+                                    {fields.filter(f => f.field_label.toLowerCase().includes(fieldSearch.toLowerCase())).map(field => (
+                                      <SelectItem key={field.id} value={field.id}>
+                                        {field.field_label}
+                                      </SelectItem>
+                                    ))}
+                                  </>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor={`filter-field-${rule.id}`}>Field</Label>
-                              <Select
-                                value={rule.field}
-                                onValueChange={(value) => updateFilterRule(rule.id, "field", value)}
-                              >
-                                <SelectTrigger id={`filter-field-${rule.id}`}>
-                                  <SelectValue placeholder="Select a field" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {formFields.map((field) => (
-                                    <SelectItem key={field.id} value={field.id}>
-                                      {field.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor={`filter-operator-${rule.id}`}>Operator</Label>
-                              <Select
-                                value={rule.operator}
-                                onValueChange={(value) => updateFilterRule(rule.id, "operator", value)}
-                              >
-                                <SelectTrigger id={`filter-operator-${rule.id}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="equals">Equals</SelectItem>
-                                  <SelectItem value="not_equals">Not equals</SelectItem>
-                                  <SelectItem value="greater_than">Greater than</SelectItem>
-                                  <SelectItem value="less_than">Less than</SelectItem>
-                                  <SelectItem value="contains">Contains</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor={`filter-value-${rule.id}`}>Value</Label>
-                              <Input
-                                id={`filter-value-${rule.id}`}
-                                value={rule.value}
-                                onChange={(e) => updateFilterRule(rule.id, "value", e.target.value)}
-                                placeholder="Enter value"
-                              />
-                            </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`filter-operator-${rule.id}`}>Operator</Label>
+                            <Select
+                              value={rule.operator}
+                              onValueChange={(value) => updateFilterRule(rule.id, "operator", value)}
+                            >
+                              <SelectTrigger id={`filter-operator-${rule.id}`}>
+                                <SelectValue placeholder="Select an operator" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="equals">Equals</SelectItem>
+                                <SelectItem value="not_equals">Not Equals</SelectItem>
+                                <SelectItem value="greater_than">Greater Than</SelectItem>
+                                <SelectItem value="less_than">Less Than</SelectItem>
+                                <SelectItem value="contains">Contains</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor={`filter-value-${rule.id}`}>Value</Label>
+                            <Input
+                              id={`filter-value-${rule.id}`}
+                              value={rule.value}
+                              onChange={(e) => updateFilterRule(rule.id, "value", e.target.value)}
+                              placeholder="Enter value"
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                    
+                    {filterRules.length === 0 && (
+                      <div className="text-center py-6 border rounded-md">
+                        <Filter className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No filters added yet</p>
+                        <Button variant="outline" className="mt-2" onClick={addFilterRule}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Your First Filter
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="sorting">
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Sort Rules</h2>
-                    <Button size="sm" onClick={addSortRule}>
+                    <h2 className="text-xl font-semibold">Sort Options</h2>
+                    <Button onClick={addSortRule} size="sm" variant="outline">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Sort Rule
                     </Button>
                   </div>
                   
-                  {sortRules.length === 0 ? (
-                    <div className="text-center py-8 border rounded-md">
-                      <SortAsc className="w-12 h-12 mx-auto text-muted-foreground opacity-50 mb-2" />
-                      <p className="text-muted-foreground">No sorting rules have been added yet.</p>
-                      <p className="text-sm text-muted-foreground">
-                        Click "Add Sort Rule" to define how your report data should be sorted.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {sortRules.map((rule, index) => (
-                        <div key={rule.id} className="border rounded-md p-4">
-                          <div className="flex justify-between items-start mb-4">
-                            <h3 className="font-medium">Sort Rule {index + 1}</h3>
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => moveSortRule(rule.id, "up")}
-                                disabled={index === 0}
-                              >
-                                <MoveVertical className="h-4 w-4 rotate-180" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => moveSortRule(rule.id, "down")}
-                                disabled={index === sortRules.length - 1}
-                              >
-                                <MoveVertical className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="text-destructive h-7 w-7"
-                                onClick={() => removeSortRule(rule.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor={`sort-field-${rule.id}`}>Field</Label>
-                              <Select
-                                value={rule.field}
-                                onValueChange={(value) => updateSortRule(rule.id, "field", value)}
-                              >
-                                <SelectTrigger id={`sort-field-${rule.id}`}>
-                                  <SelectValue placeholder="Select a field" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {formFields.map((field) => (
-                                    <SelectItem key={field.id} value={field.id}>
-                                      {field.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor={`sort-direction-${rule.id}`}>Direction</Label>
-                              <Select
-                                value={rule.direction}
-                                onValueChange={(value) => updateSortRule(rule.id, "direction", value)}
-                              >
-                                <SelectTrigger id={`sort-direction-${rule.id}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="asc">Ascending</SelectItem>
-                                  <SelectItem value="desc">Descending</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                  <div className="space-y-4">
+                    {sortRules.map((rule) => (
+                      <div key={rule.id} className="border rounded-md p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="font-medium">Sort Condition</h3>
+                          <div className="flex space-x-1">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => moveSortRule(rule.id, "up")}
+                              title="Move Up"
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => moveSortRule(rule.id, "down")}
+                              title="Move Down"
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => removeSortRule(rule.id)}
+                              title="Remove"
+                            >
+                              <Trash className="h-4 w-4 text-destructive" />
+                            </Button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`sort-field-${rule.id}`}>Field</Label>
+                            <Select
+                              value={rule.field}
+                              onValueChange={(value) => updateSortRule(rule.id, "field", value)}
+                            >
+                              <SelectTrigger id={`sort-field-${rule.id}`}>
+                                <SelectValue placeholder="Select a field" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {formFields.map((field) => (
+                                  <SelectItem key={field.id} value={field.id}>
+                                    {field.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor={`sort-direction-${rule.id}`}>Direction</Label>
+                            <Select
+                              value={rule.direction}
+                              onValueChange={(value) => updateSortRule(rule.id, "direction", value)}
+                            >
+                              <SelectTrigger id={`sort-direction-${rule.id}`}>
+                                <SelectValue placeholder="Select direction" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="asc">Ascending</SelectItem>
+                                <SelectItem value="desc">Descending</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {sortRules.length === 0 && (
+                      <div className="text-center py-6 border rounded-md">
+                        <SortAsc className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No sort rules added yet</p>
+                        <Button variant="outline" className="mt-2" onClick={addSortRule}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Your First Sort Rule
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="preview">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Report Preview</h2>
-                    <Button variant="outline" size="sm" onClick={exportCsv}>
-                      <FileSpreadsheet className="mr-2 h-4 w-4" />
-                      Export CSV
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" onClick={generatePreview}>
+                        {isLoading ? (
+                          <>Loading...</>
+                        ) : (
+                          <>Refresh Preview</>
+                        )}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={exportCsv}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Export CSV
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="border rounded-md overflow-hidden">
@@ -488,30 +740,49 @@ const ReportBuilder = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {inventoryData.map((item) => (
-                            <TableRow key={item.id}>
-                              {selectedColumns.includes("name") && <TableCell>{item.name}</TableCell>}
-                              {selectedColumns.includes("sku") && <TableCell>{item.sku}</TableCell>}
-                              {selectedColumns.includes("category") && <TableCell>{item.category}</TableCell>}
-                              {selectedColumns.includes("quantity") && <TableCell>{item.quantity}</TableCell>}
-                              {selectedColumns.includes("price") && <TableCell>${item.price}</TableCell>}
-                              {selectedColumns.includes("total") && <TableCell>${item.total}</TableCell>}
-                              {selectedColumns.includes("location") && <TableCell>{item.location}</TableCell>}
-                              {selectedColumns.includes("purchaseDate") && <TableCell>{item.purchaseDate}</TableCell>}
-                              {selectedColumns.includes("status") && <TableCell>{item.status}</TableCell>}
+                          {previewData.length > 0 ? (
+                            previewData.map((item, index) => (
+                              <TableRow key={index}>
+                                {formFields
+                                  .filter(field => selectedColumns.includes(field.id))
+                                  .map(field => (
+                                    <TableCell key={field.id}>
+                                      {item[field.id] || "-"}
+                                    </TableCell>
+                                  ))
+                                }
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={selectedColumns.length} className="text-center py-8">
+                                {isLoading ? (
+                                  <div className="flex flex-col items-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
+                                    <p>Loading preview data...</p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center">
+                                    <p className="text-muted-foreground mb-2">No preview data available</p>
+                                    <Button variant="outline" size="sm" onClick={generatePreview}>
+                                      Generate Preview
+                                    </Button>
+                                  </div>
+                                )}
+                              </TableCell>
                             </TableRow>
-                          ))}
+                          )}
                         </TableBody>
                       </Table>
                     </div>
-                    
-                    {inventoryData.length === 0 && (
-                      <div className="text-center py-8">
-                        <TableIcon className="w-12 h-12 mx-auto text-muted-foreground opacity-50 mb-2" />
-                        <p className="text-muted-foreground">No data available for preview.</p>
-                      </div>
-                    )}
                   </div>
+                  
+                  {previewData.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Showing {previewData.length} of {previewData.length} results.
+                      {previewData.length === 10 && " Limited to 10 rows in preview."}
+                    </p>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>
@@ -552,36 +823,23 @@ const ReportBuilder = () => {
                   </div>
                 </div>
                 
+                {/* Export options in a dialog */}
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full">
-                      <TableIcon className="mr-2 h-4 w-4" />
-                      Configure CSV Format
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      Export Options
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>CSV Export Settings</DialogTitle>
+                      <DialogTitle>Export Options</DialogTitle>
                       <DialogDescription>
-                        Configure how your data will be exported to CSV format
+                        Configure options for exporting your report data.
                       </DialogDescription>
                     </DialogHeader>
                     
                     <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="csv-delimiter">Column Delimiter</Label>
-                        <Select defaultValue=",">
-                          <SelectTrigger id="csv-delimiter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value=",">Comma (,)</SelectItem>
-                            <SelectItem value=";">Semicolon (;)</SelectItem>
-                            <SelectItem value="\t">Tab</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
                       <div className="space-y-2">
                         <Label htmlFor="date-format">Date Format</Label>
                         <Select defaultValue="YYYY-MM-DD">
@@ -621,6 +879,12 @@ const ReportBuilder = () => {
               
               <div className="space-y-1">
                 <div className="flex justify-between text-sm py-2 border-b">
+                  <span className="text-muted-foreground">Subject:</span>
+                  <span className="font-medium">
+                    {availableSubjects.find(s => s.id === subject)?.name || "Inventory Items"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm py-2 border-b">
                   <span className="text-muted-foreground">Selected Columns:</span>
                   <span className="font-medium">{selectedColumns.length}</span>
                 </div>
@@ -634,7 +898,7 @@ const ReportBuilder = () => {
                 </div>
                 <div className="flex justify-between text-sm py-2">
                   <span className="text-muted-foreground">Items in Preview:</span>
-                  <span className="font-medium">{inventoryData.length}</span>
+                  <span className="font-medium">{previewData.length}</span>
                 </div>
               </div>
               

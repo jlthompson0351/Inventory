@@ -1,0 +1,457 @@
+import { Database } from '@/types/database.types';
+import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { PostgrestError } from '@supabase/supabase-js';
+
+export type InventoryItem = Database['public']['Tables']['inventory_items']['Row'];
+export type InventoryPriceHistory = Database['public']['Tables']['inventory_price_history']['Row'];
+
+// Interface for inventory item creation
+export interface CreateInventoryItemData {
+  name: string;
+  description?: string;
+  sku?: string;
+  barcode?: string;
+  quantity?: number;
+  location?: string;
+  category?: string;
+  organization_id: string;
+}
+
+// Interface for inventory item update
+export interface UpdateInventoryItemData {
+  name?: string;
+  description?: string;
+  sku?: string;
+  barcode?: string;
+  quantity?: number;
+  location?: string;
+  category?: string;
+}
+
+/**
+ * Get all inventory items for an organization
+ */
+export const getInventoryItems = async (
+  supabase: SupabaseClient<Database>,
+  organizationId: string
+): Promise<any[] | null> => {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching inventory items:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * Get a single inventory item by ID
+ */
+export async function getInventoryItem(supabase: any, id: string) {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error getting inventory item:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a new inventory item
+ */
+export const createInventoryItem = async (
+  supabase: SupabaseClient<Database>,
+  itemData: CreateInventoryItemData
+): Promise<any> => {
+  // Add the current user's ID as the creator
+  const user = await supabase.auth.getUser();
+  const userId = user.data.user?.id;
+
+  const newItemData = {
+    ...itemData,
+    created_by: userId,
+  };
+
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .insert(newItemData)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating inventory item:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * Update an inventory item
+ */
+export async function updateInventoryItem(supabase: any, id: string, itemData: any) {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .update({
+        name: itemData.name,
+        description: itemData.description,
+        sku: itemData.sku,
+        barcode: itemData.barcode,
+        quantity: itemData.quantity,
+        location: itemData.location,
+        category: itemData.category,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating inventory item:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an inventory item
+ */
+export async function deleteInventoryItem(supabase: any, id: string) {
+  try {
+    // Use a database function to handle the cascading deletion
+    const { data, error } = await supabase.rpc('delete_inventory_item', { item_id: id });
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting inventory item:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search inventory items by name, description, SKU, or barcode
+ */
+export const searchInventoryItems = async (
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  searchQuery: string
+): Promise<any[] | null> => {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%,barcode.ilike.%${searchQuery}%`)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error searching inventory items:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * Filter inventory items by category
+ */
+export const filterInventoryItemsByCategory = async (
+  supabase: SupabaseClient<Database>,
+  organizationId: string,
+  category: string
+): Promise<any[] | null> => {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .eq('category', category)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error filtering inventory items by category:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * Get categories from inventory items
+ */
+export const getInventoryCategories = async (
+  supabase: SupabaseClient<Database>,
+  organizationId: string
+): Promise<string[] | null> => {
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .select('category')
+    .eq('organization_id', organizationId)
+    .not('category', 'is', null);
+
+  if (error) {
+    console.error('Error fetching inventory categories:', error);
+    throw error;
+  }
+
+  // Extract unique categories
+  const categories = data
+    .map(item => item.category)
+    .filter((value, index, self) => value && self.indexOf(value) === index);
+
+  return categories as string[];
+};
+
+/**
+ * Generate a unique barcode for an inventory item
+ */
+export const generateBarcode = async (
+  supabase: SupabaseClient,
+  prefix: string,
+  itemId: string
+) => {
+  // Extract a few characters from the itemId to create a unique code
+  const shortId = itemId.substring(0, 8).toUpperCase();
+  
+  // Combine prefix and short ID to create a barcode
+  const barcode = `${prefix}-${shortId}`;
+  
+  return barcode;
+};
+
+export const updateInventoryItemPrice = async (
+  supabaseClient: ReturnType<typeof createClient<Database>>,
+  id: string,
+  price: number,
+  currency: string = 'USD',
+  notes?: string,
+  submissionId?: string
+): Promise<void> => {
+  // First, update the inventory item with the new price
+  const { error: updateError } = await supabaseClient
+    .from('inventory_items')
+    .update({ 
+      current_price: price,
+      currency,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id);
+
+  if (updateError) {
+    console.error('Error updating inventory item price:', updateError);
+    throw updateError;
+  }
+
+  // Get the organization ID for this item
+  const { data: item, error: itemError } = await supabaseClient
+    .from('inventory_items')
+    .select('organization_id')
+    .eq('id', id)
+    .single();
+
+  if (itemError) {
+    console.error('Error fetching inventory item organization:', itemError);
+    throw itemError;
+  }
+
+  // Then create a price history record
+  const { error: historyError } = await supabaseClient
+    .from('inventory_price_history')
+    .insert({
+      inventory_item_id: id,
+      organization_id: item.organization_id,
+      price,
+      currency,
+      notes,
+      submission_id: submissionId
+    });
+
+  if (historyError) {
+    console.error('Error creating price history record:', historyError);
+    throw historyError;
+  }
+};
+
+export const getInventoryItemPriceHistory = async (
+  supabaseClient: ReturnType<typeof createClient<Database>>,
+  itemId: string
+): Promise<InventoryPriceHistory[]> => {
+  const { data, error } = await supabaseClient
+    .from('inventory_price_history')
+    .select('*')
+    .eq('inventory_item_id', itemId)
+    .order('effective_date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching price history:', error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+export const validateBarcode = async (
+  supabaseClient: ReturnType<typeof createClient<Database>>,
+  barcode: string
+): Promise<boolean> => {
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      'validate_barcode',
+      { p_barcode: barcode }
+    );
+
+    if (error) {
+      console.error('Error validating barcode:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to validate barcode:', error);
+    // Fallback validation in case the RPC fails
+    return /^[A-Za-z0-9]+-[A-Za-z0-9]{8}$/.test(barcode);
+  }
+};
+
+export type InventoryItemInsert = TablesInsert<'inventory_items'>;
+export type InventoryItemUpdate = TablesUpdate<'inventory_items'>;
+
+export async function getInventoryItemByBarcode(organizationId: string, barcode: string): Promise<InventoryItem | null> {
+  try {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select(`
+        *,
+        asset_type:asset_types(*)
+      `)
+      .eq('organization_id', organizationId)
+      .eq('barcode', barcode)
+      .single();
+
+    if (error) {
+      console.error('Error fetching inventory item by barcode:', error);
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch inventory item by barcode:', error);
+    return null;
+  }
+}
+
+export async function generateAssetBarcode(
+  supabase: ReturnType<typeof createClient<Database>>,
+  assetId: string,
+  barcodeType: string = 'qr'
+): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc('generate_asset_barcode', {
+      p_asset_id: assetId,
+      p_barcode_type: barcodeType
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error generating asset barcode:', error);
+    throw error;
+  }
+}
+
+export async function scanAssetBarcode(
+  supabase: ReturnType<typeof createClient<Database>>,
+  barcode: string
+) {
+  try {
+    const { data, error } = await supabase.rpc('scan_asset_barcode', {
+      p_barcode: barcode
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error scanning asset barcode:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get asset forms by barcode - used in QR code workflow
+ */
+export async function getAssetFormsByBarcode(
+  supabase: ReturnType<typeof createClient<Database>>,
+  barcode: string
+): Promise<any> {
+  try {
+    const { data, error } = await supabase.rpc('get_asset_forms_by_barcode', {
+      p_barcode: barcode
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error getting asset forms by barcode:', error);
+    return null;
+  }
+}
+
+/**
+ * Get asset with calculation formulas by barcode - enhanced version for formula support
+ */
+export async function getAssetWithFormulasByBarcode(
+  supabase: ReturnType<typeof createClient<Database>>,
+  barcode: string
+): Promise<any> {
+  try {
+    const { data, error } = await supabase.rpc('get_asset_with_formulas_by_barcode', {
+      p_barcode: barcode
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error getting asset with formulas by barcode:', error);
+    return null;
+  }
+}
+
+/**
+ * Apply calculation formulas to form data
+ */
+export async function applyAssetCalculationFormulas(
+  supabase: ReturnType<typeof createClient<Database>>,
+  formData: any,
+  calculationFormulas: any,
+  assetMetadata: any = {}
+): Promise<any> {
+  try {
+    const { data, error } = await supabase.rpc('apply_asset_calculation_formulas', {
+      p_form_data: formData,
+      p_calculation_formulas: calculationFormulas,
+      p_asset_metadata: assetMetadata
+    });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error applying calculation formulas:', error);
+    // Return original form data if there's an error
+    return formData;
+  }
+} 

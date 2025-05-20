@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
@@ -68,20 +67,15 @@ const UserMenu = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative rounded-full p-0 h-auto">
+        <Button variant="ghost" className="w-full flex items-center justify-start gap-3 px-2 py-1.5 h-auto text-left">
           <UserAvatar src={user?.avatarUrl} name={user?.name} size="sm" />
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-medium">{user?.name}</span>
+            <span className="text-xs text-muted-foreground">{user?.email}</span>
+          </div>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user?.name}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user?.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/profile">
             <User className="mr-2 h-4 w-4" />

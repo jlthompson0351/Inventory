@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   FileSpreadsheet, 
@@ -7,10 +6,17 @@ import {
   Plus, 
   FileText, 
   Download,
-  Search
+  Search,
+  Loader2,
+  Package2,
+  Boxes,
+  ClipboardList,
+  ArrowRight,
+  BarChart,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -19,87 +25,156 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
-
-// Mock reports data
-const mockReports = [
-  { 
-    id: 1, 
-    name: "Monthly Inventory Status", 
-    description: "Overview of all inventory items with current stock levels", 
-    columns: ["Item Name", "SKU", "Category", "Quantity", "Status"], 
-    created: "2023-05-12", 
-    lastRun: "2023-06-01",
-    assetTypes: ["General", "Equipment", "Furniture"]
-  },
-  { 
-    id: 2, 
-    name: "Low Stock Items", 
-    description: "Items that need to be restocked soon", 
-    columns: ["Item Name", "SKU", "Quantity", "Reorder Level"], 
-    created: "2023-04-20", 
-    lastRun: "2023-05-28",
-    assetTypes: ["General"]
-  },
-  { 
-    id: 3, 
-    name: "Asset Value Report", 
-    description: "Total value of all inventory assets by category", 
-    columns: ["Category", "Item Count", "Total Value", "Average Value"], 
-    created: "2023-06-05", 
-    lastRun: "2023-06-10",
-    assetTypes: ["Equipment", "Furniture", "IT Assets"]
-  },
-  { 
-    id: 4, 
-    name: "Equipment Maintenance Schedule", 
-    description: "Schedule of upcoming maintenance for all equipment", 
-    columns: ["Item Name", "Last Maintenance", "Next Maintenance", "Status"], 
-    created: "2023-03-15", 
-    lastRun: "2023-06-08",
-    assetTypes: ["Equipment", "Machinery"]
-  }
-];
+import { getReports, deleteReport, executeReport, Report } from "@/services/reportService";
+import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InventoryAggregationReport } from "@/components/inventory/InventoryAggregationReport";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useOrganization } from "@/hooks/useOrganization";
 
 const Reports = () => {
+  console.log("Reports component rendering");
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { currentOrganization, isLoading: orgLoading } = useOrganization();
   const [searchTerm, setSearchTerm] = useState("");
-  const [reports] = useState(mockReports);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("aggregation"); // Default to aggregation tab
+  
+  console.log("Reports - Auth state:", { 
+    user: user ? "LOGGED_IN" : "NOT_LOGGED_IN",
+    orgLoading,
+    organization: currentOrganization
+  });
+  
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!currentOrganization?.id) {
+        console.log("Reports - No organization ID, skipping reports fetch");
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      try {
+        console.log(`Reports - Fetching reports for org: ${currentOrganization.id}`);
+        const data = await getReports(currentOrganization.id);
+        console.log(`Reports - Fetched ${data.length} reports`);
+        setReports(data);
+      } catch (error) {
+        console.error("Failed to fetch reports:", error);
+        setError("Failed to load reports. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to load reports. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchReports();
+  }, [currentOrganization?.id, toast]);
   
   // Filter reports based on search term
   const filteredReports = reports.filter(report => 
     report.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    report.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (report.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
   
-  const runReport = (reportId: number, reportName: string) => {
-    // In a real app, this would trigger the report generation
+  const runReport = async (reportId: string, reportName: string) => {
+    const report = reports.find(r => r.id === reportId);
+    if (!report) return;
+    
     toast({
-      title: "Report Generated",
-      description: `${reportName} has been generated and is ready for download.`
+      title: "Generating Report",
+      description: "Please wait while we generate your report..."
     });
-  };
-  
-  const deleteReport = (reportId: number, reportName: string) => {
-    if (confirm(`Are you sure you want to delete "${reportName}"? This action cannot be undone.`)) {
-      // In a real app, this would delete the report
+    
+    try {
+      const result = await executeReport(report);
       toast({
-        title: "Report Deleted",
-        description: `${reportName} has been deleted successfully.`
+        title: "Report Generated",
+        description: `${reportName} has been generated with ${result.length} rows of data.`
+      });
+      
+      // In a real app, you might want to display the results in a modal or navigate to a results page
+      console.log("Report results:", result);
+    } catch (error) {
+      console.error("Error running report:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
+        variant: "destructive",
       });
     }
   };
   
-  const downloadCsv = (reportId: number, reportName: string) => {
-    // In a real app, this would download the actual report
+  const handleDeleteReport = async (reportId: string, reportName: string) => {
+    if (confirm(`Are you sure you want to delete "${reportName}"? This action cannot be undone.`)) {
+      try {
+        const success = await deleteReport(reportId);
+        if (success) {
+          setReports(reports.filter(report => report.id !== reportId));
+          toast({
+            title: "Report Deleted",
+            description: `${reportName} has been deleted successfully.`
+          });
+        } else {
+          throw new Error("Failed to delete report");
+        }
+      } catch (error) {
+        console.error("Error deleting report:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete report. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+  
+  const downloadCsv = async (reportId: string, reportName: string) => {
+    const report = reports.find(r => r.id === reportId);
+    if (!report) return;
+    
     toast({
-      title: "Download Started",
-      description: `${reportName} is being downloaded.`
+      title: "Preparing Download",
+      description: `${reportName} is being prepared for download.`
     });
     
-    // Simulate download after a short delay
-    setTimeout(() => {
-      // Create a simple CSV file
-      const csvContent = "Column 1,Column 2,Column 3\nData 1,Data 2,Data 3\nData 4,Data 5,Data 6";
+    try {
+      const results = await executeReport(report);
+      
+      // Extract headers based on report configuration
+      const headers = report.report_config.columns.map(col => {
+        // Convert field names to user-friendly headers
+        return col.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      });
+      
+      // Convert results to CSV data
+      const data = results.map(item => {
+        return report.report_config.columns.map(col => {
+          // Handle nested data with dot notation
+          if (col.includes('.')) {
+            const [parent, child] = col.split('.');
+            return item[parent]?.[child] || '';
+          }
+          return item[col] || '';
+        });
+      });
+      
+      const csvContent = [
+        headers.join(","),
+        ...data.map(row => row.join(","))
+      ].join("\n");
+      
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -109,143 +184,235 @@ const Reports = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }, 500);
+      
+      toast({
+        title: "Download Started",
+        description: `${reportName} is being downloaded.`
+      });
+    } catch (error) {
+      console.error("Error generating CSV:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate CSV file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Helper function to get icon for report subject
+  const getSubjectIcon = (subject: string | undefined) => {
+    switch (subject) {
+      case 'inventory_items':
+        return <Package2 className="h-4 w-4 text-primary" />;
+      case 'assets':
+        return <Boxes className="h-4 w-4 text-primary" />;
+      case 'form_submissions':
+        return <ClipboardList className="h-4 w-4 text-primary" />;
+      default:
+        return <FileText className="h-4 w-4 text-primary" />;
+    }
+  };
+  
+  // Helper function to get name for report subject
+  const getSubjectName = (subject: string | undefined) => {
+    switch (subject) {
+      case 'inventory_items':
+        return 'Inventory Items';
+      case 'assets':
+        return 'Assets';
+      case 'form_submissions':
+        return 'Form Submissions';
+      default:
+        return 'Unknown';
+    }
   };
   
   return (
-    <div className="animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+    <div className="container py-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
-          <p className="text-muted-foreground">Create and manage inventory reports</p>
-        </div>
-        <div className="mt-4 sm:mt-0">
-          <Button asChild>
-            <Link to="/reports/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Report
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search reports..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">
+            Generate and view reports for your organization
+          </p>
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="border-dashed border-2 hover:border-primary/50 transition-colors cursor-pointer">
-          <CardContent className="p-6 flex flex-col items-center justify-center h-full min-h-[220px]">
-            <div className="rounded-full bg-primary/10 p-3 mb-4">
-              <FileSpreadsheet className="h-6 w-6 text-primary" />
+      {/* Debug Info - Only visible during development */}
+      {process.env.NODE_ENV === 'development' && (
+        <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Debug Information</AlertTitle>
+          <AlertDescription>
+            <div>Auth State: {user ? "Logged In" : "Not Logged In"}</div>
+            <div>Organization Loading: {orgLoading ? "Yes" : "No"}</div>
+            <div>Current Org: {currentOrganization?.name || "None"}</div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {orgLoading ? (
+        <div className="flex justify-center my-12">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="mt-2 text-sm text-muted-foreground">Loading organization data...</p>
+          </div>
+        </div>
+      ) : !currentOrganization ? (
+        <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Organization Selected</AlertTitle>
+          <AlertDescription>
+            Please select an organization to view reports.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="aggregation" className="flex items-center">
+              <BarChart className="h-4 w-4 mr-2" />
+              Inventory Aggregation
+            </TabsTrigger>
+            <TabsTrigger value="custom" className="flex items-center">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Custom Reports
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="aggregation">
+            <InventoryAggregationReport />
+          </TabsContent>
+          
+          <TabsContent value="custom">
+            <div className="flex items-center justify-between mb-4">
+              <div className="relative w-64">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search reports"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Button asChild>
+                <Link to="/reports/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Report
+                </Link>
+              </Button>
             </div>
-            <h3 className="text-lg font-semibold mb-1">Create New Report</h3>
-            <p className="text-sm text-muted-foreground text-center mb-4">
-              Build a custom report for your inventory data
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/reports/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Report
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-        
-        {filteredReports.map((report) => (
-          <Card key={report.id} className="card-hover">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="rounded-full bg-primary/10 p-1.5 mr-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </div>
-                  <CardTitle className="text-lg">{report.name}</CardTitle>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link to={`/reports/${report.id}`}>
-                        Edit report
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => runReport(report.id, report.name)}>
-                      Run report
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => downloadCsv(report.id, report.name)}>
-                      Download CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => deleteReport(report.id, report.name)} className="text-destructive">
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3">
-                {report.description}
-              </p>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Columns:</span>
-                  <span>{report.columns.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Asset Types:</span>
-                  <span>{report.assetTypes.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Last Run:</span>
-                  <span>{new Date(report.lastRun).toLocaleDateString()}</span>
+            
+            {loading ? (
+              <div className="flex justify-center my-12">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+                  <p className="mt-2 text-sm text-muted-foreground">Loading reports...</p>
                 </div>
               </div>
-              
-              <div className="mt-4 pt-4 border-t flex justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                >
-                  <Link to={`/reports/${report.id}`}>
-                    Edit
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadCsv(report.id, report.name)}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
+            ) : filteredReports.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <FileSpreadsheet className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Reports Found</h3>
+                  <p className="text-muted-foreground text-center max-w-md mb-6">
+                    {searchTerm ? 
+                      "No reports match your search criteria. Try different keywords or clear the search." : 
+                      "You haven't created any reports yet. Create your first report to get started."}
+                  </p>
+                  <Button asChild>
+                    <Link to="/reports/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Report
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredReports.map((report) => (
+                  <Card key={report.id} className="card-hover">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="rounded-full bg-primary/10 p-1.5 mr-2">
+                            {getSubjectIcon(report.report_config.subject)}
+                          </div>
+                          <CardTitle className="text-lg">{report.name}</CardTitle>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/reports/${report.id}`}>
+                                Edit report
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => runReport(report.id, report.name)}>
+                              Run report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => downloadCsv(report.id, report.name)}>
+                              Download CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteReport(report.id, report.name)} className="text-destructive">
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Badge variant="outline" className="mb-2">
+                        {getSubjectName(report.report_config.subject)}
+                      </Badge>
+                      
+                      {report.description && (
+                        <CardDescription className="text-sm line-clamp-2 mb-2">
+                          {report.description}
+                        </CardDescription>
+                      )}
+                      
+                      <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                        <span>{report.report_config.columns.length} columns</span>
+                        <span>Updated {format(new Date(report.updated_at), 'MMM d, yyyy')}</span>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => runReport(report.id, report.name)}
+                        >
+                          Run
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => downloadCsv(report.id, report.name)}
+                        >
+                          <Download className="mr-1 h-3 w-3" />
+                          CSV
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      
-      {filteredReports.length === 0 && searchTerm && (
-        <div className="text-center p-8">
-          <p className="text-muted-foreground">No reports matching "{searchTerm}"</p>
-          <Button variant="outline" className="mt-4" onClick={() => setSearchTerm("")}>
-            Clear Search
-          </Button>
-        </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

@@ -1,15 +1,23 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Barcode, Camera, Search } from "lucide-react";
+import { ChevronLeft, Barcode, Camera, Search, BoxIcon, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { 
+  getInventoryItemByBarcode, 
+  getAssetFormsByBarcode,
+  getAssetWithFormulasByBarcode 
+} from "@/services/inventoryService";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Separator } from "@/components/ui/separator";
 
 const BarcodeScanner = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { currentOrganization } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -17,21 +25,41 @@ const BarcodeScanner = () => {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<any | null>(null);
+  const [assetForms, setAssetForms] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Mock function to search for item by barcode
-  const searchByBarcode = (code: string) => {
-    // In a real app, this would be an API call
-    const mockItems = [
-      { id: 1, name: "Laptop", sku: "TECH-001", barcode: "123456789012", category: "Electronics", quantity: 12 },
-      { id: 2, name: "Monitor", sku: "TECH-005", barcode: "987654321098", category: "Electronics", quantity: 8 },
-    ];
+  const searchByBarcode = async (code: string) => {
+    if (!currentOrganization?.id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No organization selected",
+      });
+      return null;
+    }
     
-    return new Promise<any>((resolve) => {
-      setTimeout(() => {
-        const found = mockItems.find(item => item.barcode === code);
-        resolve(found || null);
-      }, 500);
-    });
+    try {
+      setIsLoading(true);
+      const result = await getInventoryItemByBarcode(currentOrganization.id, code);
+      
+      // Also get the associated forms and calculation formulas for this asset
+      if (result) {
+        const assetData = await getAssetWithFormulasByBarcode(supabase, code);
+        setAssetForms(assetData);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("Error searching for item:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to search for item",
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const startScanner = async () => {
@@ -40,6 +68,11 @@ const BarcodeScanner = () => {
     setSearchResult(null);
 
     try {
+      // Check if mediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API is not available in this browser or context. Try using HTTPS or check browser permissions.");
+      }
+      
       const constraints = {
         video: {
           facingMode: "environment"
@@ -52,25 +85,12 @@ const BarcodeScanner = () => {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
         
-        // In a real app, this would use a barcode scanning library
-        // For the demo, we'll simulate a scan after a few seconds
-        setTimeout(() => {
-          const mockBarcode = "123456789012";
-          setScanning(false);
-          setScanResult(mockBarcode);
-          setBarcode(mockBarcode);
-          
-          // Stop the video stream
-          stream.getTracks().forEach(track => track.stop());
-          
-          toast({
-            title: "Barcode Scanned",
-            description: `Scanned barcode: ${mockBarcode}`,
-          });
-          
-          // Search for the item
-          searchItem(mockBarcode);
-        }, 3000);
+        // In a real implementation, you would use a barcode scanning library like quagga.js here
+        // This is a placeholder for manual testing - scanning would actually be handled by a library
+        toast({
+          title: "Scanner Started",
+          description: "In a real app, scanning would happen automatically",
+        });
       }
     } catch (error) {
       console.error("Error accessing camera:", error);
@@ -79,9 +99,32 @@ const BarcodeScanner = () => {
       toast({
         variant: "destructive",
         title: "Camera Error",
-        description: "Could not access camera. Please check permissions.",
+        description: error instanceof Error && error.message 
+          ? error.message 
+          : "Could not access camera. Please check permissions or try using the manual entry option below.",
       });
     }
+  };
+  
+  // This function would be called by the barcode scanning library when a barcode is detected
+  const onBarcodeDetected = (detectedBarcode: string) => {
+    setScanning(false);
+    setScanResult(detectedBarcode);
+    setBarcode(detectedBarcode);
+    
+    // Stop the video stream
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+    
+    toast({
+      title: "Barcode Scanned",
+      description: `Scanned barcode: ${detectedBarcode}`,
+    });
+    
+    // Search for the item
+    searchItem(detectedBarcode);
   };
 
   const searchItem = async (code: string) => {
@@ -115,13 +158,115 @@ const BarcodeScanner = () => {
     await searchItem(barcode);
   };
 
-  const navigateToItem = (id: number) => {
+  const navigateToItem = (id: string) => {
     navigate(`/inventory/${id}`);
   };
 
   const navigateToNewItem = () => {
     navigate("/inventory/new", { state: { barcode: scanResult } });
   };
+
+  const navigateToIntakeForm = () => {
+    if (!assetForms || !assetForms.intake_form_id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No intake form configured for this asset type",
+      });
+      return;
+    }
+    
+    navigate(`/forms/submit/${assetForms.intake_form_id}`, {
+      state: {
+        assetId: assetForms.asset_id,
+        assetName: assetForms.asset_name,
+        formType: 'intake',
+        assetTypeId: assetForms.asset_type_id,
+        calculationFormulas: assetForms.calculation_formulas || {},
+        prefillData: {
+          asset_id: assetForms.asset_id,
+          asset_name: assetForms.asset_name,
+          asset_type: assetForms.asset_type_name,
+          barcode: assetForms.barcode,
+          ...assetForms.form_data
+        }
+      }
+    });
+  };
+
+  const navigateToInventoryForm = () => {
+    if (!assetForms || !assetForms.inventory_form_id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No inventory form configured for this asset type",
+      });
+      return;
+    }
+    
+    navigate(`/forms/submit/${assetForms.inventory_form_id}`, {
+      state: {
+        assetId: assetForms.asset_id,
+        assetName: assetForms.asset_name,
+        formType: 'inventory',
+        assetTypeId: assetForms.asset_type_id,
+        calculationFormulas: assetForms.calculation_formulas || {},
+        prefillData: {
+          asset_id: assetForms.asset_id,
+          asset_name: assetForms.asset_name,
+          asset_type: assetForms.asset_type_name,
+          barcode: assetForms.barcode,
+          ...assetForms.form_data
+        }
+      }
+    });
+  };
+
+  // Cleanup function for the video stream
+  useEffect(() => {
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  // For testing purposes - simulates a QR code scan
+  const simulateScan = () => {
+    // Show a loading state to simulate scanning
+    setScanning(true);
+    
+    // Use the manually entered barcode if available, otherwise use a test value
+    const testBarcode = barcode.trim() || "TEST-QR-12345";
+    
+    // Simulate scan delay
+    setTimeout(() => {
+      setScanning(false);
+      onBarcodeDetected(testBarcode);
+      
+      toast({
+        title: "Test Scan Completed",
+        description: `This is a simulated scan using "${testBarcode}"`,
+      });
+    }, 1500);
+  };
+
+  // Add an effect to check camera support on component mount
+  useEffect(() => {
+    const checkCameraSupport = () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log("Camera API not available in this environment");
+        toast({
+          variant: "default",
+          title: "Camera Not Available",
+          description: "The camera feature isn't available in this environment. You can still use manual entry below.",
+        });
+      }
+    };
+    
+    checkCameraSupport();
+  }, [toast]);
 
   return (
     <div className="animate-fade-in">
@@ -130,8 +275,8 @@ const BarcodeScanner = () => {
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Barcode Scanner</h1>
-          <p className="text-muted-foreground">Scan or search inventory by barcode</p>
+          <h1 className="text-3xl font-bold">QR Code Scanner</h1>
+          <p className="text-muted-foreground">Scan assets to access inventory forms</p>
         </div>
       </div>
 
@@ -139,7 +284,7 @@ const BarcodeScanner = () => {
         <Card>
           <CardContent className="p-6">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold mb-4">Scan Barcode</h2>
+              <h2 className="text-lg font-semibold mb-4">Scan QR Code</h2>
               
               <div className="bg-muted rounded-lg overflow-hidden mb-4 relative">
                 {scanning ? (
@@ -154,6 +299,16 @@ const BarcodeScanner = () => {
                     <div className="absolute top-0 left-0 right-0 p-2 bg-black/50 text-white text-sm text-center">
                       Position barcode in center
                     </div>
+                    
+                    {/* Test button for simulation */}
+                    <Button 
+                      className="absolute bottom-2 right-2"
+                      variant="secondary"
+                      size="sm"
+                      onClick={simulateScan}
+                    >
+                      Simulate Scan
+                    </Button>
                   </>
                 ) : (
                   <div className="flex items-center justify-center h-64 bg-muted">
@@ -174,18 +329,35 @@ const BarcodeScanner = () => {
                 <Camera className="mr-2 h-4 w-4" />
                 {scanning ? "Scanning..." : "Start Scanner"}
               </Button>
+              
+              {!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia ? (
+                <div className="mt-3">
+                  <div className="text-sm text-amber-600 text-center mb-3">
+                    Camera access may not be available in this environment. Please use manual entry below.
+                  </div>
+                  
+                  <Button 
+                    onClick={simulateScan}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <Barcode className="mr-2 h-4 w-4" />
+                    Simulate QR Scan
+                  </Button>
+                </div>
+              ) : null}
             </div>
 
             <div>
               <h2 className="text-lg font-semibold mb-4">Manual Entry</h2>
               <div className="flex space-x-2">
                 <Input
-                  placeholder="Enter barcode manually"
+                  placeholder="Enter QR code manually"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
                 />
-                <Button onClick={handleManualSearch}>
-                  <Search className="h-4 w-4" />
+                <Button onClick={handleManualSearch} disabled={isLoading}>
+                  {isLoading ? <span className="animate-spin">↻</span> : <Search className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -199,7 +371,7 @@ const BarcodeScanner = () => {
             {scanResult ? (
               <div>
                 <div className="mb-4 p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Scanned Barcode:</p>
+                  <p className="text-sm text-muted-foreground mb-1">Scanned QR Code:</p>
                   <div className="flex items-center">
                     <Barcode className="h-5 w-5 mr-2 text-primary" />
                     <p className="font-mono font-semibold">{scanResult}</p>
@@ -213,25 +385,66 @@ const BarcodeScanner = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">SKU:</span>
-                          <span>{searchResult.sku}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Category:</span>
-                          <span>{searchResult.category}</span>
+                          <span>{searchResult.sku || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Quantity:</span>
                           <span>{searchResult.quantity}</span>
                         </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Status:</span>
+                          <span>{searchResult.status || 'N/A'}</span>
+                        </div>
                       </div>
                     </div>
                     
-                    <Button 
-                      className="w-full" 
-                      onClick={() => navigateToItem(searchResult.id)}
-                    >
-                      View Item Details
-                    </Button>
+                    <div className="space-y-4">
+                      <Button 
+                        className="w-full" 
+                        onClick={() => navigateToItem(searchResult.id)}
+                        variant="outline"
+                      >
+                        View Item Details
+                      </Button>
+                      
+                      <Separator />
+                      
+                      <h4 className="font-medium text-center">Select Form Action</h4>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <Button 
+                          onClick={navigateToIntakeForm}
+                          variant="default"
+                          disabled={!assetForms || !assetForms.intake_form_id}
+                          className="h-auto py-4"
+                        >
+                          <div className="flex flex-col items-center">
+                            <BoxIcon className="h-8 w-8 mb-2" />
+                            <span>Intake</span>
+                            <span className="text-xs opacity-80">Add to Stock</span>
+                          </div>
+                        </Button>
+                        
+                        <Button 
+                          onClick={navigateToInventoryForm}
+                          variant="default"
+                          disabled={!assetForms || !assetForms.inventory_form_id}
+                          className="h-auto py-4"
+                        >
+                          <div className="flex flex-col items-center">
+                            <ClipboardList className="h-8 w-8 mb-2" />
+                            <span>Monthly Inventory</span>
+                            <span className="text-xs opacity-80">Take Stock</span>
+                          </div>
+                        </Button>
+                      </div>
+                      
+                      {!assetForms || (!assetForms.intake_form_id && !assetForms.inventory_form_id) ? (
+                        <div className="text-sm text-amber-600 text-center">
+                          This asset type doesn't have forms configured. Contact your administrator.
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ) : (
                   <div className="mb-4">
@@ -239,7 +452,7 @@ const BarcodeScanner = () => {
                       <Search className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                       <p className="mb-1 font-medium">Item Not Found</p>
                       <p className="text-sm text-muted-foreground mb-4">
-                        No item found with this barcode
+                        No item found with this QR code
                       </p>
                       <Button 
                         variant="outline" 
@@ -252,15 +465,15 @@ const BarcodeScanner = () => {
                 )}
                 
                 <div className="text-sm text-muted-foreground">
-                  <p>Scan another barcode or enter manually to search inventory.</p>
+                  <p>Scan another QR code or enter manually to search inventory.</p>
                 </div>
               </div>
             ) : (
               <div className="border border-dashed rounded-lg p-8 text-center">
                 <Barcode className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-muted-foreground mb-2">No barcode scanned yet</p>
+                <p className="text-muted-foreground mb-2">No QR code scanned yet</p>
                 <p className="text-sm text-muted-foreground">
-                  Use the scanner or enter a barcode manually
+                  Use the scanner or enter a QR code manually
                 </p>
               </div>
             )}
