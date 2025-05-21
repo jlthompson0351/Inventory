@@ -81,14 +81,15 @@ const ReportBuilder = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [formFields, setFormFields] = useState<any[]>([]);
   const [fieldSearch, setFieldSearch] = useState("");
+  const [isLoadingAssetTypes, setIsLoadingAssetTypes] = useState(false);
   
   useEffect(() => {
     const fetchAssetTypes = async () => {
-      if (!currentOrganization?.id) return;
-      
+      if (!currentOrganization) return;
+      setIsLoadingAssetTypes(true);
       try {
-        const data = await getAssetTypes(supabase, currentOrganization.id);
-        setAssetTypes(data);
+        const data = await getAssetTypes(currentOrganization.id);
+        setAssetTypes(data || []);
       } catch (error) {
         console.error("Failed to fetch asset types:", error);
         toast({
@@ -96,6 +97,8 @@ const ReportBuilder = () => {
           description: "Failed to load asset types. Please try again.",
           variant: "destructive",
         });
+      } finally {
+        setIsLoadingAssetTypes(false);
       }
     };
     

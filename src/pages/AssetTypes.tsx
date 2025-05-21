@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Plus, Edit, Trash2, Loader2, ArrowUp, ArrowDown, Filter, Copy, RefreshCw, Search, FileText, ListCheck, Package, FileStack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,9 +120,15 @@ const AssetTypes = () => {
   const [selectedAssetType, setSelectedAssetType] = useState<AssetTypeWithCount | null>(null);
   const [allForms, setAllForms] = useState<any[]>([]);
   const [assetTypeForms, setAssetTypeForms] = useState<{ [assetTypeId: string]: any[] }>({});
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
+  
+  // Memoize the current organization ID to stabilize dependencies
+  const currentOrgId = useMemo(() => currentOrganization?.id, [currentOrganization?.id]);
   
   // Fix the Supabase connection check function
-  const checkSupabaseConnection = async () => {
+  const checkSupabaseConnection = useCallback(async () => {
+    if (supabaseConnected !== null) return supabaseConnected;
+    
     try {
       console.log('Checking Supabase connection...');
       // Correct syntax for Supabase count query
@@ -137,10 +143,12 @@ const AssetTypes = () => {
           description: "There was an issue connecting to the database. Please try again.",
           variant: "destructive"
         });
+        setSupabaseConnected(false);
         return false;
       }
       
       console.log('Supabase connection successful');
+      setSupabaseConnected(true);
       return true;
     } catch (err) {
       console.error('Failed to check Supabase connection:', err);
@@ -149,24 +157,30 @@ const AssetTypes = () => {
         description: "Could not verify database connection. Please refresh the page.",
         variant: "destructive"
       });
+      setSupabaseConnected(false);
       return false;
     }
-  };
+  }, [toast, supabaseConnected]);
 
-  // Modify the existing useEffect to check the connection on mount
+  // Check connection once on mount
   useEffect(() => {
-    // Check Supabase connection on component mount
     checkSupabaseConnection();
+  }, []);
+
+  // Handle data fetching based on view type and organization
+  useEffect(() => {
+    // Only fetch if we have an organization and know Supabase is connected
+    if (supabaseConnected === false) return;
     
     if (activeView === "normal") {
       fetchAssetTypes();
     } else {
       fetchMothershipAssetTypes();
     }
-  }, [currentOrganization, activeView]);
+  }, [currentOrgId, activeView, supabaseConnected]);
 
-  const fetchAssetTypes = async () => {
-    if (!currentOrganization?.id) {
+  const fetchAssetTypes = useCallback(async () => {
+    if (!currentOrgId) {
       setAssetTypes([]);
       setIsLoading(false);
       return;
@@ -175,7 +189,7 @@ const AssetTypes = () => {
     console.log('Setting isLoading to true');
     setIsLoading(true);
     try {
-      const data = await getAssetTypesWithCounts(supabase, currentOrganization.id);
+      const data = await getAssetTypesWithCounts(supabase, currentOrgId);
       setAssetTypes(data);
       console.log('Fetched asset types successfully:', data?.length || 0);
     } catch (error) {
@@ -189,9 +203,9 @@ const AssetTypes = () => {
       console.log('Setting isLoading to false');
       setIsLoading(false);
     }
-  };
+  }, [currentOrgId, toast]);
 
-  const fetchMothershipAssetTypes = async () => {
+  const fetchMothershipAssetTypes = useCallback(async () => {
     if (!user?.id) {
       setMothershipTypes([]);
       setIsMothershipLoading(false);
@@ -212,7 +226,7 @@ const AssetTypes = () => {
     } finally {
       setIsMothershipLoading(false);
     }
-  };
+  }, [user?.id, toast]);
   
   // Apply filters and sorting to asset types
   const filteredAssetTypes = useMemo(() => {
@@ -250,7 +264,7 @@ const AssetTypes = () => {
     });
     
     return filtered;
-  }, [assetTypes, searchTerm, sortField, sortDirection, filterOptions]);
+  }, [assetTypes, filterOptions.hasAssets, searchTerm, sortField, sortDirection]);
 
   // Apply filters and sorting to mothership asset types
   const filteredMothershipTypes = useMemo(() => {

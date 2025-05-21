@@ -21,6 +21,7 @@ export async function getForms(organizationId: string) {
     .from('forms')
     .select('*')
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .order('name');
 
   if (error) {
@@ -49,6 +50,7 @@ export async function getFormTemplates(organizationId: string) {
     .from('forms')
     .select('*')
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .eq('is_template', true)
     .order('name');
 
@@ -68,6 +70,7 @@ export async function getFormsByStatus(organizationId: string, status: 'draft' |
     .from('forms')
     .select('*')
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .eq('status', status)
     .order('updated_at', { ascending: false });
 
@@ -87,6 +90,7 @@ export async function getFormsByAssetType(organizationId: string, assetTypeId: s
     .from('forms')
     .select('*')
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .contains('asset_types', [assetTypeId])
     .order('name');
 
@@ -112,6 +116,7 @@ export async function getFormById(formId: string) {
       .from('forms')
       .select('*')
       .eq('id', formId)
+      .is('deleted_at', null)
       .single();
 
     if (error) {
@@ -155,6 +160,7 @@ export async function getFormWithRelatedData(formId: string) {
       .from('forms')
       .select('*')
       .eq('id', formId)
+      .is('deleted_at', null)
       .single();
 
     if (formError) {
@@ -460,7 +466,7 @@ export async function deleteForm(formId: string) {
     // Now that all references have been cleared, delete the form
     const { error } = await supabase
       .from('forms')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('id', formId);
 
     if (error) {

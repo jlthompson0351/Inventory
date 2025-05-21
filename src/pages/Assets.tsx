@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useOrganization } from "@/hooks/useOrganization";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -12,15 +12,31 @@ export default function Assets() {
   const { currentOrganization, isLoading } = useOrganization();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  console.log("Assets.tsx minimal version rendering");
-  console.log("- isLoading:", isLoading);
-  console.log("- currentOrganization:", currentOrganization);
+  // Debug logging - only on initial render
+  console.log("Assets.tsx rendering");
+  
+  // Memoize the organization ID to prevent unnecessary re-renders
+  const organizationId = useMemo(() => 
+    currentOrganization?.id,
+    [currentOrganization?.id]
+  );
 
-  const handleAddNewAsset = () => {
+  // Memoize handlers to prevent recreation on every render
+  const handleAddNewAsset = useCallback(() => {
     navigate("/assets/new");
-  };
+  }, [navigate]);
+  
+  const handleRefresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+  
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
+  // Show loading state
   if (isLoading) {
     return (
       <Card>
@@ -34,6 +50,7 @@ export default function Assets() {
     );
   }
 
+  // Show no organization selected state
   if (!currentOrganization) {
     return (
       <Card>
@@ -78,7 +95,7 @@ export default function Assets() {
                 <Input
                   placeholder="Search assets..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                   className="pl-8"
                 />
                 <div className="absolute left-2.5 top-2.5">
@@ -89,7 +106,7 @@ export default function Assets() {
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -97,7 +114,11 @@ export default function Assets() {
           </div>
         </CardHeader>
         <CardContent>
-          <AssetList organizationId={currentOrganization.id} />
+          {/* Pass a key to force the component to remount when refresh is clicked */}
+          <AssetList 
+            key={`asset-list-${refreshTrigger}`}
+            organizationId={organizationId} 
+          />
         </CardContent>
       </Card>
     </div>

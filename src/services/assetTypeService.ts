@@ -35,6 +35,7 @@ export const getAssetTypes = async (
     .from('asset_types')
     .select('*')
     .eq('organization_id', organizationId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (error) {

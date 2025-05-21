@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Asset } from "./Assets";
 import { generateAssetBarcode } from "@/services/inventoryService";
 import QRCode from "qrcode.react";
+import { softDeleteAsset } from "@/services/assetService";
 
 interface FormSubmission {
   id: string;
@@ -247,15 +248,8 @@ export default function AssetDetail() {
     try {
       setIsDeleting(true);
       
-      // Delete the asset
-      const { error } = await supabase
-        .from('assets')
-        .delete()
-        .eq('id', asset.id);
-      
-      if (error) {
-        throw error;
-      }
+      // Soft delete the asset
+      await softDeleteAsset(asset.id);
       
       toast({
         title: "Success",

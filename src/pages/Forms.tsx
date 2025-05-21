@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { FileInput, MoreVertical, Plus, FileCheck, FilePlus, Loader2, AlertTriangle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ const Forms = () => {
   const [hasAssetTypeLinks, setHasAssetTypeLinks] = useState(false);
   const [formAssetTypeLinks, setFormAssetTypeLinks] = useState<Record<string, any[]>>({});
   const [loadingAssetTypeLinks, setLoadingAssetTypeLinks] = useState(false);
+  const hasLoadedFormsRef = useRef(false);
+  const [formsLoaded, setFormsLoaded] = useState(false);
 
   useEffect(() => {
     if (!isOrgLoading && currentOrganization?.id) {
@@ -42,31 +44,36 @@ const Forms = () => {
     } else if (!isOrgLoading && !currentOrganization?.id) {
       setForms([]);
     }
-  }, [currentOrganization, isOrgLoading]);
+  }, [currentOrganization?.id, isOrgLoading]);
 
   const loadForms = async () => {
     if (!currentOrganization?.id) return;
     
     try {
       setLoading(true);
-      const data = await getForms(currentOrganization.id);
-      console.log("Loaded forms:", data);
+      let data;
+      try {
+        data = await getForms(currentOrganization.id);
+        console.log("Loaded forms:", data);
+      } catch (fetchError) {
+        console.error("Error fetching forms:", fetchError);
+        data = []; // Set to empty array on error
+      }
 
-      // Make sure any form with schema but no form_data gets converted
-      const normalizedForms = data?.map(form => {
-        return form;
-      }) || [];
-
-      setForms(normalizedForms);
+      // Set forms only if the component is still mounted and data is valid
+      setForms(data || []);
     } catch (error) {
-      console.error("Error loading forms:", error);
+      console.error("Error in loadForms:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to load forms",
       });
+      // Set forms to empty array to prevent further reloads
+      setForms([]);
     } finally {
       setLoading(false);
+      setFormsLoaded(true);
     }
   };
   
@@ -147,24 +154,36 @@ const Forms = () => {
   const isPageLoading = isOrgLoading || loading;
 
   useEffect(() => {
-    if (!isPageLoading && currentOrganization?.id && forms.length > 0) {
+    // Only fetch asset type links if we have forms and are not currently loading
+    if (!isOrgLoading && currentOrganization?.id && formsLoaded && forms.length > 0 && !loadingAssetTypeLinks) {
       setLoadingAssetTypeLinks(true);
-      Promise.all(
-        forms.map(form =>
-          getFormAssetTypeLinks(form.id, currentOrganization.id)
-            .then(links => ({ formId: form.id, links }))
-            .catch(() => ({ formId: form.id, links: [] }))
-        )
-      ).then(results => {
-        const linksMap: Record<string, any[]> = {};
-        results.forEach(({ formId, links }) => {
-          linksMap[formId] = links;
+      
+      // Use a timeout to prevent immediate re-render race conditions
+      const timeoutId = setTimeout(() => {
+        Promise.all(
+          forms.map(form =>
+            getFormAssetTypeLinks(form.id, currentOrganization.id)
+              .then(links => ({ formId: form.id, links }))
+              .catch(() => ({ formId: form.id, links: [] })) // Provide a default empty array on error for a specific form
+          )
+        ).then(results => {
+          const linksMap: Record<string, any[]> = {};
+          results.forEach(({ formId, links }) => {
+            linksMap[formId] = links;
+          });
+          setFormAssetTypeLinks(linksMap);
+        }).catch(error => {
+          console.error("Error fetching asset type links:", error);
+          // Optionally, set all links to empty or handle global error state
+          setFormAssetTypeLinks({}); 
+        }).finally(() => {
+          setLoadingAssetTypeLinks(false);
         });
-        setFormAssetTypeLinks(linksMap);
-        setLoadingAssetTypeLinks(false);
-      });
+      }, 500); // Small delay to avoid immediate re-renders
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [isPageLoading, currentOrganization, forms]);
+  }, [isOrgLoading, currentOrganization?.id, formsLoaded, forms.length]); // Removed loadingAssetTypeLinks
 
   return (
     <div className="animate-fade-in">
