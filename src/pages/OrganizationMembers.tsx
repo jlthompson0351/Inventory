@@ -11,7 +11,7 @@ import DirectUserAddForm from '@/components/organization/DirectUserAddForm';
 import PendingInvitationsList from '@/components/organization/PendingInvitationsList';
 
 const OrganizationMembers = () => {
-  const { currentOrganization, organizations, fetchOrganizations } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("invite");
   
@@ -31,92 +31,77 @@ const OrganizationMembers = () => {
 
   if (!currentOrganization) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">No Organization Selected</h2>
-          <p className="text-muted-foreground mb-4">Please select or create an organization.</p>
-          <div className="p-4 mb-6 border rounded-md bg-gray-50 max-w-lg">
-            <h2 className="text-xl font-semibold mb-2">Organization Debug Info</h2>
-            <div>
-              <p className="font-medium">Available Organizations ({organizations.length}):</p>
-              {organizations.length > 0 ? (
-                <pre className="bg-white p-2 rounded text-sm">
-                  {JSON.stringify(organizations, null, 2)}
-                </pre>
-              ) : (
-                <p className="text-red-500">No organizations available</p>
-              )}
-            </div>
-            <button
-              onClick={() => fetchOrganizations()}
-              className="mt-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Refresh Organizations
-            </button>
-          </div>
-          <Button onClick={() => navigate('/organization-setup')}>
-            Create Organization
-          </Button>
+          <h2 className="text-xl font-semibold mb-2">No Organization Available</h2>
+          <p className="text-muted-foreground mb-4">There was an error loading your organization.</p>
         </div>
       </div>
     );
   }
 
-  const handleUserAdded = () => {
-    // Refresh the members list when a user is added directly
-    membersRefresh();
-  };
-
-  const membersRefresh = () => {
-    // We'll fetch both members and pending invitations
-    // In a real application, these would be separate functions in their respective hooks
-    if (currentOrganization?.id) {
-      fetchInvitations();
-    }
-  };
-
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Organization Members</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Organization Members</h1>
+        <Button
+          variant="outline"
+          className="mt-2 sm:mt-0"
+          onClick={() => navigate('/organization/settings')}
+        >
+          Organization Settings
+        </Button>
+      </div>
       
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <MembersList 
-          members={members} 
-          isLoading={isLoading} 
-          onUpdateRole={updateMemberRole} 
-          onRemoveMember={removeMember} 
-        />
+      <div className="mb-6">
+        <p className="text-muted-foreground">
+          Manage the members of your organization. Invite new users or manage existing ones.
+        </p>
+      </div>
+      
+      <div className="grid lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3 space-y-4">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Current Members</h2>
+            <MembersList 
+              members={members || []} 
+              isLoading={isLoading}
+              onRoleChange={updateMemberRole}
+              onRemoveMember={removeMember}
+            />
+          </div>
+        </div>
         
-        <div className="space-y-6">
-          <Tabs defaultValue="invite" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="invite">Email Invitation</TabsTrigger>
-              <TabsTrigger value="direct">Direct Add</TabsTrigger>
-            </TabsList>
-            <TabsContent value="invite" className="pt-4">
-              <InviteForm 
-                email={newInviteEmail}
-                setEmail={setNewInviteEmail}
-                role={newInviteRole}
-                setRole={setNewInviteRole}
-                isSubmitting={isSubmitting}
-                onSubmit={sendInvitation}
-              />
-            </TabsContent>
-            <TabsContent value="direct" className="pt-4">
-              {currentOrganization.id && (
-                <DirectUserAddForm 
-                  organizationId={currentOrganization.id}
-                  onUserAdded={handleUserAdded}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
-          
-          <PendingInvitationsList 
-            invitations={invitations} 
-            onDelete={deleteInvitation} 
-          />
+        <div className="lg:col-span-2">
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="invite">Invite Members</TabsTrigger>
+                <TabsTrigger value="pending">Pending ({invitations?.length || 0})</TabsTrigger>
+              </TabsList>
+              
+              <div className="p-6">
+                <TabsContent value="invite" className="mt-0">
+                  <InviteForm
+                    email={newInviteEmail}
+                    setEmail={setNewInviteEmail}
+                    role={newInviteRole}
+                    setRole={setNewInviteRole}
+                    onSubmit={sendInvitation}
+                    isSubmitting={isSubmitting}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="pending" className="mt-0">
+                  <PendingInvitationsList
+                    invitations={invitations || []}
+                    onDelete={deleteInvitation}
+                    onRefresh={fetchInvitations}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
         </div>
       </div>
     </div>

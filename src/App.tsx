@@ -19,7 +19,6 @@ import Reports from "./pages/Reports";
 import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import OrganizationSetup from "./pages/OrganizationSetup";
 import SystemAdmin from "./pages/SystemAdmin";
 import Profile from "./pages/Profile";
 import AppSettings from "./pages/AppSettings";
@@ -97,8 +96,10 @@ const AppRoutes = () => {
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
         <Route path="/invitation" element={<InvitationAccept />} />
         
-        {/* Protected organization setup and admin routes */}
-        <Route path="/organization-setup" element={user ? <OrganizationSetup /> : <Navigate to="/login" />} />
+        {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
+        <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />
+        
+        {/* Protected admin routes */}
         <Route path="/system-admin" element={user ? <SystemAdmin /> : <Navigate to="/login" />} />
         
         {/* Main application routes - require authentication */}

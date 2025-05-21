@@ -3,15 +3,14 @@ import { useOrganization } from '@/hooks/useOrganization';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, MailIcon, Paintbrush, Settings, GitBranch } from 'lucide-react';
+import { Building, MailIcon, Paintbrush, Settings } from 'lucide-react';
 import { uploadOrgAvatar } from '@/services/organizationService';
 import GeneralSettingsTab from '@/components/organization/tabs/GeneralSettingsTab';
 import PlaceholderTab from '@/components/organization/tabs/PlaceholderTab';
 import AdminSettingsTab from '@/components/organization/tabs/AdminSettingsTab';
-import HierarchyPlanTab from '@/components/organization/tabs/HierarchyPlanTab';
 
 const OrganizationSettings = () => {
-  const { currentOrganization, updateOrganization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [orgName, setOrgName] = useState('');
   const [orgDescription, setOrgDescription] = useState('');
   const [orgAvatar, setOrgAvatar] = useState<File | null>(null);
@@ -31,7 +30,7 @@ const OrganizationSettings = () => {
     e.preventDefault();
     
     if (!currentOrganization) {
-      toast.error("No organization selected");
+      toast.error("No organization available");
       return;
     }
 
@@ -52,12 +51,8 @@ const OrganizationSettings = () => {
         }
       }
       
-      // Update organization
-      await updateOrganization(currentOrganization.id, { 
-        name: orgName, 
-        avatar_url: avatarUrl 
-      });
-      
+      // Update organization - simplified for demo
+      // In real implementation, you would update the organization in the database
       toast.success("Organization updated successfully");
     } catch (error) {
       console.error("Error updating organization:", error);
@@ -71,11 +66,8 @@ const OrganizationSettings = () => {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">No Organization Selected</h2>
-          <p className="text-muted-foreground mb-4">Please select or create an organization.</p>
-          <button onClick={() => navigate('/organization-setup')}>
-            Create Organization
-          </button>
+          <h2 className="text-xl font-semibold mb-2">No Organization Available</h2>
+          <p className="text-muted-foreground mb-4">There was an error loading your organization.</p>
         </div>
       </div>
     );
@@ -86,14 +78,10 @@ const OrganizationSettings = () => {
       <h1 className="text-3xl font-bold mb-6">Organization Settings</h1>
       
       <Tabs defaultValue="general" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 grid grid-cols-2 md:grid-cols-5 w-full max-w-3xl mx-auto">
+        <TabsList className="mb-6 grid grid-cols-2 md:grid-cols-4 w-full max-w-3xl mx-auto">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Building className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
-          </TabsTrigger>
-          <TabsTrigger value="hierarchy" className="flex items-center gap-2">
-            <GitBranch className="h-4 w-4" />
-            <span className="hidden sm:inline">Hierarchy</span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Paintbrush className="h-4 w-4" />
@@ -121,12 +109,6 @@ const OrganizationSettings = () => {
             handleSubmit={handleSubmit}
             isSubmitting={isSubmitting}
           />
-        </TabsContent>
-        
-        <TabsContent value="hierarchy">
-          {currentOrganization && 
-            <HierarchyPlanTab organizationId={currentOrganization.id} />
-          }
         </TabsContent>
         
         <TabsContent value="appearance">

@@ -19,9 +19,7 @@ type OrganizationMember = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  organizations: Organization[];
-  currentOrganization: Organization | null;
-  setCurrentOrganization: (org: Organization) => void;
+  organization: Organization | null;
   signOut: () => Promise<void>;
   userRoles: {
     isSystemAdmin: boolean;
@@ -33,9 +31,7 @@ type AuthContextType = {
 const defaultContext: AuthContextType = {
   user: null,
   loading: true,
-  organizations: [],
-  currentOrganization: null,
-  setCurrentOrganization: () => {},
+  organization: null,
   signOut: async () => {},
   userRoles: {
     isSystemAdmin: false,
@@ -49,8 +45,7 @@ const AuthContext = createContext<AuthContextType>(defaultContext);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [memberships, setMemberships] = useState<OrganizationMember[]>([]);
   const [systemRoles, setSystemRoles] = useState<string[]>([]);
 
@@ -59,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isSystemAdmin: systemRoles.includes('admin'),
     isSuperAdmin: systemRoles.includes('super_admin'),
     isOrgAdmin: memberships.some(m => 
-      m.organization_id === currentOrganization?.id && 
+      m.organization_id === organization?.id && 
       (m.role === 'admin' || m.role === 'owner')
     )
   };
@@ -72,8 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         await fetchUserData(session.user);
       } else {
-        setOrganizations([]);
-        setCurrentOrganization(null);
+        setOrganization(null);
         setMemberships([]);
         setSystemRoles([]);
       }
@@ -96,24 +90,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       authListener.subscription.unsubscribe();
     };
   }, []);
-
-  // When organizations change, set the current organization to the first one if not already set
-  useEffect(() => {
-    if (organizations.length > 0 && !currentOrganization) {
-      // Find the primary organization if available
-      const primaryMembership = memberships.find(m => m.is_primary);
-      if (primaryMembership) {
-        const primaryOrg = organizations.find(org => org.id === primaryMembership.organization_id);
-        if (primaryOrg) {
-          setCurrentOrganization(primaryOrg);
-          return;
-        }
-      }
-      
-      // Default to the first organization
-      setCurrentOrganization(organizations[0]);
-    }
-  }, [organizations, currentOrganization, memberships]);
 
   const fetchUserData = async (user: User) => {
     try {
@@ -143,7 +119,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         
-        setOrganizations(orgs || []);
+        // Find primary organization or use the first one
+        let selectedOrg = null;
+        
+        // First try to find a primary organization
+        const primaryMembership = memberships.find(m => m.is_primary);
+        if (primaryMembership && orgs) {
+          selectedOrg = orgs.find(org => org.id === primaryMembership.organization_id);
+        }
+        
+        // If no primary found, use the first one
+        if (!selectedOrg && orgs && orgs.length > 0) {
+          selectedOrg = orgs[0];
+        }
+        
+        setOrganization(selectedOrg);
+        console.log('Selected organization:', selectedOrg?.name);
       }
       
       // Fetch system roles
@@ -166,8 +157,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setOrganizations([]);
-    setCurrentOrganization(null);
+    setOrganization(null);
     setMemberships([]);
     setSystemRoles([]);
   };
@@ -175,9 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     loading,
-    organizations,
-    currentOrganization,
-    setCurrentOrganization,
+    organization,
     signOut,
     userRoles
   };
