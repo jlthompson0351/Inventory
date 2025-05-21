@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Mail, Trash2 } from 'lucide-react';
+import { Mail, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PendingInvitation } from '@/types/invitation';
@@ -8,13 +7,21 @@ import { PendingInvitation } from '@/types/invitation';
 interface PendingInvitationsListProps {
   invitations: PendingInvitation[];
   onDelete: (invitationId: string) => void;
+  onRefresh: () => void;
 }
 
-const PendingInvitationsList = ({ invitations, onDelete }: PendingInvitationsListProps) => {
+const PendingInvitationsList = ({ invitations, onDelete, onRefresh }: PendingInvitationsListProps) => {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Pending Invitations</CardTitle>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onRefresh}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </CardHeader>
       <CardContent>
         {invitations.length === 0 ? (

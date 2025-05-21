@@ -2,18 +2,19 @@ import React, { useState, useEffect, useContext, createContext, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
+// Simple organization type
 type Organization = {
   id: string;
   name: string;
   avatar_url: string | null;
 };
 
+// Simplified organization member type
 type OrganizationMember = {
   id: string;
   user_id: string;
   organization_id: string;
   role: string;
-  is_primary: boolean;
 };
 
 type AuthContextType = {
@@ -93,48 +94,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserData = async (user: User) => {
     try {
-      // Fetch organizations the user is a member of
-      const { data: memberships, error: membershipError } = await supabase
-        .from('organization_members')
-        .select('*')
-        .eq('user_id', user.id);
+      // Get the user's organization using our simplified function
+      const { data: orgId, error: orgIdError } = await supabase.rpc('get_current_organization_id');
       
-      if (membershipError) {
-        console.error('Error fetching memberships:', membershipError);
+      if (orgIdError) {
+        console.error('Error fetching user organization ID:', orgIdError);
         return;
       }
       
-      setMemberships(memberships || []);
-      
-      if (memberships && memberships.length > 0) {
-        const orgIds = memberships.map(m => m.organization_id);
-        
-        const { data: orgs, error: orgsError } = await supabase
+      if (orgId) {
+        // Get organization details
+        const { data: org, error: orgError } = await supabase
           .from('organizations')
           .select('*')
-          .in('id', orgIds);
+          .eq('id', orgId)
+          .single();
         
-        if (orgsError) {
-          console.error('Error fetching organizations:', orgsError);
+        if (orgError) {
+          console.error('Error fetching organization details:', orgError);
           return;
         }
         
-        // Find primary organization or use the first one
-        let selectedOrg = null;
+        setOrganization(org);
         
-        // First try to find a primary organization
-        const primaryMembership = memberships.find(m => m.is_primary);
-        if (primaryMembership && orgs) {
-          selectedOrg = orgs.find(org => org.id === primaryMembership.organization_id);
+        // Get the user's membership
+        const { data: membership, error: membershipError } = await supabase
+          .from('organization_members')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('organization_id', orgId)
+          .single();
+        
+        if (membershipError) {
+          console.error('Error fetching membership:', membershipError);
+          return;
         }
         
-        // If no primary found, use the first one
-        if (!selectedOrg && orgs && orgs.length > 0) {
-          selectedOrg = orgs[0];
-        }
-        
-        setOrganization(selectedOrg);
-        console.log('Selected organization:', selectedOrg?.name);
+        setMemberships(membership ? [membership] : []);
       }
       
       // Fetch system roles

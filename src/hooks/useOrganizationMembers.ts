@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Member {
   id: string;
   user_id: string;
   role: string;
-  is_primary: boolean;
   email: string;
   full_name: string | null;
 }
@@ -19,20 +19,21 @@ interface User {
   };
 }
 
-export const useOrganizationMembers = (organizationId: string | undefined) => {
+export const useOrganizationMembers = () => {
+  const { organization } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchMembers = async () => {
-    if (!organizationId) return;
+    if (!organization?.id) return;
 
     setIsLoading(true);
     try {
-      // First, get the member records
+      // Get the member records for the organization
       const { data: memberData, error: memberError } = await supabase
         .from('organization_members')
-        .select('id, user_id, role, is_primary')
-        .eq('organization_id', organizationId);
+        .select('id, user_id, role')
+        .eq('organization_id', organization.id);
 
       if (memberError) throw memberError;
       
@@ -45,10 +46,7 @@ export const useOrganizationMembers = (organizationId: string | undefined) => {
       // Now get the user emails for these members
       const userIds = memberData.map(member => member.user_id);
       
-      // Get the auth user emails - simulating this since we don't have admin access
-      // In a real implementation, you would use the admin API
-      
-      // Instead, we'll try getting profile data directly
+      // Get profile data 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name')
@@ -64,7 +62,6 @@ export const useOrganizationMembers = (organizationId: string | undefined) => {
           id: member.id,
           user_id: member.user_id,
           role: member.role,
-          is_primary: member.is_primary,
           email: `user-${member.user_id.substring(0, 8)}@example.com`, // Fallback email
           full_name: profile?.full_name || null
         };
@@ -96,12 +93,7 @@ export const useOrganizationMembers = (organizationId: string | undefined) => {
     }
   };
 
-  const removeMember = async (memberId: string, isPrimary: boolean) => {
-    if (isPrimary) {
-      toast.error("Cannot remove the primary member of an organization");
-      return;
-    }
-
+  const removeMember = async (memberId: string) => {
     try {
       const { error } = await supabase
         .from('organization_members')
@@ -119,10 +111,10 @@ export const useOrganizationMembers = (organizationId: string | undefined) => {
   };
 
   useEffect(() => {
-    if (organizationId) {
+    if (organization?.id) {
       fetchMembers();
     }
-  }, [organizationId]);
+  }, [organization?.id]);
 
   return {
     members,

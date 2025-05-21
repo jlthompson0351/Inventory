@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getUserOrganization, updateOrganization as updateOrgService } from '@/services/organizationService';
 
 // Helper function to normalize organization field names for consistency
 const normalizeOrganization = (org) => {
@@ -12,11 +13,7 @@ const normalizeOrganization = (org) => {
   return {
     ...org,
     avatarUrl: org.avatar_url,
-    avatar_url: org.avatar_url || org.avatarUrl,
-    parentId: org.parent_id,
-    parent_id: org.parent_id || org.parentId,
-    hierarchyLevel: org.hierarchy_level,
-    hierarchy_level: org.hierarchy_level || org.hierarchyLevel
+    avatar_url: org.avatar_url || org.avatarUrl
   };
 };
 
@@ -29,22 +26,8 @@ export function useOrganization() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   
-  // Simplified version - just a stub that doesn't actually change organizations
-  // This is for backwards compatibility with components that expect this function
-  const selectOrganization = useCallback(async (organizationId) => {
-    console.log('Organization switching is disabled - using single organization model');
-    return true;
-  }, []);
-
-  // Simplified version - just a stub that doesn't actually fetch organizations
-  // This is for backwards compatibility with components that expect this function
-  const fetchOrganizations = useCallback(async () => {
-    console.log('Organization fetching is disabled - using single organization model');
-    return true;
-  }, []);
-  
   // Method to update the organization details
-  const updateOrganization = useCallback(async (organizationId, updates) => {
+  const updateOrganization = useCallback(async (organizationId: string, updates: any) => {
     if (!organizationId) {
       toast.error('No organization to update');
       return false;
@@ -53,15 +36,13 @@ export function useOrganization() {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update(updates)
-        .eq('id', organizationId);
-        
-      if (error) throw error;
+      const result = await updateOrgService(organizationId, updates);
       
-      toast.success('Organization updated successfully');
-      return true;
+      if (result) {
+        toast.success('Organization updated successfully');
+      }
+      
+      return result;
     } catch (error) {
       console.error('Error updating organization:', error);
       toast.error('Failed to update organization');
@@ -72,19 +53,14 @@ export function useOrganization() {
     }
   }, []);
 
-  // For backwards compatibility, provide both currentOrganization and organizations
-  // where organizations is just an array with the single organization
+  // For backward compatibility, maintain the old property names
   return {
     currentOrganization: organization ? normalizeOrganization(organization) : null,
     organizations: organization ? [normalizeOrganization(organization)] : [],
-    selectOrganization,
-    fetchOrganizations,
     updateOrganization,
     isLoading,
     lastError,
-    userRoles,
-    // Helper function to maintain compatibility with components that use organization hierarchies
-    getOrganizationAncestors: useCallback(() => [], [])
+    userRoles
   };
 }
 

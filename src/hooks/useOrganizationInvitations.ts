@@ -1,22 +1,23 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PendingInvitation } from '@/types/invitation';
+import { useAuth } from '@/hooks/useAuth';
 
-export const useOrganizationInvitations = (organizationId: string | undefined) => {
+export const useOrganizationInvitations = () => {
+  const { organization } = useAuth();
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [newInviteRole, setNewInviteRole] = useState('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchInvitations = async () => {
-    if (!organizationId) return;
+    if (!organization?.id) return;
 
     try {
       // Use the function to fetch invitations using RPC
       const { data, error } = await supabase
-        .rpc('get_organization_invitations', { org_id: organizationId });
+        .rpc('get_organization_invitations', { org_id: organization.id });
 
       if (error) throw error;
       
@@ -29,14 +30,14 @@ export const useOrganizationInvitations = (organizationId: string | undefined) =
 
   const sendInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!organizationId) return;
+    if (!organization?.id) return;
 
     setIsSubmitting(true);
     try {
       // Use the function to create an invitation using RPC
       const { data, error } = await supabase
         .rpc('create_invitation', {
-          org_id: organizationId,
+          org_id: organization.id,
           email_address: newInviteEmail,
           member_role: newInviteRole
         });
@@ -72,10 +73,10 @@ export const useOrganizationInvitations = (organizationId: string | undefined) =
   };
 
   useEffect(() => {
-    if (organizationId) {
+    if (organization?.id) {
       fetchInvitations();
     }
-  }, [organizationId]);
+  }, [organization?.id]);
 
   return {
     invitations,

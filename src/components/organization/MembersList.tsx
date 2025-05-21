@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { User, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,11 +8,11 @@ import type { Member } from '@/hooks/useOrganizationMembers';
 interface MembersListProps {
   members: Member[];
   isLoading: boolean;
-  onUpdateRole: (memberId: string, role: string) => void;
-  onRemoveMember: (memberId: string, isPrimary: boolean) => void;
+  onRoleChange: (memberId: string, role: string) => void;
+  onRemoveMember: (memberId: string) => void;
 }
 
-const MembersList = ({ members, isLoading, onUpdateRole, onRemoveMember }: MembersListProps) => {
+const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember }: MembersListProps) => {
   return (
     <Card>
       <CardHeader>
@@ -38,11 +37,6 @@ const MembersList = ({ members, isLoading, onUpdateRole, onRemoveMember }: Membe
                   <div>
                     <p className="font-medium">
                       {member.full_name || "Unnamed User"}
-                      {member.is_primary && (
-                        <span className="ml-2 text-xs bg-primary/10 text-primary rounded-full px-2 py-0.5">
-                          Primary
-                        </span>
-                      )}
                     </p>
                     <p className="text-sm text-muted-foreground">{member.email}</p>
                   </div>
@@ -51,8 +45,7 @@ const MembersList = ({ members, isLoading, onUpdateRole, onRemoveMember }: Membe
                 <div className="flex items-center gap-2">
                   <Select 
                     defaultValue={member.role} 
-                    disabled={member.is_primary}
-                    onValueChange={(value) => onUpdateRole(member.id, value)}
+                    onValueChange={(value) => onRoleChange(member.id, value)}
                   >
                     <SelectTrigger className="w-24">
                       <SelectValue placeholder="Role" />
@@ -67,8 +60,7 @@ const MembersList = ({ members, isLoading, onUpdateRole, onRemoveMember }: Membe
                   <Button 
                     variant="ghost" 
                     size="icon"
-                    disabled={member.is_primary}
-                    onClick={() => onRemoveMember(member.id, member.is_primary)}
+                    onClick={() => onRemoveMember(member.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

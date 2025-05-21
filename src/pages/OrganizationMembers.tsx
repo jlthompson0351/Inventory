@@ -7,7 +7,6 @@ import { useOrganizationInvitations } from '@/hooks/useOrganizationInvitations';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MembersList from '@/components/organization/MembersList';
 import InviteForm from '@/components/organization/InviteForm';
-import DirectUserAddForm from '@/components/organization/DirectUserAddForm';
 import PendingInvitationsList from '@/components/organization/PendingInvitationsList';
 
 const OrganizationMembers = () => {
@@ -15,8 +14,8 @@ const OrganizationMembers = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>("invite");
   
-  // Use custom hooks to manage members and invitations
-  const { members, isLoading, updateMemberRole, removeMember } = useOrganizationMembers(currentOrganization?.id);
+  // Use custom hooks for members and invitations
+  const { members, isLoading, updateMemberRole, removeMember } = useOrganizationMembers();
   const { 
     invitations, 
     newInviteEmail, 
@@ -27,7 +26,7 @@ const OrganizationMembers = () => {
     sendInvitation, 
     deleteInvitation,
     fetchInvitations 
-  } = useOrganizationInvitations(currentOrganization?.id);
+  } = useOrganizationInvitations();
 
   if (!currentOrganization) {
     return (
