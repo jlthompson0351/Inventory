@@ -27,6 +27,7 @@ type AuthContextType = {
     isSuperAdmin: boolean;
     isOrgAdmin: boolean;
   };
+  fetchUserData: (user: User) => Promise<void>;
 };
 
 const defaultContext: AuthContextType = {
@@ -38,7 +39,8 @@ const defaultContext: AuthContextType = {
     isSystemAdmin: false,
     isSuperAdmin: false,
     isOrgAdmin: false
-  }
+  },
+  fetchUserData: async () => {}
 };
 
 const AuthContext = createContext<AuthContextType>(defaultContext);
@@ -47,16 +49,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [memberships, setMemberships] = useState<OrganizationMember[]>([]);
+  const [membership, setMembership] = useState<OrganizationMember | null>(null);
   const [systemRoles, setSystemRoles] = useState<string[]>([]);
 
   // Calculate user roles based on data
   const userRoles = {
     isSystemAdmin: systemRoles.includes('admin'),
     isSuperAdmin: systemRoles.includes('super_admin'),
-    isOrgAdmin: memberships.some(m => 
-      m.organization_id === organization?.id && 
-      (m.role === 'admin' || m.role === 'owner')
+    isOrgAdmin: !!(membership &&
+      membership.organization_id === organization?.id && 
+      (membership.role === 'admin' || membership.role === 'owner')
     )
   };
 
@@ -69,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await fetchUserData(session.user);
       } else {
         setOrganization(null);
-        setMemberships([]);
+        setMembership(null);
         setSystemRoles([]);
       }
       
@@ -99,6 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (orgIdError) {
         console.error('Error fetching user organization ID:', orgIdError);
+        setOrganization(null);
+        setMembership(null);
         return;
       }
       
@@ -112,13 +116,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (orgError) {
           console.error('Error fetching organization details:', orgError);
+          setOrganization(null);
+          setMembership(null);
           return;
         }
         
         setOrganization(org);
         
         // Get the user's membership
-        const { data: membership, error: membershipError } = await supabase
+        const { data: memberRec, error: membershipError } = await supabase
           .from('organization_members')
           .select('*')
           .eq('user_id', user.id)
@@ -127,10 +133,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (membershipError) {
           console.error('Error fetching membership:', membershipError);
+          setMembership(null);
           return;
         }
         
-        setMemberships(membership ? [membership] : []);
+        setMembership(memberRec || null);
+      } else {
+        // If no orgId, ensure organization and membership are null
+        setOrganization(null);
+        setMembership(null);
       }
       
       // Fetch system roles
@@ -154,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
     setUser(null);
     setOrganization(null);
-    setMemberships([]);
+    setMembership(null);
     setSystemRoles([]);
   };
 
@@ -163,7 +174,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     organization,
     signOut,
-    userRoles
+    userRoles,
+    fetchUserData
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

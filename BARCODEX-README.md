@@ -6,7 +6,7 @@ BarcodEx is a modern inventory management system designed to help businesses tra
 
 ## Key Features
 
-- **Organization Management**: Multi-organization support with hierarchical access controls
+- **Organization Management**: Simplified organization structure (one organization per user).
 - **Asset Type and Form Management**: Define asset categories, link them to various forms (intake, inventory, custom) for different purposes, and manage these relationships.
 - **Asset Tracking**: Track individual assets with detailed properties, history, and linked forms.
 - **User Management**: Role-based access control (coming soon)
@@ -49,7 +49,6 @@ The system includes comprehensive organization management features:
 - **General Settings**: Update organization name, description, and avatar
 - **Admin Settings**: Configure organization-specific settings
 - **Debug Panels**: Advanced diagnostic tools for system administrators
-- **Multi-organization Support**: Users can belong to multiple organizations
 
 For detailed documentation on organization components, see [Organization Components Documentation](./src/components/organization/README.md).
 
@@ -175,10 +174,8 @@ For detailed documentation on Supabase integration, see [Supabase Integration Do
    - Implemented safety timeouts for loading states
    - Enhanced error handling with descriptive messages
 
-3. **Cross-Organization Features**
-   - Improved mothership view for system administrators
-   - Enhanced asset type cloning between organizations
-   - Better filtering and sorting in multi-organization views
+3. **Administrative Features**
+   - Improved system administrator view for managing all organizations.
 
 ### Organization Management Improvements
 

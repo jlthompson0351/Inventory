@@ -27,13 +27,15 @@ export function useOrganization() {
   const [lastError, setLastError] = useState<string | null>(null);
   
   // Method to update the organization details
-  const updateOrganization = useCallback(async (organizationId: string, updates: any) => {
-    if (!organizationId) {
-      toast.error('No organization to update');
+  const updateOrganization = useCallback(async (updates: any) => {
+    if (!organization?.id) {
+      toast.error('No organization to update or user not loaded');
       return false;
     }
+    const organizationId = organization.id;
     
     setIsLoading(true);
+    setLastError(null);
     
     try {
       const result = await updateOrgService(organizationId, updates);
@@ -45,18 +47,18 @@ export function useOrganization() {
       return result;
     } catch (error) {
       console.error('Error updating organization:', error);
-      toast.error('Failed to update organization');
-      setLastError('Failed to update organization');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update organization';
+      toast.error(errorMessage);
+      setLastError(errorMessage);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [organization, userRoles]);
 
   // For backward compatibility, maintain the old property names
   return {
     currentOrganization: organization ? normalizeOrganization(organization) : null,
-    organizations: organization ? [normalizeOrganization(organization)] : [],
     updateOrganization,
     isLoading,
     lastError,

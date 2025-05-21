@@ -7,8 +7,8 @@ A comprehensive inventory management system built with React, TypeScript, and Su
 - Dynamic Form Builder with formula support
 - Asset Type Management
 - Inventory Tracking
-- Organization Management with hierarchical structures
-- User Authentication and Authorization
+- Organization Management (simplified to one organization per user)
+- User Authentication and Authorization (within their organization)
 - File Upload Management
 
 ## Technology Stack
@@ -92,9 +92,9 @@ The built-in formula evaluator allows for safe evaluation of mathematical expres
 
 ### Organization Management
 
-- Create hierarchical organization structures
-- Manage user roles and permissions
-- Share assets and forms across organizations
+- Users belong to a single organization.
+- System administrators can view and manage all organizations.
+- Manage user roles (e.g., admin, member) and permissions within their organization.
 
 ## Development
 
@@ -104,8 +104,4 @@ To update TypeScript definitions from your Supabase schema:
 
 ```
 npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/database.types.ts
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+``

@@ -17,7 +17,7 @@ export const useOrganizationInvitations = () => {
     try {
       // Use the function to fetch invitations using RPC
       const { data, error } = await supabase
-        .rpc('get_organization_invitations', { org_id: organization.id });
+        .rpc('get_organization_invitations');
 
       if (error) throw error;
       
@@ -37,7 +37,6 @@ export const useOrganizationInvitations = () => {
       // Use the function to create an invitation using RPC
       const { data, error } = await supabase
         .rpc('create_invitation', {
-          org_id: organization.id,
           email_address: newInviteEmail,
           member_role: newInviteRole
         });
