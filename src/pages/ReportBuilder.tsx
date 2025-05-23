@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -14,7 +14,9 @@ import {
   SortAsc,
   Trash,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Loader2,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,13 +52,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { getAssetTypes } from "@/services/assetTypeService";
-import { ReportConfig, createReport, updateReport, getReport, executeReport } from "@/services/reportService";
+import { ReportConfig, createReport, updateReport, getReport, executeReport, Report } from "@/services/reportService";
 import { supabase } from "@/integrations/supabase/client";
 import { getMappedFieldsForReporting, getAllMappedFieldsForAssetType } from '@/services/mappedFieldService';
 import { createForm, updateForm, getFormById } from "@/services/formService";
 import { Badge } from "@/components/ui/badge";
 import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTypeService';
 import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
+import { debounce } from 'lodash';
+import * as XLSX from 'xlsx';
 
 // Available data sources for reports (MaintainX style)
 const availableDataSources = [
@@ -191,9 +195,62 @@ const ReportBuilder = () => {
   const [isFieldsLoading, setIsFieldsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(true);
+  
+  // 🚀 NEW: Performance tracking and caching
+  const [fieldCache, setFieldCache] = useState<Map<string, any[]>>(new Map());
+  const [lastPreviewTime, setLastPreviewTime] = useState<number>(0);
+  const [isExporting, setIsExporting] = useState(false);
 
   // 🎯 DYNAMIC SUBJECT - No more manual selection needed!
   const subject = detectPrimarySubject(selectedDataSources);
+
+  // 🚀 Smart debounced search
+  const debouncedSetFieldSearch = useMemo(
+    () => debounce((value: string) => setFieldSearch(value), 300),
+    []
+  );
+
+  // Cleanup debounced function on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSetFieldSearch.cancel();
+    };
+  }, [debouncedSetFieldSearch]);
+
+  const fieldsByForm = formFields.reduce((acc, field) => {
+    const formName = field.form_name || "Other Fields";
+    if (!acc[formName]) acc[formName] = [];
+    acc[formName].push(field);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // 🚀 Memoized filtered fields for performance (moved here after fieldsByForm)
+  const filteredFieldsByForm = useMemo(() => {
+    if (!fieldSearch) return fieldsByForm;
+    
+    const filtered: Record<string, any[]> = {};
+    Object.entries(fieldsByForm).forEach(([formName, fields]) => {
+      const matchingFields = (fields as any[]).filter((f: any) => 
+        f.field_label.toLowerCase().includes(fieldSearch.toLowerCase()) ||
+        (f.description || '').toLowerCase().includes(fieldSearch.toLowerCase())
+      );
+      if (matchingFields.length > 0) {
+        filtered[formName] = matchingFields;
+      }
+    });
+    return filtered;
+  }, [fieldsByForm, fieldSearch]);
+
+  // 🚀 Performance metrics
+  const previewMetrics = useMemo(() => {
+    return {
+      totalSources: selectedDataSources.length,
+      totalColumns: selectedColumns.length,
+      totalFields: formFields.length,
+      previewRows: previewData.length,
+      lastPreviewMs: lastPreviewTime
+    };
+  }, [selectedDataSources.length, selectedColumns.length, formFields.length, previewData.length, lastPreviewTime]);
 
   useEffect(() => {
     const fetchAssetTypes = async () => {
@@ -464,13 +521,6 @@ const ReportBuilder = () => {
     fetchAllAvailableFields();
   }, [currentOrganization?.id, selectedDataSources, selectedAssetTypes, toast, assetTypes]);
 
-  const fieldsByForm = formFields.reduce((acc, field) => {
-    const formName = field.form_name || "Other Fields";
-    if (!acc[formName]) acc[formName] = [];
-    acc[formName].push(field);
-    return acc;
-  }, {} as Record<string, any[]>);
-
   const handleColumnToggle = (columnId: string) => {
     setSelectedColumns(prev =>
       prev.includes(columnId) ? prev.filter(id => id !== columnId) : [...prev, columnId]
@@ -485,6 +535,8 @@ const ReportBuilder = () => {
     setSelectedColumns([]);
     // Don't clear formFields here - let the useEffect handle refreshing them
   };
+
+  
 
   const handleAssetTypeToggle = (typeId: string) => {
     setSelectedAssetTypes(prev =>
@@ -549,13 +601,107 @@ const ReportBuilder = () => {
   };
 
   const generatePreview = async () => {
-    if (!currentOrganization?.id || selectedColumns.length === 0) {
-        toast({title: "Cannot Generate Preview", description: "Please select at least one column.", variant: "destructive"});
-        return;
+    if (!reportName || selectedColumns.length === 0 || selectedDataSources.length === 0) {
+      toast({
+        title: "Cannot Preview",
+        description: "Please configure data sources and select columns first",
+        variant: "destructive"
+      });
+      return;
     }
+
+    if (!currentOrganization?.id) {
+      toast({
+        title: "Error", 
+        description: "No organization selected",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const startTime = performance.now();
     setIsLoading(true);
-    const tempReport = {
-      id: id || 'preview',
+    
+    try {
+      // Create a temporary report config for preview
+      const tempReport: Report = {
+        id: 'temp',
+        name: reportName,
+        description: description,
+        organization_id: currentOrganization.id,
+        report_config: {
+          subject,
+          dataSources: selectedDataSources,
+          columns: selectedColumns,
+          filters: filterRules,
+          sorts: sortRules,
+          assetTypes: selectedAssetTypes
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // 🐛 DEBUG: Log the report config and organization info
+      console.log('🔍 DEBUG - Generating preview with:', {
+        organization_id: currentOrganization.id,
+        organization_name: currentOrganization.name,
+        dataSources: selectedDataSources,
+        columns: selectedColumns,
+        tempReport
+      });
+
+      const results = await executeReport(tempReport, 10);
+      const endTime = performance.now();
+      const executionTime = Math.round(endTime - startTime);
+      
+      setLastPreviewTime(executionTime);
+      
+      // 🐛 DEBUG: Log the results
+      console.log('🔍 DEBUG - Preview results:', {
+        resultsCount: results.length,
+        firstResult: results[0],
+        allResults: results,
+        executionTimeMs: executionTime
+      });
+
+      setPreviewData(results);
+      
+      if (results.length === 0) {
+        toast({
+          title: "No Data Found",
+          description: "The report configuration returned no results. Check your filters and data sources.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Preview Generated ⚡",
+          description: `Found ${results.length} record(s) in ${executionTime}ms`,
+        });
+      }
+    } catch (error) {
+      console.error('Preview generation failed:', error);
+      toast({
+        title: "Preview Failed",
+        description: error instanceof Error ? error.message : "An error occurred while generating the preview",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // 🚀 NEW: Enhanced Excel Export
+  const exportExcel = async () => {
+    if (!currentOrganization?.id || selectedColumns.length === 0) {
+      toast({title: "Cannot Export", description: "Please select at least one column for the export.", variant: "destructive"});
+      return;
+    }
+    
+    setIsExporting(true);
+    toast({ title: "Preparing Excel Export ✨", description: "Generating your report..." });
+    
+    const tempReport: Report = {
+      id: id || 'export',
       name: reportName,
       description,
       report_config: {
@@ -570,18 +716,87 @@ const ReportBuilder = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+    
     try {
-      const results = await executeReport(tempReport, 20); // Increased preview limit
-      setPreviewData(results);
-      if(results.length === 0) {
-        toast({title: "No Data", description: "The preview query returned no results based on your current configuration.", variant: "default"});
+      const results = await executeReport(tempReport);
+      if (results.length === 0) {
+        toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
+        return;
       }
+
+      // Create workbook with enhanced formatting
+      const workbook = XLSX.utils.book_new();
+      
+      // Prepare headers
+      const headers = selectedColumns.map(colId => formFields.find(f => f.id === colId)?.field_label || colId);
+      
+      // Prepare data rows
+      const data = results.map(item => selectedColumns.map(colId => {
+        let value = item[colId]; // First try direct access with the exact field ID
+        
+        // If not found directly and field contains dots, try nested access
+        if ((value === undefined || value === null) && colId.includes('.')) {
+          const parts = colId.split('.');
+          value = item[parts[0]]?.[parts[1]];
+        }
+        
+        // Check if property exists directly on item
+        if ((value === undefined || value === null) && item.hasOwnProperty(colId)) {
+          value = item[colId];
+        }
+        
+        // For form submission data
+        if ((value === undefined || value === null) && item.submission_data && item.submission_data[colId]) {
+          value = item.submission_data[colId];
+        }
+        
+        // Format dates for Excel
+        const field = formFields.find(f => f.id === colId);
+        if (field?.field_type === 'date' && value) {
+          return new Date(value);
+        }
+        
+        return value !== null && value !== undefined ? value : '';
+      }));
+
+      // Create worksheet with headers and data
+      const worksheetData = [headers, ...data];
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths
+      const columnWidths = headers.map(header => ({ width: Math.max(header.length + 2, 12) }));
+      worksheet['!cols'] = columnWidths;
+      
+      // Add metadata sheet
+      const metadataSheet = XLSX.utils.aoa_to_sheet([
+        ['Report Information'],
+        ['Report Name', reportName],
+        ['Description', description || 'No description'],
+        ['Generated At', new Date().toLocaleString()],
+        ['Organization', currentOrganization.name],
+        ['Data Sources', selectedDataSources.join(', ')],
+        ['Total Records', results.length],
+        ['Total Columns', selectedColumns.length]
+      ]);
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Report Data');
+      XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
+      
+      // Generate filename
+      const filename = `${reportName.replace(/\s+/g, "_")}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Write and download
+      XLSX.writeFile(workbook, filename);
+      
+      toast({ 
+        title: "Excel Export Complete 🎉", 
+        description: `Downloaded ${filename} with ${results.length} records` 
+      });
     } catch (error) {
-      console.error("Failed to generate preview:", error);
-      toast({ title: "Error Generating Preview", description: String(error), variant: "destructive" });
-      setPreviewData([]);
+      console.error("Error exporting Excel:", error);
+      toast({ title: "Export Error", description: String(error), variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      setIsExporting(false);
     }
   };
   
@@ -592,7 +807,7 @@ const ReportBuilder = () => {
     }
     toast({ title: "Preparing Export", description: "Please wait..." });
     setIsLoading(true);
-     const tempReport = {
+     const tempReport: Report = {
       id: id || 'export',
       name: reportName,
       description,
@@ -616,11 +831,24 @@ const ReportBuilder = () => {
       }
       const headers = selectedColumns.map(colId => formFields.find(f => f.id === colId)?.field_label || colId);
       const data = results.map(item => selectedColumns.map(colId => {
-        let value = item[colId];
-         if (colId.includes('.')) {
-            const parts = colId.split('.');
-            value = item[parts[0]]?.[parts[1]];
+        let value = item[colId]; // First try direct access with the exact field ID
+        
+        // If not found directly and field contains dots, try nested access
+        if ((value === undefined || value === null) && colId.includes('.')) {
+          const parts = colId.split('.');
+          value = item[parts[0]]?.[parts[1]];
         }
+        
+        // Check if property exists directly on item
+        if ((value === undefined || value === null) && item.hasOwnProperty(colId)) {
+          value = item[colId];
+        }
+        
+        // For form submission data
+        if ((value === undefined || value === null) && item.submission_data && item.submission_data[colId]) {
+          value = item.submission_data[colId];
+        }
+        
         return value !== null && value !== undefined ? String(value) : '';
       }));
       const csvContent = [headers.join(","), ...data.map(row => row.join(","))].join("\n");
@@ -711,9 +939,13 @@ const ReportBuilder = () => {
           </div>
         </div>
         <div className="flex space-x-2 flex-shrink-0 self-start md:self-center">
-          <Button variant="outline" onClick={exportCsv} disabled={isLoading || selectedColumns.length === 0}>
+          <Button variant="outline" onClick={exportExcel} disabled={isLoading || selectedColumns.length === 0}>
             <Download className="mr-2 h-4 w-4" />
-            Export
+            Export as Excel
+          </Button>
+          <Button onClick={exportCsv} disabled={isLoading || selectedColumns.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Export as CSV
           </Button>
           <Button onClick={saveReport} disabled={isLoading}>
             <Save className="mr-2 h-4 w-4" />
@@ -830,13 +1062,12 @@ const ReportBuilder = () => {
                     </div>
                     <Input
                       placeholder="🔍 Search available fields..."
-                      value={fieldSearch}
-                      onChange={e => setFieldSearch(e.target.value)}
+                      onChange={e => debouncedSetFieldSearch(e.target.value)}
                       className="w-full mb-3"
                     />
                     {isFieldsLoading ? (
                       <div className="text-center py-10 text-muted-foreground">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                        <Loader2 className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2" />
                         Discovering fields...
                       </div>
                     ) : formFields.length === 0 ? (
@@ -846,22 +1077,12 @@ const ReportBuilder = () => {
                         </div>
                     ) : (
                       <div className="border rounded-md max-h-[500px] overflow-y-auto divide-y divide-slate-100">
-                        {Object.entries(fieldsByForm).filter(([formName, fields]) => 
-                            (fields as any[]).some((f: any) => 
-                                f.field_label.toLowerCase().includes(fieldSearch.toLowerCase()) ||
-                                (f.description || '').toLowerCase().includes(fieldSearch.toLowerCase())
-                            )
-                        ).map(([formName, fields]) => {
-                          const filteredFields = (fields as any[]).filter((f: any) => 
-                                f.field_label.toLowerCase().includes(fieldSearch.toLowerCase()) ||
-                                (f.description || '').toLowerCase().includes(fieldSearch.toLowerCase())
-                          );
-                          if (filteredFields.length === 0) return null;
-                          return (
+                        {Object.entries(filteredFieldsByForm).length > 0 ? (
+                          Object.entries(filteredFieldsByForm).map(([formName, fields]) => (
                             <div key={formName} className="p-3">
                               <h4 className="font-semibold text-sm mb-1.5 text-primary">{formName}</h4>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
-                                {filteredFields.map((field: any) => (
+                                {(fields as any[]).map((field: any) => (
                                   <div key={field.id} className="flex items-center space-x-2 py-0.5">
                                     <Checkbox
                                       id={`column-${field.id}`}
@@ -878,10 +1099,12 @@ const ReportBuilder = () => {
                                 ))}
                               </div>
                             </div>
-                          );
-                        })}
-                        {Object.keys(fieldsByForm).length === 0 && !isFieldsLoading && (
-                            <div className="text-center py-10 text-muted-foreground">No fields found matching your search.</div>
+                          ))
+                        ) : (
+                          <div className="text-center py-10 text-muted-foreground">
+                            <p>No fields found matching your search.</p>
+                            <p className="text-xs mt-1">Try different keywords or clear your search.</p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -980,11 +1203,25 @@ const ReportBuilder = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-xl font-semibold">🔍 Live Data Preview</h2>
-                      <Button onClick={generatePreview} disabled={isLoading || selectedColumns.length === 0} variant="outline" size="sm">
-                        {isLoading ? (
-                            <><div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-1.5"></div>Refreshing...</>
-                        ) : (<>🔄 Refresh Preview</>)}
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button onClick={generatePreview} disabled={isLoading || selectedColumns.length === 0} variant="outline" size="sm">
+                          {isLoading ? (
+                              <><Loader2 className="animate-spin rounded-full h-3 w-3 mr-1.5" />Refreshing...</>
+                          ) : (<>🔄 Refresh Preview</>)}
+                        </Button>
+                        {previewData.length > 0 && (
+                          <>
+                            <Button onClick={exportExcel} disabled={isExporting || selectedColumns.length === 0} size="sm">
+                              {isExporting ? (
+                                <><Loader2 className="animate-spin rounded-full h-3 w-3 mr-1.5" />Exporting...</>
+                              ) : (<><Sparkles className="mr-1.5 h-3 w-3" />Excel</>)}
+                            </Button>
+                            <Button onClick={exportCsv} disabled={isLoading || selectedColumns.length === 0} variant="outline" size="sm">
+                              <FileSpreadsheet className="mr-1.5 h-3 w-3" />CSV
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     {selectedColumns.length === 0 ? (
                       <div className="text-center py-10 text-muted-foreground text-sm">
@@ -1016,17 +1253,23 @@ const ReportBuilder = () => {
                               <TableRow key={rowIndex} className="text-xs">
                                 {selectedColumns.map(colId => {
                                   const field = formFields.find(f => f.id === colId);
-                                  let value = row[colId]; // Default for custom/dynamic fields
-                                  // Handle direct table fields (e.g. assets.name)
-                                  if (field && field.id.includes('.')) { 
+                                  let value = row[colId]; // First try direct access with the exact field ID
+                                  
+                                  // If not found directly and field contains dots, try nested access
+                                  if ((value === undefined || value === null) && field && field.id.includes('.')) { 
                                       const parts = field.id.split('.');
                                       value = row[parts[0]]?.[parts[1]];
-                                  } else if (field && row.hasOwnProperty(field.id)) { // Check if property exists directly
+                                  } 
+                                  
+                                  // Check if property exists directly on row
+                                  if ((value === undefined || value === null) && field && row.hasOwnProperty(field.id)) {
                                        value = row[field.id];
-                                  } else if (row.submission_data && row.submission_data[colId]) { // For form_submission data
+                                  } 
+                                  
+                                  // For form submission data
+                                  if ((value === undefined || value === null) && row.submission_data && row.submission_data[colId]) {
                                       value = row.submission_data[colId];
                                   }
-
 
                                   let displayValue = value;
                                   if (typeof value === 'boolean') {
@@ -1065,17 +1308,29 @@ const ReportBuilder = () => {
                   <span className="text-xl mr-1.5">🎯</span>
                   Smart Report Insights
                 </h2>
-                <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">Live</Badge>
+                <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
+                  {lastPreviewTime > 0 ? `${lastPreviewTime}ms` : 'Live'}
+                </Badge>
               </div>
               <div className="space-y-3">
                 <div className="p-3 bg-slate-50 rounded-md border">
                   <h3 className="font-medium text-xs text-slate-600 mb-1">📊 Overview</h3>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="font-semibold text-slate-800">{selectedDataSources.length}</span> Sources</div>
-                    <div><span className="font-semibold text-slate-800">{selectedColumns.length}</span> Columns</div>
-                    <div><span className="font-semibold text-slate-800">{formFields.length}</span> Available</div>
-                    <div><span className="font-semibold text-slate-800">{previewData.length}</span> Preview Rows</div>
+                    <div><span className="font-semibold text-slate-800">{previewMetrics.totalSources}</span> Sources</div>
+                    <div><span className="font-semibold text-slate-800">{previewMetrics.totalColumns}</span> Columns</div>
+                    <div><span className="font-semibold text-slate-800">{previewMetrics.totalFields}</span> Available</div>
+                    <div><span className="font-semibold text-slate-800">{previewMetrics.previewRows}</span> Preview Rows</div>
                   </div>
+                  {lastPreviewTime > 0 && (
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600">Last Query</span>
+                        <span className={`font-medium ${lastPreviewTime < 500 ? 'text-green-600' : lastPreviewTime < 2000 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {lastPreviewTime}ms {lastPreviewTime < 500 ? '⚡' : lastPreviewTime < 2000 ? '⚠️' : '🐌'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                  {/* Smart suggestions based on current state */}
                  { selectedDataSources.length > 0 && selectedColumns.length === 0 && formFields.length > 0 && (
@@ -1098,6 +1353,16 @@ const ReportBuilder = () => {
                         ⚠️ No data found with current filters. Try adjusting your configuration or removing filters.
                     </div>
                  )}
+                 { selectedColumns.length > 10 && (
+                     <div className="p-2.5 bg-purple-50 rounded-md border border-purple-200 text-xs text-purple-700">
+                        📊 Large report detected! Consider breaking this into smaller focused reports for better performance.
+                    </div>
+                 )}
+                 { selectedDataSources.includes('asset_types') && selectedDataSources.includes('assets') && (
+                     <div className="p-2.5 bg-emerald-50 rounded-md border border-emerald-200 text-xs text-emerald-700">
+                        🔗 Great! Asset types + Assets combination will show conversion fields when applicable.
+                    </div>
+                 )}
               </div>
             </CardContent>
           </Card>
@@ -1105,11 +1370,11 @@ const ReportBuilder = () => {
             <CardContent className="p-4">
               <h3 className="font-semibold text-base mb-2.5 flex items-center"><span className="text-xl mr-1.5">⚡</span>Quick Actions</h3>
               <div className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={exportExcel} disabled={isLoading || selectedColumns.length === 0}>
+                    <Download className="mr-2 h-3.5 w-3.5" />Export as Excel
+                </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" onClick={exportCsv} disabled={isLoading || selectedColumns.length === 0}>
                     <Download className="mr-2 h-3.5 w-3.5" />Export as CSV
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start" onClick={generatePreview} disabled={isLoading || selectedColumns.length === 0}>
-                    <Save className="mr-2 h-3.5 w-3.5" />Refresh Preview
                 </Button>
                  <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setActiveTab("columns")}>
                     <TableIcon className="mr-2 h-3.5 w-3.5" />Manage Columns

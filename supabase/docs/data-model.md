@@ -1,5 +1,29 @@
 # Barcodex Database Model Documentation
 
+## Performance Infrastructure
+
+### Materialized Views
+- **mv_asset_type_summary**: Pre-computed asset counts and statistics by type
+- **mv_inventory_summary**: Aggregated inventory values and quantities
+- **mv_form_submission_trends**: Daily submission trends for analytics
+
+### Performance Tables
+- **report_cache**: Intelligent caching for frequently accessed reports
+- **slow_query_log**: Tracks queries exceeding 1 second for optimization
+- **report_runs**: Enhanced with cache_hit, query_complexity, bytes_processed columns
+
+### Advanced Indexes
+- Multi-column composite indexes for common query patterns
+- GIN indexes for JSON/JSONB fields and text search
+- Partial indexes for active/non-deleted records
+
+### Performance Functions
+- **refresh_reporting_views()**: Refresh all materialized views
+- **get_asset_count_fast()**: Optimized asset counting with filters
+- **get_inventory_value_fast()**: Fast inventory value calculations
+- **get_report_performance_stats()**: Analytics on report execution
+- **run_reporting_maintenance()**: Comprehensive maintenance routine
+
 ## Core Entities
 
 ### Organizations
