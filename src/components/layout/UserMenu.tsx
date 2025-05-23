@@ -1,77 +1,62 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { 
-  Settings, 
   LogOut,
   Shield,
   User,
-  Sliders
+  Sliders,
+  Settings
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/common/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 
 const UserMenu = () => {
   const navigate = useNavigate();
-  
-  // Get user data (in a real app this would come from an auth context)
-  const [user, setUser] = useState<{ name: string; email: string; avatarUrl: string | null } | null>(null);
-  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
-  
-  // Fetch user data on component mount
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        // Use the RPC function to get profile data
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-          
-        // Check if user is a system admin
-        const { data: systemRole } = await supabase
-          .from('system_roles')
-          .select('role')
-          .eq('user_id', data.user.id)
-          .single();
-        
-        setIsSystemAdmin(!!systemRole && ['admin', 'super_admin'].includes(systemRole.role));
-        
-        setUser({
-          name: profileData?.full_name || data.user.user_metadata?.name || "User",
-          email: data.user.email || "",
-          avatarUrl: profileData?.avatar_url || null
-        });
-      }
-    };
-    
-    fetchUserData();
-  }, []);
+  const { user, profile, userRoles, organizationRole } = useAuth();
   
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
+  const displayName = profile?.full_name || user?.email || "User";
+  const avatarUrl = profile?.avatar_url || null;
+  const email = user?.email || "";
+
+  if (!user) {
+    return (
+      <div className="w-full flex items-center justify-start gap-3 px-2 py-1.5 h-auto">
+        <UserAvatar src={null} name={null} size="sm" />
+        <div className="flex flex-col items-start">
+          <span className="text-sm font-medium">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="w-full flex items-center justify-start gap-3 px-2 py-1.5 h-auto text-left">
-          <UserAvatar src={user?.avatarUrl} name={user?.name} size="sm" />
+          <UserAvatar src={avatarUrl} name={displayName} size="sm" />
           <div className="flex flex-col items-start">
-            <span className="text-sm font-medium">{user?.name}</span>
-            <span className="text-xs text-muted-foreground">{user?.email}</span>
+            <span className="text-sm font-medium">{displayName}</span>
+            <span className="text-xs text-muted-foreground">{email}</span>
+            {organizationRole && (
+              <Badge variant="secondary" className="mt-1 capitalize text-xs">
+                {organizationRole}
+              </Badge>
+            )}
           </div>
         </Button>
       </DropdownMenuTrigger>
@@ -88,11 +73,19 @@ const UserMenu = () => {
             <span>App Settings</span>
           </Link>
         </DropdownMenuItem>
-        {isSystemAdmin && (
+        {userRoles?.isOrgAdmin && (
           <DropdownMenuItem asChild>
-            <Link to="/system-admin">
+            <Link to="/organization-admin">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Organization Admin</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {userRoles?.isPlatformOperator && (
+          <DropdownMenuItem asChild>
+            <Link to="/platform-dashboard">
               <Shield className="mr-2 h-4 w-4" />
-              <span>System Administration</span>
+              <span>Platform Dashboard</span>
             </Link>
           </DropdownMenuItem>
         )}

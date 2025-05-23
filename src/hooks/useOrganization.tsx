@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -56,9 +56,14 @@ export function useOrganization() {
     }
   }, [organization, userRoles]);
 
+  // Memoize currentOrganization
+  const currentOrganization = useMemo(() => {
+    return organization ? normalizeOrganization(organization) : null;
+  }, [organization]);
+
   // For backward compatibility, maintain the old property names
   return {
-    currentOrganization: organization ? normalizeOrganization(organization) : null,
+    currentOrganization,
     updateOrganization,
     isLoading,
     lastError,

@@ -7,10 +7,11 @@ import { PendingInvitation } from '@/types/invitation';
 interface PendingInvitationsListProps {
   invitations: PendingInvitation[];
   onDelete: (invitationId: string) => void;
+  onResend: (invitationId: string) => void;
   onRefresh: () => void;
 }
 
-const PendingInvitationsList = ({ invitations, onDelete, onRefresh }: PendingInvitationsListProps) => {
+const PendingInvitationsList = ({ invitations, onDelete, onResend, onRefresh }: PendingInvitationsListProps) => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -44,13 +45,24 @@ const PendingInvitationsList = ({ invitations, onDelete, onRefresh }: PendingInv
                   </div>
                 </div>
                 
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => onDelete(invitation.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => onResend(invitation.id)}
+                    title="Resend Invitation"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => onDelete(invitation.id)}
+                    title="Delete Invitation"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

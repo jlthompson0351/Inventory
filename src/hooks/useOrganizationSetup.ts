@@ -14,84 +14,18 @@ export const useOrganizationSetup = () => {
 
   // Check if user can create organizations
   useEffect(() => {
-    const checkUserPermissions = async () => {
-      // Get current user - use the user from useAuth context
-      if (!user) {
-        // If user from useAuth is null, it might still be loading or not logged in.
-        // The original code fetched user directly here. Let's ensure user context is prioritized.
-        // If auth hook has user as null and not loading, then navigate.
-        const session = await supabase.auth.getSession();
-        if (!session.data.session?.user) {
-          navigate('/login');
-          return;
-        }
-        // If we reach here, it implies useAuth might not have updated yet, but a session exists.
-        // This part might need more robust handling of auth state loading.
-      }
-      
-      // Use user.id from useAuth context
-      const userId = user?.id;
-      if (!userId) {
-        toast.error("User not available for permission check.");
-        return;
-      }
-
-      console.log('Checking permissions for user:', userId);
-
-      // Check if user is creating their first org (anyone can create their first org)
-      const { data: existingOrgs, error: orgsError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', userId); // Use userId from context
-      
-      if (orgsError) {
-        console.error('Error checking organizations:', orgsError);
-        toast.error('Error checking permissions');
-        return;
-      }
-
-      const isFirstOrg = !existingOrgs || existingOrgs.length === 0;
-      console.log('Is first org?', isFirstOrg);
-      
-      // Check if user is a system admin (can create multiple orgs)
-      const { data: systemRoles, error: roleError } = await supabase
-        .from('system_roles')
-        .select('role')
-        .eq('user_id', userId); // Use userId from context
-      
-      if (roleError) {
-        console.error('Error checking system roles:', roleError);
-      }
-      
-      // Check for both 'admin' and 'super_admin' roles
-      const isSystemAdmin = systemRoles && systemRoles.length > 0 && 
-        (systemRoles[0]?.role === 'admin' || systemRoles[0]?.role === 'super_admin');
-      
-      console.log('System roles:', systemRoles);
-      console.log('Is system admin?', isSystemAdmin);
-      
-      // DEVELOPMENT BYPASS: Allow all users to create organizations
-      // Remove this in production
-      const devBypassEnabled = false;
-      
-      if (devBypassEnabled) {
-        console.log('Development bypass enabled: All users can create organizations');
-        setCanCreateOrg(true);
-        return;
-      }
-      
-      setCanCreateOrg(isSystemAdmin || isFirstOrg);
-    };
-    
-    // Trigger checkUserPermissions only if user is loaded
-    if (user) {
-      checkUserPermissions();
+    // In a single-organization model, a user can "create" (or rather, go through setup)
+    // if they are not currently associated with an organization.
+    if (user && !currentOrganization) {
+      setCanCreateOrg(true);
+    } else {
+      setCanCreateOrg(false);
     }
-  }, [user, navigate]); // Depend on user from useAuth
+  }, [user, currentOrganization]);
 
-  // If user already has an organization and isn't allowed to create another, redirect to dashboard
+  // If user already has an organization, redirect to dashboard
   useEffect(() => {
-    if (currentOrganization && !canCreateOrg && user) { // Ensure user is loaded before this check
+    if (currentOrganization && !canCreateOrg && user) {
       navigate('/');
     }
   }, [currentOrganization, navigate, canCreateOrg, user]); 

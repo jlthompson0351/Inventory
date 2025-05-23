@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Loader2,
   ArrowLeft,
-  InfoIcon
+  InfoIcon,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,15 +42,18 @@ import {
   DialogTitle,
   DialogFooter,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useOrganization } from "@/hooks/useOrganization";
 import { createForm, updateForm, getFormById } from "@/services/formService";
-import { syncMappedFieldsForAssetType, getMappedFields } from "@/services/mappedFieldService";
+import { syncMappedFieldsForAssetType, getMappedFields, getAllMappedFieldsForAssetType } from "@/services/mappedFieldService";
 import { Badge } from "@/components/ui/badge";
-import { addAssetTypeFormLink } from '@/services/assetTypeService';
+import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTypeService';
 import { registerMappedField, unregisterMappedField } from "@/services/mappedFieldService";
+import { getAssetTypes } from "@/services/assetTypeService";
+import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
 
 // Field type options
 const fieldTypes = [
@@ -78,7 +82,7 @@ const initialForm = {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none'
+      inventory_action: 'none' as 'none'
     },
     {
       id: "field_2",
@@ -90,7 +94,7 @@ const initialForm = {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none'
+      inventory_action: 'none' as 'none'
     },
   ]
 };
@@ -209,7 +213,6 @@ const FormBuilder = () => {
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [newOptionText, setNewOptionText] = useState("");
   const [fieldBeingDragged, setFieldBeingDragged] = useState<string | null>(null);
-  const [showFormulaHelp, setShowFormulaHelp] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!!id);
   const fieldRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -218,100 +221,135 @@ const FormBuilder = () => {
   const [mockMappedValues, setMockMappedValues] = useState<{ [key: string]: string | number }>({});
   const [mockValueSets, setMockValueSets] = useState<MockValueSet[]>([]);
   const [activeMockSetId, setActiveMockSetId] = useState<string | null>(null);
+  
+  // Asset type selection for new forms
+  const [assetTypes, setAssetTypes] = useState<any[]>([]);
+  const [selectedAssetTypeId, setSelectedAssetTypeId] = useState<string>('');
+  const [showAssetTypeSelection, setShowAssetTypeSelection] = useState(false);
+  const [selectedFormPurpose, setSelectedFormPurpose] = useState<string>(''); // Optional form purpose
+  
+  // Asset type links for existing forms
+  const [assetTypeLinks, setAssetTypeLinks] = useState<any[]>([]);
+  const [loadingAssetTypeLinks, setLoadingAssetTypeLinks] = useState(false);
+  
   // Parse query params for assetType and purpose
   const queryParams = new URLSearchParams(location.search);
   const assetTypeIdFromQuery = queryParams.get('assetType');
   const purposeFromQuery = queryParams.get('purpose');
+  
+  // Get effective asset type info for display
+  const effectiveAssetTypeId = selectedAssetTypeId || assetTypeIdFromQuery;
+  const selectedAssetType = assetTypes.find(at => at.id === effectiveAssetTypeId);
 
+  // For new forms, show asset type selection if not already set
   useEffect(() => {
-    // If we have an ID, load the existing form
-    if (id) {
-      setIsLoading(true);
-      console.log(`Loading form with ID: ${id}`);
-      
-      getFormById(id)
-        .then(formData => {
-          if (formData) {
-            console.log('Form data loaded:', formData);
-            try {
-              // Parse form_data if it's a string
-              let parsedFormData;
-              if (typeof formData.form_data === 'string') {
-                try {
-                  parsedFormData = JSON.parse(formData.form_data);
-                } catch (parseError) {
-                  console.error("Error parsing form_data JSON:", parseError);
-                  parsedFormData = { fields: [] };
-                }
-              } else {
-                parsedFormData = formData.form_data || { fields: [] };
-              }
-              
-              // Set form data with proper structure and fallbacks for missing properties
-              setFormData({
-                title: formData.name || '',
-                description: formData.description || '',
-                fields: Array.isArray(parsedFormData.fields) 
-                  ? parsedFormData.fields.map(field => {
-                      const incomingAction = field.inventory_action;
-                      let validInventoryAction: 'add' | 'subtract' | 'set' | 'none' = 'none';
-                      if (incomingAction === 'add' || incomingAction === 'subtract' || incomingAction === 'set') {
-                        validInventoryAction = incomingAction;
-                      }
-                      // All other cases, including null, undefined, or other strings, default to 'none'
+    if (!id && !effectiveAssetTypeId && assetTypes.length > 0 && currentOrganization) {
+      setShowAssetTypeSelection(true);
+    }
+  }, [id, effectiveAssetTypeId, assetTypes, currentOrganization]);
 
-                      return {
-                        id: field.id || generateFieldId(),
-                        label: field.label || 'Untitled Field',
-                        type: field.type || 'text',
-                        required: !!field.required,
-                        placeholder: field.placeholder || '',
-                        options: Array.isArray(field.options) ? field.options : [],
-                        formula: field.formula || '',
-                        description: field.description || '',
-                        mappable: field.mappable ?? false,
-                        inventory_action: validInventoryAction // Use validated and type-guarded action
-                      };
-                    })
-                  : []
-              });
-              
-              console.log('Form successfully loaded and parsed');
-            } catch (error) {
-              console.error("Error setting form data:", error);
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to parse form data. The form format may be invalid.",
-              });
-            }
-          } else {
-            console.error(`Form with ID ${id} not found`);
-            toast({
-              variant: "destructive",
-              title: "Form Not Found",
-              description: `The form you're trying to edit could not be found.`,
-            });
-            navigate("/forms");
-          }
+  // Load asset types and mapped fields when organization is available
+  useEffect(() => {
+    if (currentOrganization?.id) {
+      loadAssetTypes();
+      loadMappedFields();
+    }
+  }, [currentOrganization?.id]);
+
+  // Reload mapped fields when asset type selection changes
+  useEffect(() => {
+    if (currentOrganization?.id && (selectedAssetTypeId || assetTypeIdFromQuery)) {
+      loadMappedFields();
+    }
+  }, [selectedAssetTypeId, assetTypeIdFromQuery, currentOrganization?.id]);
+
+  // Load asset type links for existing forms
+  useEffect(() => {
+    if (id && currentOrganization?.id && !loadingAssetTypeLinks) {
+      setLoadingAssetTypeLinks(true);
+      getFormAssetTypeLinks(id, currentOrganization.id)
+        .then(links => {
+          setAssetTypeLinks(links || []);
         })
         .catch(error => {
-          console.error("Error loading form:", error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to load form data",
-          });
-          navigate("/forms");
+          console.error("Error fetching asset type links:", error);
+          setAssetTypeLinks([]);
         })
         .finally(() => {
-          setIsLoading(false);
+          setLoadingAssetTypeLinks(false);
         });
-    } else {
-      // If creating a new form, no initial loading needed for form data
-      setIsLoading(false);
     }
-  }, [id, toast, navigate]);
+  }, [id, currentOrganization?.id]);
+
+  // Initialize form data and asset type selection
+  useEffect(() => {
+    const initializeForm = async () => {
+      if (!currentOrganization?.id) return;
+
+      if (id) {
+        // Editing existing form
+        setIsLoading(true);
+        try {
+          const form = await getFormById(id);
+          if (form && form.form_data) {
+            let parsedFormData;
+            if (typeof form.form_data === 'string') {
+              parsedFormData = JSON.parse(form.form_data);
+            } else {
+              parsedFormData = form.form_data;
+            }
+            
+            setFormData({
+              title: form.name,
+              description: form.description || "",
+              fields: Array.isArray(parsedFormData.fields) 
+                ? parsedFormData.fields.map((field: any) => {
+                    const incomingAction = field.inventory_action;
+                    let validInventoryAction: 'add' | 'subtract' | 'set' | 'none' = 'none';
+                    if (incomingAction === 'add' || incomingAction === 'subtract' || incomingAction === 'set' || incomingAction === 'none') {
+                      validInventoryAction = incomingAction;
+                    }
+
+                    return {
+                      id: field.id || generateFieldId(),
+                      label: field.label || 'Untitled Field',
+                      type: field.type || 'text',
+                      required: !!field.required,
+                      placeholder: field.placeholder || '',
+                      options: Array.isArray(field.options) ? field.options : [],
+                      formula: field.formula || '',
+                      description: field.description || '',
+                      mappable: field.mappable ?? false,
+                      inventory_action: validInventoryAction
+                    };
+                  })
+                : []
+            });
+          }
+        } catch (error) {
+          console.error("Error loading form:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load form data",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // Creating new form
+        if (assetTypeIdFromQuery) {
+          // Asset type provided in URL
+          setSelectedAssetTypeId(assetTypeIdFromQuery);
+        } else {
+          // Show asset type selection for new forms
+          setShowAssetTypeSelection(true);
+        }
+      }
+    };
+
+    initializeForm();
+  }, [id, currentOrganization?.id, assetTypeIdFromQuery]);
 
   // Generate unique ID for new fields
   const generateFieldId = () => {
@@ -335,7 +373,7 @@ const FormBuilder = () => {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none'
+      inventory_action: 'none' as const
     };
     
     setFormData({
@@ -355,15 +393,18 @@ const FormBuilder = () => {
   const addFieldOfType = (type: string) => {
     const newField: FormField = {
       id: generateFieldId(),
-      label: type === "current_inventory" ? "Current Inventory" : "New Field",
+      label: type === "current_inventory" ? "Current Inventory" : 
+             type === "calculated" ? "Calculated Field" : "New Field",
       type: type,
-      required: false,
-      placeholder: type === "current_inventory" ? "Enter initial inventory count" : "Enter value",
+      required: type === "current_inventory",
+      placeholder: type === "current_inventory" ? "Enter current inventory count" : 
+                   type === "number" ? "Enter number" : 
+                   type === "calculated" ? "Will be calculated automatically" : "Enter value",
       options: [],
       formula: "",
-      description: type === "current_inventory" ? "Set initial inventory count for this asset" : "",
-      mappable: false,
-      inventory_action: 'none'
+      description: "",
+      mappable: type === "current_inventory" || type === "calculated",
+      inventory_action: 'none' as const
     };
     
     setFormData({
@@ -484,127 +525,78 @@ const FormBuilder = () => {
     setFieldBeingDragged(null);
   };
 
-  // Save the form
+  // Save form (now with asset type linking)
   const saveForm = async () => {
-    // Check organization before proceeding
-    if (isOrgLoading || !currentOrganization?.id) {
-        toast({
-          variant: "destructive",
-        title: "Organization Not Ready",
-        description: isOrgLoading 
-          ? "Organization context is still loading. Please wait."
-          : "No organization selected. Please select an organization first."
-        });
-        return;
-      }
-    
+    if (!currentOrganization?.id) {
+      console.error("No organization selected");
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Form title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      setIsSaving(true);
-
-      // Validate form data
-      if (!formData.title.trim()) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Form title is required"
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      if (formData.fields.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "At least one form field is required"
-        });
-        setIsSaving(false);
-        return;
-      }
-
-      // Create a properly structured form data to save
       const formDataToSave = {
-        title: formData.title,
-        description: formData.description,
-        fields: formData.fields
-      };
-
-      const formToSave = {
         name: formData.title,
         description: formData.description,
-        form_data: JSON.stringify(formDataToSave),
         organization_id: currentOrganization.id,
-        status: 'draft',
-        version: 1,
-        is_template: false
+        form_data: { fields: formData.fields },
       };
 
-      console.log("Saving form with data:", formToSave);
-      let result;
-
+      let savedForm;
       if (id) {
         // Update existing form
-        console.log(`Updating form with ID: ${id}`);
-        result = await updateForm(id, formToSave);
+        savedForm = await updateForm(id, formDataToSave);
       } else {
         // Create new form
-        console.log('Creating new form');
-        result = await createForm(formToSave);
+        savedForm = await createForm(formDataToSave);
       }
 
-      if (result && result.id) {
-        console.log("Form saved successfully:", result);
-        
-        // Sync mappable fields for this specific form
-        for (const field of formData.fields) {
-          if (field.mappable) {
-            await registerMappedField({
-              organization_id: currentOrganization.id,
-              form_id: result.id,
-              field_id: field.id,
-              field_label: field.label,
-              field_type: field.type || 'text',
-              description: field.description,
-              inventory_action: field.inventory_action || 'none'
-            });
-          } else {
-            // Ensure it's unregistered if not mappable
-            await unregisterMappedField(result.id, field.id);
-          }
-        }
-        
-        toast({
-          title: id ? "Form Updated" : "Form Saved",
-          description: `Form "${formData.title}" has been ${id ? "updated" : "saved"}.`,
-        });
-        
-        // If creating a new form and assetType/purpose are present, link the form
-        if (!id && assetTypeIdFromQuery && purposeFromQuery && currentOrganization?.id) {
+      if (savedForm) {
+        // Auto-link form to selected asset type if creating new form
+        const effectiveAssetTypeId = selectedAssetTypeId || assetTypeIdFromQuery;
+        if (!id && effectiveAssetTypeId) {
           try {
-            await addAssetTypeFormLink(assetTypeIdFromQuery, result.id, purposeFromQuery, currentOrganization.id);
-            toast({
-              title: 'Form Linked',
-              description: `Form linked to asset type for purpose: ${purposeFromQuery}`
-            });
+            // Use selected form purpose, or purpose from query, or default to 'other'
+            const formPurpose = selectedFormPurpose || purposeFromQuery || 'other';
+            await addAssetTypeFormLink(
+              effectiveAssetTypeId,
+              savedForm.id,
+              formPurpose,
+              currentOrganization.id
+            );
+            console.log(`Form linked to asset type: ${effectiveAssetTypeId} with purpose: ${formPurpose}`);
           } catch (linkError) {
-            toast({
-              title: 'Warning',
-              description: 'Form was created but could not be linked to the asset type.',
-              variant: 'destructive'
-            });
+            console.error("Error linking form to asset type:", linkError);
+            // Don't fail the save, just log the error
           }
         }
-        
+
+        // Sync mapped fields if we have an asset type
+        if (effectiveAssetTypeId) {
+          await syncMappedFieldsForAssetType(currentOrganization.id, effectiveAssetTypeId);
+        }
+
+        toast({
+          title: "Success",
+          description: id ? "Form updated successfully" : "Form created successfully",
+        });
+
         navigate("/forms");
-      } else {
-        throw new Error("Failed to save form. No result returned.");
       }
     } catch (error) {
       console.error("Error saving form:", error);
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to save form. Please try again."
+        description: "Failed to save form",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -734,21 +726,66 @@ const FormBuilder = () => {
     }
   };
 
-  // Load mapped fields when organization is available
-  useEffect(() => {
-    if (currentOrganization?.id) {
-      loadMappedFields();
-    }
-  }, [currentOrganization?.id]);
-
+  // Load mapped fields (now enhanced for asset types)
   const loadMappedFields = async () => {
     if (!currentOrganization?.id) return;
     
     try {
-      const fields = await getMappedFields(currentOrganization.id);
-      setMappedFields(fields);
+      const effectiveAssetTypeId = selectedAssetTypeId || assetTypeIdFromQuery;
+      
+      if (effectiveAssetTypeId) {
+        // Get comprehensive mapped fields for the selected asset type
+        const { conversionFields, formMappedFields } = await getAllMappedFieldsForAssetType(
+          effectiveAssetTypeId, 
+          currentOrganization.id
+        );
+        
+        // Combine conversion fields and form mapped fields into a unified format
+        const allFields = [
+          // Conversion fields from asset type - ensure they all have the right format
+          ...conversionFields.map((field, index) => ({
+            id: field.id || `conversion_${index}`,
+            field_id: field.field_name,
+            field_label: field.label,
+            field_type: field.type,
+            form_name: 'Asset Type Conversions',
+            source: 'conversion' as const,
+            description: field.description,
+            form_id: effectiveAssetTypeId // Use asset type ID as form_id for conversions
+          })),
+          // Mapped fields from linked forms
+          ...formMappedFields.map(field => ({
+            ...field,
+            source: 'form' as const
+          }))
+        ];
+        
+        setMappedFields(allFields);
+      } else {
+        // Fallback to organization-wide mapped fields if no asset type selected
+        const fields = await getMappedFields(currentOrganization.id);
+        setMappedFields(fields.map(field => ({ ...field, source: 'form' as const })));
+      }
     } catch (error) {
-      console.error('Error loading mapped fields:', error);
+      console.error("Error loading mapped fields:", error);
+      toast({
+        title: "Error Loading Fields",
+        description: "Failed to load conversion and mapped fields",
+        variant: "destructive",
+      });
+      setMappedFields([]);
+    }
+  };
+
+  // Load asset types
+  const loadAssetTypes = async () => {
+    if (!currentOrganization?.id) return;
+    
+    try {
+      const types = await getAssetTypes(currentOrganization.id);
+      setAssetTypes(types);
+    } catch (error) {
+      console.error("Error loading asset types:", error);
     }
   };
 
@@ -825,6 +862,76 @@ const FormBuilder = () => {
         </div>
       </div>
 
+      {/* Asset Type Information Panel */}
+      {selectedAssetType && (
+        <Card className="mb-6 border-l-4" style={{ borderLeftColor: selectedAssetType.color || '#6E56CF' }}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                  style={{ backgroundColor: selectedAssetType.color || '#6E56CF' }}
+                >
+                  {selectedAssetType.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-semibold">{selectedAssetType.name}</h3>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>
+                      {mappedFields.filter(f => f.source === 'conversion').length} conversion fields
+                    </span>
+                    <span>
+                      {mappedFields.filter(f => f.source === 'form').length} form fields
+                    </span>
+                    <span className="text-green-600">
+                      ✓ Available in formulas
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/asset-types/${selectedAssetType.id}`)}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Manage Asset Type
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAssetTypeSelection(true)}
+                >
+                  Change Type
+                </Button>
+              </div>
+            </div>
+            
+            {/* Show conversion fields if available */}
+            {mappedFields.filter(f => f.source === 'conversion').length > 0 && (
+              <div className="mt-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <p className="text-sm text-blue-800 font-medium mb-2">
+                  Conversion Fields Available for Formulas:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {mappedFields.filter(f => f.source === 'conversion').slice(0, 5).map(field => (
+                    <Badge key={field.id} variant="secondary" className="text-xs">
+                      {field.field_label}
+                    </Badge>
+                  ))}
+                  {mappedFields.filter(f => f.source === 'conversion').length > 5 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{mappedFields.filter(f => f.source === 'conversion').length - 5} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8">
           <Card>
@@ -848,6 +955,35 @@ const FormBuilder = () => {
                     rows={2}
                   />
                 </div>
+                
+                {/* Asset type links for existing forms */}
+                {id && (
+                  <div className="mt-4">
+                    {loadingAssetTypeLinks ? (
+                      <div className="text-xs text-muted-foreground">Loading asset type links...</div>
+                    ) : assetTypeLinks.length > 0 ? (
+                      <div>
+                        <Label className="text-sm text-muted-foreground">Linked to Asset Types:</Label>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {assetTypeLinks.map(link => (
+                            <span
+                              key={link.asset_type_id + link.purpose}
+                              className="px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80"
+                              style={{ backgroundColor: link.asset_type_color || '#e5e7eb', color: '#222' }}
+                              title={link.purpose ? `Purpose: ${link.purpose}` : ''}
+                              onClick={() => navigate(`/asset-types/${link.asset_type_id}`)}
+                            >
+                              {link.asset_type_name}
+                              {link.purpose ? ` (${link.purpose})` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">Not linked to any asset types</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mb-4 flex justify-between items-center">
@@ -869,6 +1005,133 @@ const FormBuilder = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {/* Bulk Operations */}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Bulk Operations
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Bulk Field Operations</DialogTitle>
+                        <DialogDescription>
+                          Import, export, or manage multiple fields at once
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Export Fields</Label>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => {
+                                const fieldsData = JSON.stringify(formData.fields, null, 2);
+                                const blob = new Blob([fieldsData], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `${formData.title.replace(/\s+/g, '_')}_fields.json`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="flex-1"
+                            >
+                              Export All Fields
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => {
+                                const mappableFields = formData.fields.filter(f => f.mappable);
+                                const fieldsData = JSON.stringify(mappableFields, null, 2);
+                                const blob = new Blob([fieldsData], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `${formData.title.replace(/\s+/g, '_')}_mappable_fields.json`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="flex-1"
+                            >
+                              Export Mappable Only
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Import Fields</Label>
+                          <Input
+                            type="file"
+                            accept=".json"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  try {
+                                    const importedFields = JSON.parse(event.target?.result as string);
+                                    if (Array.isArray(importedFields)) {
+                                      const validatedFields = importedFields.map(field => ({
+                                        ...field,
+                                        id: `field_${Date.now()}_${Math.random()}`,
+                                        inventory_action: validateInventoryAction(field.inventory_action),
+                                      }));
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        fields: [...prev.fields, ...validatedFields]
+                                      }));
+                                      toast({
+                                        title: "Success",
+                                        description: `Imported ${validatedFields.length} fields`,
+                                      });
+                                    }
+                                  } catch (error) {
+                                    toast({
+                                      title: "Error",
+                                      description: "Invalid JSON file",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                };
+                                reader.readAsText(file);
+                              }
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Import fields from a JSON file (will be added to existing fields)
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Clear Fields</Label>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => {
+                              if (confirm('Are you sure you want to remove all fields? This cannot be undone.')) {
+                                setFormData(prev => ({ ...prev, fields: [] }));
+                                setSelectedField(null);
+                                toast({
+                                  title: "Fields Cleared",
+                                  description: "All fields have been removed",
+                                });
+                              }
+                            }}
+                            className="w-full"
+                          >
+                            Clear All Fields
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
 
@@ -1005,13 +1268,20 @@ const FormBuilder = () => {
                       )}
                       
                       {field.type === "calculated" && (
-                        <div className="flex items-center space-x-2">
-                          <Input 
-                            disabled 
-                            value={field.formula ? previewCalculation(field.formula) : "Calculated value"} 
-                            className="bg-muted/50"
-                          />
-                          <Calculator className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="space-y-4">
+                            <VisualFormulaBuilder
+                              formula={field.formula || ''}
+                              onChange={(formula) => updateField(field.id, 'formula', formula)}
+                              currentFields={formData.fields.filter(f => f.id !== field.id)}
+                              mappedFields={mappedFields}
+                              onPreview={(formula) => previewCalculationWithMocks(
+                                formula, 
+                                formData.fields.filter(f => f.id !== selectedField), 
+                                mockMappedValues
+                              )}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1186,175 +1456,6 @@ const FormBuilder = () => {
                           </div>
                         )}
                         
-                        {field.type === "calculated" && (
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <Label htmlFor="fieldFormula">Formula</Label>
-                              <Dialog open={showFormulaHelp} onOpenChange={setShowFormulaHelp}>
-                                <DialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <AlertCircle className="h-4 w-4" />
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-md">
-                                  <DialogHeader>
-                                    <DialogTitle>Formula Help</DialogTitle>
-                                  </DialogHeader>
-                                  <div className="space-y-2">
-                                    <p className="text-sm">
-                                      Create mathematical formulas using field references and operators.
-                                    </p>
-                                    <h3 className="font-semibold">Examples:</h3>
-                                    <p className="text-sm">
-                                      <code>{"{field_1} * {field_2}"}</code> - Multiply fields
-                                    </p>
-                                    <p className="text-sm">
-                                      <code>{"{field_1} + {field_2} - {field_3}"}</code> - Addition and subtraction
-                                    </p>
-                                    <p className="text-sm">
-                                      <code>{"({field_1} + {field_2}) * 0.1"}</code> - Use parentheses and constants
-                                    </p>
-                                    <Separator className="my-2" />
-                                    <h3 className="font-semibold">Available Fields:</h3>
-                                    <div className="max-h-48 overflow-y-auto space-y-1">
-                                      {formData.fields
-                                        .filter(f => f.id !== field.id)
-                                        .map(f => (
-                                          <div key={f.id} className="text-sm p-1 rounded bg-muted">
-                                            <code>{`{${f.id}}`}</code> - {f.label}
-                                          </div>
-                                        ))}
-                                    </div>
-                                    
-                                    {mappedFields.length > 0 && (
-                                      <>
-                                        <Separator className="my-2" />
-                                        <h3 className="font-semibold">Mapped Fields From Other Forms:</h3>
-                                        <div className="max-h-48 overflow-y-auto space-y-1">
-                                          {mappedFields.map(f => (
-                                            <div key={f.id} className="text-sm p-1 rounded bg-muted">
-                                              <code>{`{mapped.${f.field_id}}`}</code> - {f.field_label} 
-                                              <span className="text-xs text-muted-foreground ml-1">
-                                                (from {f.form_name || "Unknown Form"})
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                  <DialogFooter>
-                                    <Button onClick={() => setShowFormulaHelp(false)}>
-                                      Close
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
-                            </div>
-                            <div className="space-y-2">
-                              <Textarea
-                                id="fieldFormula"
-                                value={field.formula}
-                                onChange={(e) => {
-                                  updateField(field.id, 'formula', e.target.value);
-                                  // Optionally, trigger re-evaluation of mapped field dependencies here if needed
-                                  const fieldData = formData.fields.find(f => f.id === selectedField);
-                                  if (fieldData && fieldData.type === 'calculated' && fieldData.formula) {
-                                    const dependencies = getMappedFieldsFromFormula(fieldData.formula);
-                                    const newMocks = { ...mockMappedValues };
-                                    let mocksChanged = false;
-                                    dependencies.forEach(depKey => {
-                                      if (!(depKey in newMocks)) {
-                                        newMocks[depKey] = ''; 
-                                        mocksChanged = true;
-                                      }
-                                    });
-                                    if(mocksChanged) setMockMappedValues(newMocks);
-                                  }
-                                }}
-                                placeholder="e.g. {field_1} * {field_2} or {mapped.field_id}"
-                                rows={3}
-                                className="font-mono"
-                              />
-                              
-                              <div className="mt-2 border rounded-md overflow-hidden">
-                                <div className="bg-muted p-2 text-xs font-medium flex justify-between items-center">
-                                  <span>Quick Field Insert</span>
-                                  <Badge variant="outline">Click to insert</Badge>
-                                </div>
-                                <div className="max-h-[120px] overflow-y-auto p-2 flex flex-wrap gap-1">
-                                  {/* Current form fields */}
-                                  {formData.fields
-                                    .filter(f => f.id !== field.id && ['number', 'text', 'calculated'].includes(f.type))
-                                    .map(f => {
-                                      const isUsed = field.formula?.includes(`{${f.id}}`) || false;
-                                      return (
-                                        <Button 
-                                          key={f.id}
-                                          variant="outline" 
-                                          size="sm"
-                                          className={`text-xs ${isUsed ? 'bg-green-50 border-green-300 hover:bg-green-100' : ''}`}
-                                          onClick={() => {
-                                            updateField(field.id, 'formula', 
-                                              (field.formula || '') + `{${f.id}}`);
-                                          }}
-                                        >
-                                          {f.label}
-                                          {isUsed && (
-                                            <span className="ml-1 h-2 w-2 rounded-full bg-green-500"></span>
-                                          )}
-                                        </Button>
-                                      );
-                                  })}
-                                </div>
-                                
-                                {mappedFields.length > 0 && (
-                                  <>
-                                    <div className="bg-blue-50 p-2 text-xs font-medium">
-                                      Mapped Fields From Other Forms
-                                    </div>
-                                    <div className="max-h-[120px] overflow-y-auto p-2 flex flex-wrap gap-1">
-                                      {mappedFields.map(f => {
-                                        const mappedRef = `{mapped.${f.field_id}}`;
-                                        const isUsed = field.formula?.includes(mappedRef) || false;
-                                        return (
-                                          <Button 
-                                            key={f.id}
-                                            variant="outline" 
-                                            size="sm"
-                                            className={`text-xs ${isUsed 
-                                              ? 'bg-blue-100 border-blue-300 hover:bg-blue-200' 
-                                              : 'bg-blue-50 border-blue-200 hover:bg-blue-100'}`}
-                                            onClick={() => {
-                                              updateField(field.id, 'formula', 
-                                                (field.formula || '') + `{mapped.${f.field_id}} /* ${f.field_label} from ${f.form_name} */`);
-                                            }}
-                                          >
-                                            {f.field_label}
-                                            <span className="ml-1 text-[10px] opacity-70">({f.form_name})</span>
-                                            {isUsed && (
-                                              <span className="ml-1 h-2 w-2 rounded-full bg-blue-500"></span>
-                                            )}
-                                          </Button>
-                                        );
-                                      })}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {field.formula && (
-                          <div className="p-2 bg-muted rounded text-sm mt-2">
-                            <p className="font-medium mb-1">Preview:</p>
-                            <div className="font-mono">
-                              {previewCalculationWithMocks(field.formula, formData.fields.filter(f => f.id !== field.id), mockMappedValues)}
-                            </div>
-                          </div>
-                        )}
-
                         {(() => {
                           const currentCalcField = formData.fields.find(f => f.id === selectedField);
                           let mappedDependenciesInFormula: string[] = [];
@@ -1502,6 +1603,120 @@ const FormBuilder = () => {
           </div>
         </div>
       </div>
+
+      {/* Asset Type Selection Dialog for New Forms */}
+      <Dialog open={showAssetTypeSelection} onOpenChange={(open) => {
+        // Prevent closing if this is a new form without asset type selected
+        if (!open && !id && !effectiveAssetTypeId) {
+          toast({
+            title: "Asset Type Required",
+            description: "Please select an asset type to continue creating your form",
+            variant: "destructive",
+          });
+          return;
+        }
+        setShowAssetTypeSelection(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Asset Type</DialogTitle>
+            <DialogDescription>
+              Choose which asset type this form will be used for. <strong>This selection is required</strong> to organize your forms and provide relevant mapped fields for formulas.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="asset-type-select">Asset Type *</Label>
+              <Select 
+                value={selectedAssetTypeId} 
+                onValueChange={setSelectedAssetTypeId}
+              >
+                <SelectTrigger id="asset-type-select">
+                  <SelectValue placeholder="Select an asset type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assetTypes.map((assetType) => (
+                    <SelectItem key={assetType.id} value={assetType.id}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: assetType.color || '#6E56CF' }}
+                        />
+                        {assetType.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="form-purpose-select">Form Purpose (Optional)</Label>
+              <Select 
+                value={selectedFormPurpose} 
+                onValueChange={setSelectedFormPurpose}
+              >
+                <SelectTrigger id="form-purpose-select">
+                  <SelectValue placeholder="Select a purpose (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="intake">Intake Form - For adding new items</SelectItem>
+                  <SelectItem value="inventory">Inventory Form - For tracking existing items</SelectItem>
+                  <SelectItem value="adjustment">Adjustment Form - For inventory adjustments</SelectItem>
+                  <SelectItem value="transfer">Transfer Form - For moving items</SelectItem>
+                  <SelectItem value="audit">Audit Form - For inventory audits</SelectItem>
+                  <SelectItem value="other">Other - General purpose</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This helps suggest which form to use for different operations, but can be changed later.
+              </p>
+            </div>
+            
+            {selectedAssetTypeId && (
+              <div className="text-sm text-muted-foreground p-3 bg-blue-50 rounded-lg">
+                <strong>Benefits of linking to an asset type:</strong>
+                <ul className="mt-1 list-disc list-inside text-xs space-y-1">
+                  <li>Formula fields will show conversion fields from this asset type</li>
+                  <li>Access to mapped fields from other forms linked to this asset type</li> 
+                  <li>Form will be automatically linked to this asset type</li>
+                  <li>Better organization and asset type management</li>
+                </ul>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // For new forms, navigate back to forms page if they cancel
+                if (!id) {
+                  navigate('/forms');
+                } else {
+                  setShowAssetTypeSelection(false);
+                  setSelectedAssetTypeId('');
+                  setSelectedFormPurpose('');
+                }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowAssetTypeSelection(false);
+                if (selectedAssetTypeId) {
+                  loadMappedFields(); // Reload mapped fields for selected asset type
+                }
+              }}
+              disabled={!selectedAssetTypeId}
+            >
+              Continue with {assetTypes.find(at => at.id === selectedAssetTypeId)?.name || 'Selected Type'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

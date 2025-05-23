@@ -1,44 +1,53 @@
 import React, { useState, useEffect, useContext, createContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import type { Organization as FullOrganizationType } from '@/types/organization';
 
-// Simple organization type
-type Organization = {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-};
+// Remove or comment out the local, simplified Organization type
+// type Organization = {
+//   id: string;
+//   name: string;
+//   avatar_url: string | null;
+// };
 
 // Simplified organization member type
 type OrganizationMember = {
   id: string;
   user_id: string;
   organization_id: string;
-  role: string;
+  role: string; // e.g., 'owner', 'admin', 'manager', 'member'
+};
+
+// Profile type to hold full_name and avatar_url
+type UserProfile = {
+  full_name: string | null;
+  avatar_url: string | null;
 };
 
 type AuthContextType = {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
-  organization: Organization | null;
+  organization: FullOrganizationType | null;
+  organizationRole: string | null;
   signOut: () => Promise<void>;
   userRoles: {
-    isSystemAdmin: boolean;
-    isSuperAdmin: boolean;
     isOrgAdmin: boolean;
+    isPlatformOperator: boolean;
   };
   fetchUserData: (user: User) => Promise<void>;
 };
 
 const defaultContext: AuthContextType = {
   user: null,
+  profile: null,
   loading: true,
   organization: null,
+  organizationRole: null,
   signOut: async () => {},
   userRoles: {
-    isSystemAdmin: false,
-    isSuperAdmin: false,
-    isOrgAdmin: false
+    isOrgAdmin: false,
+    isPlatformOperator: false
   },
   fetchUserData: async () => {}
 };
@@ -47,32 +56,35 @@ const AuthContext = createContext<AuthContextType>(defaultContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [organization, setOrganization] = useState<FullOrganizationType | null>(null);
   const [membership, setMembership] = useState<OrganizationMember | null>(null);
-  const [systemRoles, setSystemRoles] = useState<string[]>([]);
+  const [isPlatformOperatorState, setIsPlatformOperatorState] = useState(false);
 
-  // Calculate user roles based on data
+  const organizationRole = membership?.role || null;
+
   const userRoles = {
-    isSystemAdmin: systemRoles.includes('admin'),
-    isSuperAdmin: systemRoles.includes('super_admin'),
     isOrgAdmin: !!(membership &&
       membership.organization_id === organization?.id && 
       (membership.role === 'admin' || membership.role === 'owner')
-    )
+    ),
+    isPlatformOperator: isPlatformOperatorState
   };
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
       
-      if (session?.user) {
-        await fetchUserData(session.user);
+      if (sessionUser) {
+        await fetchUserData(sessionUser);
       } else {
         setOrganization(null);
         setMembership(null);
-        setSystemRoles([]);
+        setProfile(null);
+        setIsPlatformOperatorState(false);
       }
       
       setLoading(false);
@@ -80,10 +92,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Initial auth check
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
       
-      if (session?.user) {
-        await fetchUserData(session.user);
+      if (sessionUser) {
+        await fetchUserData(sessionUser);
       }
       
       setLoading(false);
@@ -94,8 +107,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const fetchUserData = async (user: User) => {
+  const fetchUserData = async (currentUser: User) => {
     try {
+      // Fetch Profile Data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        setProfile(null);
+      } else {
+        setProfile(profileData ? { full_name: profileData.full_name, avatar_url: profileData.avatar_url } : null);
+      }
+
+      // Check if user is a platform operator
+      const { data: operatorData, error: operatorError } = await supabase
+        .from('platform_operators')
+        .select('user_id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+      if (operatorError) {
+        console.error('Error checking platform operator status:', operatorError);
+        setIsPlatformOperatorState(false);
+      } else {
+        setIsPlatformOperatorState(!!operatorData);
+      }
+
       // Get the user's organization using our simplified function
       const { data: orgId, error: orgIdError } = await supabase.rpc('get_current_organization_id');
       
@@ -103,10 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('Error fetching user organization ID:', orgIdError);
         setOrganization(null);
         setMembership(null);
-        return;
-      }
-      
-      if (orgId) {
+      } else if (orgId) {
         // Get organization details
         const { data: org, error: orgError } = await supabase
           .from('organizations')
@@ -118,46 +156,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error fetching organization details:', orgError);
           setOrganization(null);
           setMembership(null);
-          return;
+        } else {
+          setOrganization(org as FullOrganizationType);
+          
+          // Get the user's membership
+          const { data: memberRec, error: membershipError } = await supabase
+            .from('organization_members')
+            .select('*') // Fetch all fields including 'role'
+            .eq('user_id', currentUser.id)
+            .eq('organization_id', orgId)
+            .single();
+          
+          if (membershipError) {
+            console.error('Error fetching membership:', membershipError);
+            setMembership(null);
+          } else {
+            setMembership(memberRec || null);
+          }
         }
-        
-        setOrganization(org);
-        
-        // Get the user's membership
-        const { data: memberRec, error: membershipError } = await supabase
-          .from('organization_members')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('organization_id', orgId)
-          .single();
-        
-        if (membershipError) {
-          console.error('Error fetching membership:', membershipError);
-          setMembership(null);
-          return;
-        }
-        
-        setMembership(memberRec || null);
       } else {
         // If no orgId, ensure organization and membership are null
         setOrganization(null);
         setMembership(null);
       }
-      
-      // Fetch system roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('system_roles')
-        .select('role')
-        .eq('user_id', user.id);
-      
-      if (rolesError) {
-        console.error('Error fetching system roles:', rolesError);
-        return;
-      }
-      
-      setSystemRoles(roles?.map(r => r.role) || []);
     } catch (error) {
       console.error('Error fetching user data:', error);
+      setProfile(null);
+      setOrganization(null);
+      setMembership(null);
+      setIsPlatformOperatorState(false);
     }
   };
 
@@ -166,13 +193,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setOrganization(null);
     setMembership(null);
-    setSystemRoles([]);
+    setProfile(null);
+    setIsPlatformOperatorState(false);
   };
 
   const value = {
     user,
+    profile,
     loading,
     organization,
+    organizationRole,
     signOut,
     userRoles,
     fetchUserData

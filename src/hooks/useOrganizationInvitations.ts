@@ -9,6 +9,7 @@ export const useOrganizationInvitations = () => {
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [newInviteEmail, setNewInviteEmail] = useState('');
   const [newInviteRole, setNewInviteRole] = useState('member');
+  const [newInviteCustomMessage, setNewInviteCustomMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchInvitations = async () => {
@@ -17,7 +18,7 @@ export const useOrganizationInvitations = () => {
     try {
       // Use the function to fetch invitations using RPC
       const { data, error } = await supabase
-        .rpc('get_organization_invitations');
+        .rpc('get_organization_invitations', { target_organization_id: organization.id });
 
       if (error) throw error;
       
@@ -37,8 +38,10 @@ export const useOrganizationInvitations = () => {
       // Use the function to create an invitation using RPC
       const { data, error } = await supabase
         .rpc('create_invitation', {
-          email_address: newInviteEmail,
-          member_role: newInviteRole
+          target_email: newInviteEmail,
+          target_role: newInviteRole,
+          target_custom_message: newInviteCustomMessage,
+          target_organization_id: organization.id
         });
 
       if (error) throw error;
@@ -46,12 +49,29 @@ export const useOrganizationInvitations = () => {
       toast.success(`Invitation sent to ${newInviteEmail}`);
       setNewInviteEmail('');
       setNewInviteRole('member');
+      setNewInviteCustomMessage('');
       fetchInvitations();
     } catch (error) {
       console.error('Error sending invitation:', error);
       toast.error("Failed to send invitation");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const resendInvitation = async (invitationId: string) => {
+    try {
+      // Assume an RPC function 'resend_invitation' exists
+      const { error } = await supabase
+        .rpc('resend_invitation', { invitation_id: invitationId });
+
+      if (error) throw error;
+
+      toast.success("Invitation resent successfully");
+      fetchInvitations(); // Refresh the list to show updated expiry or status
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      toast.error("Failed to resend invitation");
     }
   };
 
@@ -83,9 +103,12 @@ export const useOrganizationInvitations = () => {
     setNewInviteEmail,
     newInviteRole,
     setNewInviteRole,
+    newInviteCustomMessage,
+    setNewInviteCustomMessage,
     isSubmitting,
     fetchInvitations,
     sendInvitation,
+    resendInvitation,
     deleteInvitation
   };
 };

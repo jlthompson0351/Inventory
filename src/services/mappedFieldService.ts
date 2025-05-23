@@ -189,4 +189,103 @@ export const getMappedFieldsForReporting = async (
     console.error('Error fetching mapped fields for reporting:', error);
     return [];
   }
+};
+
+/**
+ * Get ALL mapped fields available for an asset type (conversion fields + form mapped fields)
+ * This includes:
+ * - Conversion fields defined directly on the asset type
+ * - Mapped fields from all forms linked to this asset type
+ */
+export const getAllMappedFieldsForAssetType = async (
+  assetTypeId: string,
+  organizationId: string
+): Promise<{
+  conversionFields: Array<{
+    id: string;
+    field_name: string;
+    label: string;
+    type: string;
+    source: 'conversion';
+    description?: string;
+  }>;
+  formMappedFields: Array<{
+    id: string;
+    field_id: string;
+    field_label: string;
+    field_type: string;
+    form_name: string;
+    form_id: string;
+    source: 'form';
+    description?: string;
+  }>;
+}> => {
+  try {
+    // 1. Get conversion fields from asset type
+    const { data: assetType, error: assetTypeError } = await supabase
+      .from('asset_types')
+      .select('conversion_fields')
+      .eq('id', assetTypeId)
+      .single();
+    
+    if (assetTypeError) throw assetTypeError;
+    
+    let conversionFields: any[] = [];
+    if (assetType?.conversion_fields && Array.isArray(assetType.conversion_fields)) {
+      conversionFields = (assetType.conversion_fields as any[]).map(field => ({
+        id: field.id,
+        field_name: field.field_name,
+        label: field.label,
+        type: field.type,
+        source: 'conversion',
+        description: field.description
+      }));
+    }
+    
+    // 2. Get all forms linked to this asset type
+    const { data: linkedForms, error: formsError } = await supabase.rpc(
+      'get_forms_for_asset_type',
+      { p_asset_type_id: assetTypeId, p_organization_id: organizationId }
+    );
+    
+    if (formsError) throw formsError;
+    
+    // 3. Get mapped fields from all linked forms
+    let formMappedFields: any[] = [];
+    if (linkedForms && linkedForms.length > 0) {
+      const formIds = linkedForms.map((f: any) => f.form_id);
+      
+      const { data: mappedFields, error: mappedError } = await supabase.rpc(
+        'get_mappable_fields_with_form_names',
+        { p_organization_id: organizationId }
+      );
+      
+      if (mappedError) throw mappedError;
+      
+      // Filter to only include fields from forms linked to this asset type
+      formMappedFields = (mappedFields || [])
+        .filter((field: any) => formIds.includes(field.form_id))
+        .map((field: any) => ({
+          id: field.id,
+          field_id: field.field_id,
+          field_label: field.field_label,
+          field_type: field.field_type,
+          form_name: field.form_name,
+          form_id: field.form_id,
+          source: 'form',
+          description: field.description
+        }));
+    }
+    
+    return {
+      conversionFields,
+      formMappedFields
+    };
+  } catch (error) {
+    console.error('Error fetching all mapped fields for asset type:', error);
+    return {
+      conversionFields: [],
+      formMappedFields: []
+    };
+  }
 }; 

@@ -206,18 +206,35 @@ export const getMappableFields = async (
     // Get the form schema
     const { data, error } = await supabase
       .from('forms')
-      .select('form_schema')
+      .select('form_data')
       .eq('id', formId)
       .single();
     
     if (error) throw error;
     
-    if (!data || !data.form_schema || !data.form_schema.fields) {
+    if (!data || !data.form_data) {
+      return [];
+    }
+    
+    // Parse form_data if it's a string, similar to other parts of the codebase
+    let formData: any;
+    if (typeof data.form_data === 'string') {
+      try {
+        formData = JSON.parse(data.form_data);
+      } catch (e) {
+        console.error('Error parsing form_data JSON:', e);
+        return [];
+      }
+    } else {
+      formData = data.form_data;
+    }
+    
+    if (!formData || !formData.fields) {
       return [];
     }
     
     // Filter out only mappable fields
-    const mappableFields = data.form_schema.fields
+    const mappableFields = formData.fields
       .filter((field: any) => field.mappable)
       .map((field: any) => ({
         id: field.id,

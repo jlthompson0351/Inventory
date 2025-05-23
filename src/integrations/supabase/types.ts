@@ -27,8 +27,11 @@ export type InventoryPriceHistoryRow = TablesRow<'inventory_price_history'>;
 export type InventoryPriceHistoryInsert = TablesInsert<'inventory_price_history'>;
 export type InventoryPriceHistoryUpdate = TablesUpdate<'inventory_price_history'>;
 
-// Form types with explicit ID field
-export type FormRow = TablesRow<'forms'> & { id: string };
+// Form types
+export type FormRow = TablesRow<'forms'> & { 
+  id: string;
+  deleted_at?: string | null;
+};
 export type FormInsert = TablesInsert<'forms'>;
 export type FormUpdate = TablesUpdate<'forms'>;
 
@@ -62,11 +65,6 @@ export type LocationUpdate = TablesUpdate<'locations'>;
 export type ReportRow = TablesRow<'reports'>;
 export type ReportInsert = TablesInsert<'reports'>;
 export type ReportUpdate = TablesUpdate<'reports'>;
-
-// System role types
-export type SystemRoleRow = TablesRow<'system_roles'>;
-export type SystemRoleInsert = TablesInsert<'system_roles'>;
-export type SystemRoleUpdate = TablesUpdate<'system_roles'>;
 
 // Organization invitation types
 export type OrganizationInvitationRow = TablesRow<'organization_invitations'>;
@@ -102,3 +100,11 @@ export type InventoryEventType =
 export type InventoryHistoryRow = TablesRow<'inventory_history'> & { event_type: InventoryEventType };
 export type InventoryHistoryInsert = TablesInsert<'inventory_history'> & { event_type: InventoryEventType };
 export type InventoryHistoryUpdate = TablesUpdate<'inventory_history'> & { event_type?: InventoryEventType };
+
+// System role types - REMOVING THESE
+// export type SystemRoleRow = TablesRow<'system_roles'>;
+// export type SystemRoleInsert = TablesInsert<'system_roles'>;
+// export type SystemRoleUpdate = TablesUpdate<'system_roles'>;
+
+// Invitation types
+export type InvitationRow = TablesRow<"organization_invitations">;

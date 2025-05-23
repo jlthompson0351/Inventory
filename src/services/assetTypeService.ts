@@ -1,4 +1,4 @@
-import { Database } from '@/types/database.types';
+import { Database, Json } from '@/types/database.types';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,18 +10,22 @@ export interface AssetType {
   color: string | null;
   created_at: string;
   updated_at: string | null;
+  deleted_at?: string | null;
   intake_form_id?: string | null;
   inventory_form_id?: string | null;
+  mapping_form_id?: string | null;
+  conversion_fields?: Json | null;
   enable_barcodes?: boolean;
   barcode_type?: string;
   barcode_prefix?: string;
-  calculation_formulas?: Record<string, any> | null;
+  calculation_formulas?: Json | null;
 }
 
 export interface AssetTypeWithCount extends AssetType {
   asset_count: number;
   intake_form_id?: string | null;
   inventory_form_id?: string | null;
+  mapping_form_id?: string | null;
 }
 
 export type MothershipAssetType = AssetTypeWithCount & {
@@ -70,10 +74,10 @@ export const getMothershipAssetTypes = async (
 
   if (error) {
     console.error('Error fetching mothership asset types:', error);
-    throw error;
+    return [];
   }
 
-  return data || [];
+  return (data as any) || [];
 };
 
 export const createAssetType = async (
@@ -117,6 +121,8 @@ export const updateAssetType = async (
         color: updates.color,
         intake_form_id: updates.intake_form_id,
         inventory_form_id: updates.inventory_form_id,
+        mapping_form_id: updates.mapping_form_id,
+        conversion_fields: updates.conversion_fields,
         enable_barcodes: updates.enable_barcodes,
         barcode_type: updates.barcode_type,
         barcode_prefix: updates.barcode_prefix,
@@ -157,9 +163,9 @@ export const cloneAssetType = async (
 ): Promise<string> => {
   const { data, error } = await supabase
     .rpc('clone_asset_type', {
-      source_asset_type_id: sourceAssetTypeId,
-      target_organization_id: targetOrganizationId,
-      user_id: userId
+      type_id: sourceAssetTypeId,
+      target_org_id: targetOrganizationId,
+      admin_user_id: userId
     });
 
   if (error) {
@@ -230,7 +236,14 @@ export const createDefaultFormsForAssetType = async (
       throw error;
     }
 
-    return data;
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0] as { intake_form_id: string, inventory_form_id: string };
+    }
+    if (data && !Array.isArray(data)) {
+      return data as { intake_form_id: string, inventory_form_id: string };
+    }
+    
+    return null;
   } catch (error) {
     console.error('Failed to create default forms:', error);
     return null;
@@ -318,4 +331,107 @@ export const getRecommendedFormsForAssetType = async (
     console.error('Failed to get recommended forms:', error);
     return [];
   }
+};
+
+/**
+ * Restores a soft-deleted asset type by setting deleted_at to null.
+ */
+export const restoreAssetType = async (id: string): Promise<boolean> => {
+  if (!id) {
+    console.warn('[assetTypeService] restoreAssetType called with no ID.');
+    return false;
+  }
+  try {
+    const { error } = await supabase
+      .from('asset_types')
+      .update({ deleted_at: null })
+      .eq('id', id)
+      // Crucially, we also need to ensure we are not violating the unique constraint
+      // This requires a bit more complex logic if we want to prevent errors proactively,
+      // or we handle the potential unique constraint violation error post-update attempt.
+      // For now, we'll rely on the database to throw an error if a conflict occurs.
+
+    if (error) {
+      console.error('[assetTypeService] Error restoring asset type:', error);
+      // Check for unique constraint violation (code 23505 in PostgreSQL)
+      if (error.code === '23505') {
+        // Optionally, re-throw a custom error or return a specific status
+        throw new Error('An active asset type with the same name already exists in this organization.');
+      }
+      throw error;
+    }
+    console.log(`[assetTypeService] Asset type ${id} restored successfully.`);
+    return true;
+  } catch (error) {
+    console.error(`[assetTypeService] Failed to restore asset type ${id}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Soft deletes an asset type by setting its deleted_at field.
+ */
+export const softDeleteAssetType = async (id: string): Promise<boolean> => {
+  if (!id) {
+    console.warn('[assetTypeService] softDeleteAssetType called with no ID.');
+    return false;
+  }
+  try {
+    const { error } = await supabase
+      .from('asset_types')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('[assetTypeService] Error soft deleting asset type:', error);
+      throw error;
+    }
+    console.log(`[assetTypeService] Asset type ${id} soft deleted successfully.`);
+    return true;
+  } catch (error) {
+    console.error(`[assetTypeService] Failed to soft delete asset type ${id}:`, error);
+    return false;
+  }
+};
+
+export const getArchivedAssetTypesWithCounts = async (
+  supabaseClient: ReturnType<typeof createClient<Database>>,
+  organizationId: string
+): Promise<AssetTypeWithCount[]> => {
+  // Step 1: Fetch archived asset types for the organization
+  const { data: archivedTypes, error: fetchError } = await supabaseClient
+    .from('asset_types')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .not('deleted_at', 'is', null) // Get records where deleted_at is NOT NULL
+    .order('name', { ascending: true });
+
+  if (fetchError) {
+    console.error('[assetTypeService] Error fetching archived asset types:', fetchError);
+    throw fetchError;
+  }
+
+  if (!archivedTypes || archivedTypes.length === 0) {
+    return [];
+  }
+
+  // Step 2: For each archived type, count its active assets
+  const typesWithCounts: AssetTypeWithCount[] = await Promise.all(
+    archivedTypes.map(async (type) => {
+      const { count, error: countError } = await supabaseClient
+        .from('assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('asset_type_id', type.id)
+        .is('deleted_at', null); // Count only active assets
+
+      if (countError) {
+        console.error(`[assetTypeService] Error counting assets for archived type ${type.id}:`, countError);
+        // Return with count 0 or handle error as appropriate
+        return { ...type, asset_count: 0 };
+      }
+      return { ...type, asset_count: count || 0 };
+    })
+  );
+  console.log(`[assetTypeService] Fetched ${typesWithCounts.length} archived asset types with counts.`);
+  return typesWithCounts;
 }; 

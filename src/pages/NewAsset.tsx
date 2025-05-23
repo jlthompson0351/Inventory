@@ -51,6 +51,7 @@ import * as z from "zod";
 import { Checkbox } from "@/components/ui/checkbox";
 import { generateAssetBarcode, createInventoryCheck, createAssetAndInitialInventory } from "@/services/inventoryService";
 import { getAssetTypeForms } from '@/services/assetTypeService';
+import { getFormById } from '@/services/formService';
 
 // Dynamic form component
 import DynamicForm from "@/components/forms/DynamicForm";
@@ -66,6 +67,8 @@ interface AssetType {
   barcode_type?: string;
   barcode_prefix?: string;
   deleted_at?: string | null;
+  mapping_form_id?: string | null;
+  conversion_fields?: any[];
 }
 
 interface Asset {
@@ -92,6 +95,7 @@ export default function NewAsset() {
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [loadingAssets, setLoadingAssets] = useState(false);
   const [intakeFormError, setIntakeFormError] = useState<string | null>(null);
+  const [intakeFormSchemaJson, setIntakeFormSchemaJson] = useState<any | null>(null);
 
   // Initialize form validation schema
   const formSchema = z.object({
@@ -169,26 +173,42 @@ export default function NewAsset() {
           if (assetType && currentOrganization?.id) {
             setLoadingIntakeForm(true);
             try {
-              const forms = await getAssetTypeForms(assetType.id, currentOrganization.id);
-              const intake = (forms || []).find(f => f.purpose === 'intake');
-              if (intake) {
-                if (intake.form_data && typeof intake.form_data === 'string') {
-                  try {
-                    intake.form_data = JSON.parse(intake.form_data);
-                  } catch (e) {
-                    console.error('Error parsing intake form_data:', e);
-                    intake.form_data = null;
+              // Load conversion fields directly from asset type
+              if (assetType.conversion_fields && Array.isArray(assetType.conversion_fields)) {
+                // Create a mock form structure from conversion fields
+                const conversionForm = {
+                  id: 'conversion_fields',
+                  name: 'Conversion Fields',
+                  form_data: {
+                    fields: assetType.conversion_fields.map((field: any) => ({
+                      id: field.field_name,
+                      label: field.label,
+                      type: field.type,
+                      required: field.required || false,
+                      mappable: field.mappable || true,
+                      description: field.description,
+                      placeholder: field.placeholder,
+                      options: field.options || []
+                    }))
                   }
-                }
-                setIntakeForm(intake);
+                };
+                
+                setIntakeForm(conversionForm);
+                setIntakeFormSchemaJson(conversionForm.form_data);
               } else {
                 setIntakeForm(null);
+                setIntakeFormSchemaJson(null);
               }
+            } catch (error) {
+              console.error('Error loading conversion fields:', error);
+              setIntakeForm(null);
+              setIntakeFormSchemaJson(null);
             } finally {
               setLoadingIntakeForm(false);
             }
           } else {
             setIntakeForm(null);
+            setIntakeFormSchemaJson(null);
           }
         }
       });
@@ -202,7 +222,7 @@ export default function NewAsset() {
     try {
       const { data, error } = await supabase
         .from('asset_types')
-        .select('*, intake_form_id, enable_barcodes, barcode_type, barcode_prefix')
+        .select('*, intake_form_id, enable_barcodes, barcode_type, barcode_prefix, conversion_fields')
         .eq('organization_id', currentOrganization.id)
         .order('name');
       
@@ -245,6 +265,7 @@ export default function NewAsset() {
       }
       
       setIntakeForm(data);
+      setIntakeFormSchemaJson(data?.form_data || null);
     } catch (error) {
       console.error("Error fetching intake form:", error);
       toast({
@@ -253,6 +274,7 @@ export default function NewAsset() {
         variant: "destructive",
       });
       setIntakeForm(null);
+      setIntakeFormSchemaJson(null);
     } finally {
       setLoadingIntakeForm(false);
     }
@@ -297,6 +319,9 @@ export default function NewAsset() {
           description: values.description,
           color: values.color,
           organization_id: currentOrganization.id,
+          enable_barcodes: false, // Default to false
+          barcode_type: 'qr',    // Default to 'qr'
+          barcode_prefix: null   // Default to null
         })
         .select()
         .single();
@@ -409,7 +434,8 @@ export default function NewAsset() {
             assetData,
             values.asset_type_id,
             currentOrganization.id,
-            intakeFormData
+            intakeFormData,
+            intakeFormSchemaJson
           );
           
           data = result.asset;
@@ -533,8 +559,15 @@ export default function NewAsset() {
       }
       
       // Set dynamic form values from metadata
-      if (data.metadata) {
-        const dynamicFormValues = { ...data.metadata };
+      if (data.metadata && typeof data.metadata === 'object' && !Array.isArray(data.metadata)) {
+        const metadataObject = data.metadata as Record<string, any>; // Type assertion
+        form.setValue('location', metadataObject.location || "");
+        form.setValue('location_details', metadataObject.location_details || "");
+        form.setValue('cost', metadataObject.cost);
+        form.setValue('unit_type', metadataObject.unit_type || "");
+        form.setValue('current_inventory', metadataObject.current_inventory || 0);
+
+        const dynamicFormValues = { ...metadataObject };
         // Remove fields we handle separately
         delete dynamicFormValues.location;
         delete dynamicFormValues.location_details;
@@ -543,6 +576,15 @@ export default function NewAsset() {
         delete dynamicFormValues.current_inventory;
         
         setFormValues(dynamicFormValues);
+      } else {
+        // If metadata is not an object or is null, set defaults for form values
+        // and empty object for dynamicFormValues to prevent spread errors.
+        form.setValue('location', "");
+        form.setValue('location_details', "");
+        form.setValue('cost', undefined);
+        form.setValue('unit_type', "");
+        form.setValue('current_inventory', 0);
+        setFormValues({});
       }
       
     } catch (error) {
@@ -750,18 +792,18 @@ export default function NewAsset() {
             {/* Only show additional fields and intake form if an asset type is selected */}
             {selectedAssetType && (
               <>
-                {/* Intake Form - Show this first when a type is selected */}
+                {/* Mapping Form - Show this first when a type is selected */}
                 {intakeForm ? (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Intake Form for {selectedAssetType.name}</CardTitle>
+                      <CardTitle>Conversion Values for {selectedAssetType.name}</CardTitle>
                       <CardDescription>
-                        Complete the required information for this {selectedAssetType.name}
+                        Set the conversion rates and mapped field values for this specific {selectedAssetType.name}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       {loadingIntakeForm ? (
-                        <div className="text-center py-4">Loading form...</div>
+                        <div className="text-center py-4">Loading mapping form...</div>
                       ) : (
                         <>
                           {intakeFormError && (
@@ -782,7 +824,7 @@ export default function NewAsset() {
                   </Card>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
-                    No intake form available for this asset type
+                    No mapping form available for this asset type. You can create one in the Asset Type settings.
                   </div>
                 )}
                 

@@ -19,10 +19,10 @@ import Reports from "./pages/Reports";
 import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
-import SystemAdmin from "./pages/SystemAdmin";
+// import SystemAdmin from "./pages/SystemAdmin"; // Old import
+import OrganizationAdminPage from "./pages/OrganizationAdminPage"; // New import
 import Profile from "./pages/Profile";
 import AppSettings from "./pages/AppSettings";
-import OrganizationSettings from "./pages/OrganizationSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import InvitationAccept from "./pages/InvitationAccept";
 import AdminDebugPanel from "./pages/AdminDebugPanel";
@@ -30,6 +30,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
 import FormPreview from "./pages/FormPreview";
 import AssetTypeDetail from "./pages/AssetTypeDetail";
+import AssetTypeEdit from "./pages/AssetTypeEdit";
 import { InventoryItemDetail } from "./pages/InventoryItemDetail";
 import { EditInventoryItem } from "./pages/EditInventoryItem";
 import ScanAsset from './pages/ScanAsset';
@@ -99,8 +100,11 @@ const AppRoutes = () => {
         {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
         <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />
         
+        {/* Redirect old system-admin to new organization-admin route */}
+        <Route path="/system-admin" element={<Navigate to="/organization-admin" replace />} />
+        
         {/* Protected admin routes */}
-        <Route path="/system-admin" element={user ? <SystemAdmin /> : <Navigate to="/login" />} />
+        <Route path="/organization-admin" element={user ? <OrganizationAdminPage /> : <Navigate to="/login" />} />
         
         {/* Main application routes - require authentication */}
         <Route path="/" element={user ? <PageLayout><Dashboard /></PageLayout> : <Navigate to="/login" />} />
@@ -133,6 +137,7 @@ const AppRoutes = () => {
         {/* Asset Type Management Routes */}
         <Route path="/asset-types" element={user ? <PageLayout><AssetTypes /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/asset-types/:id" element={user ? <PageLayout><AssetTypeDetail /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/asset-types/edit/:id" element={user ? <PageLayout><AssetTypeEdit /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Asset Management Routes */}
         <Route path="/assets" element={user ? <PageLayout><Assets /></PageLayout> : <Navigate to="/login" />} />
@@ -150,7 +155,6 @@ const AppRoutes = () => {
         {/* User and Organization Settings Routes */}
         <Route path="/profile" element={user ? <PageLayout><Profile /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/app-settings" element={user ? <PageLayout><AppSettings /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/organization/settings" element={user ? <PageLayout><OrganizationSettings /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/organization/members" element={user ? <PageLayout><OrganizationMembers /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Utilities and Tools */}

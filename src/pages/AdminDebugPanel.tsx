@@ -6,16 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
-import { SetupMothership } from '@/scripts/setupMothership';
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const AdminDebugPanel = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { fetchOrganizations, organizations, currentOrganization } = useOrganization();
+  const { user, userRoles } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [databaseDiagnostics, setDatabaseDiagnostics] = useState<any>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [organizationCount, setOrganizationCount] = useState<number | null>(null);
@@ -25,50 +25,21 @@ const AdminDebugPanel = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   
   useEffect(() => {
-    checkUserPermissions();
-    loadCounts();
-  }, []);
-
-  const checkUserPermissions = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('system_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'super_admin')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking permissions:', error);
-        toast({
-          title: 'Permission Check Failed',
-          description: 'Could not verify your permissions.',
-          variant: 'destructive'
-        });
-        navigate('/');
-        return;
-      }
-
-      setIsSuperAdmin(!!data);
-      if (!data) {
-        toast({
-          title: 'Access Denied',
-          description: 'This page is only available to system administrators.',
-          variant: 'destructive'
-        });
-        navigate('/');
-      }
-    } catch (error) {
-      console.error('Error checking permissions:', error);
-      navigate('/');
+    if (!user) {
+      navigate('/login');
+      return;
     }
-  };
+    if (!userRoles.isPlatformOperator) {
+      toast({
+        title: 'Access Denied',
+        description: 'This page is only available to platform operators.',
+        variant: 'destructive'
+      });
+      navigate('/');
+      return;
+    }
+    loadCounts();
+  }, [user, userRoles.isPlatformOperator, navigate, toast]);
 
   const runDatabaseDiagnostics = async () => {
     setLoading(true);
@@ -81,14 +52,9 @@ const AdminDebugPanel = () => {
           description: 'Please log in to access this feature.',
           variant: 'destructive'
         });
+        setLoading(false); // Ensure loading is false on early return
         return;
       }
-
-      // Check system roles
-      const { data: systemRoles, error: rolesError } = await supabase
-        .from('system_roles')
-        .select('*')
-        .eq('user_id', user.id);
 
       // Get org members
       const { data: orgMembers, error: membersError } = await supabase
@@ -118,18 +84,16 @@ const AdminDebugPanel = () => {
 
       const diagnosticData = {
         userId: user.id,
-        systemRoles,
         orgMembers,
         organizations,
         joinedData,
-        rolesError,
         membersError, 
         orgsError,
         joinError
       };
 
       setDatabaseDiagnostics(diagnosticData);
-      setSystemHealth(!rolesError && !membersError && !orgsError && !joinError);
+      setSystemHealth(!membersError && !orgsError && !joinError);
       
       toast({
         title: 'Diagnostics Complete',
@@ -166,8 +130,6 @@ const AdminDebugPanel = () => {
         title: 'Success',
         description: 'RLS policy has been fixed! Please refresh your data.',
       });
-      
-      await fetchOrganizations();
     } catch (error) {
       console.error('Error fixing RLS policy:', error);
       toast({
@@ -184,7 +146,7 @@ const AdminDebugPanel = () => {
     try {
       // Get user count
       const { count: userCount, error: userError } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*', { count: 'exact', head: true });
       
       if (!userError) {
@@ -221,15 +183,6 @@ const AdminDebugPanel = () => {
       console.error('Error loading counts:', error);
     }
   };
-
-  if (!isSuperAdmin) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)] flex-col">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground mt-2">Checking permissions...</p>
-      </div>
-    );
-  }
 
   const resetDatabase = async () => {
     if (!showConfirmation) {
@@ -366,15 +319,6 @@ const AdminDebugPanel = () => {
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Fix RLS Policies
                 </Button>
-                <Button 
-                  onClick={fetchOrganizations} 
-                  disabled={loading}
-                  variant="outline"
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Refresh Organizations
-                </Button>
-                <SetupMothership />
               </div>
 
               {databaseDiagnostics && (
@@ -384,14 +328,6 @@ const AdminDebugPanel = () => {
                     <AccordionContent>
                       <pre className="bg-secondary p-4 rounded-md overflow-auto max-h-[400px] text-xs">
                         {JSON.stringify(databaseDiagnostics, null, 2)}
-                      </pre>
-                    </AccordionContent>
-                  </AccordionItem>
-                  <AccordionItem value="system-roles">
-                    <AccordionTrigger>System Roles</AccordionTrigger>
-                    <AccordionContent>
-                      <pre className="bg-secondary p-4 rounded-md overflow-auto max-h-[400px] text-xs">
-                        {JSON.stringify(databaseDiagnostics?.systemRoles, null, 2)}
                       </pre>
                     </AccordionContent>
                   </AccordionItem>
@@ -429,18 +365,6 @@ const AdminDebugPanel = () => {
               ) : (
                 <p>No organization selected</p>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Organizations</CardTitle>
-              <CardDescription>All organizations accessible to the current user</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <pre className="bg-secondary p-4 rounded-md overflow-auto max-h-[200px] text-xs">
-                {JSON.stringify(organizations, null, 2)}
-              </pre>
             </CardContent>
           </Card>
         </TabsContent>

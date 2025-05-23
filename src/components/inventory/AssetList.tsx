@@ -7,6 +7,7 @@ import { Eye, Edit, Trash2, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { softDeleteAsset } from "@/services/assetService";
 
 // Define Asset type interface properly
 interface Asset {
@@ -17,8 +18,10 @@ interface Asset {
   serial_number?: string;
   acquisition_date?: string;
   asset_type?: {
+    id: string;
     name: string;
     color: string;
+    deleted_at?: string | null;
   };
 }
 
@@ -57,14 +60,18 @@ const processAssetData = (rawData: RawAssetData[]): Asset[] => {
     if (Array.isArray(item.asset_type) && item.asset_type.length > 0) {
       // If asset_type is an array, take the first item
       assetType = {
+        id: item.asset_type[0]?.id,
         name: item.asset_type[0]?.name || 'Unknown',
-        color: item.asset_type[0]?.color || '#888888'
+        color: item.asset_type[0]?.color || '#888888',
+        deleted_at: item.asset_type[0]?.deleted_at
       };
-    } else if (item.asset_type && typeof item.asset_type === 'object') {
+    } else if (item.asset_type && typeof item.asset_type === 'object' && item.asset_type.id) {
       // If asset_type is an object
       assetType = {
+        id: item.asset_type.id,
         name: item.asset_type?.name || 'Unknown',
-        color: item.asset_type?.color || '#888888'
+        color: item.asset_type?.color || '#888888',
+        deleted_at: item.asset_type?.deleted_at
       };
     }
     
@@ -147,7 +154,7 @@ export default function AssetList({
           status,
           serial_number,
           acquisition_date,
-          asset_type:asset_types(id, name, color)
+          asset_type:asset_types(id, name, color, deleted_at)
         `)
         .eq('organization_id', organizationId)
         .is('deleted_at', null);
@@ -250,12 +257,33 @@ export default function AssetList({
     try {
       if (onDelete) {
         onDelete(asset);
+      } else {
+        // Use Dialog component to confirm deletion
+        // This is an example, you might need a more robust confirmation
+        if (window.confirm(`Are you sure you want to delete ${asset.name}?`)) {
+          console.log(`[AssetList] Attempting to delete asset: ${asset.id}`);
+          softDeleteAsset(asset.id).then(success => {
+            console.log(`[AssetList] softDeleteAsset success: ${success} for asset: ${asset.id}`);
+            if (success) {
+              // Clear the cache for this specific key before refreshing
+              assetsCache.delete(cacheKey);
+              // Refresh the list after deletion
+              fetchAssets(true); 
+            } else {
+              console.error(`[AssetList] Failed to delete asset from service: ${asset.id}`);
+              setError("Failed to delete asset.");
+            }
+          }).catch(err => {
+            console.error(`[AssetList] Error in softDeleteAsset promise for asset: ${asset.id}:`, err);
+            setError("Error during asset deletion process.");
+          });
+        }
       }
     } catch (err) {
-      console.error("[AssetList] Error deleting asset:", err);
+      console.error("[AssetList] Error in handleDelete function:", err);
       setError("Failed to delete asset");
     }
-  }, [onDelete]);
+  }, [onDelete, fetchAssets, cacheKey]);
 
   const handleView = useCallback((asset: Asset) => {
     try {
@@ -334,9 +362,11 @@ export default function AssetList({
                     style={{
                       borderColor: asset.asset_type.color || "#888",
                       color: asset.asset_type.color || "#888",
+                      opacity: asset.asset_type.deleted_at ? 0.6 : 1,
                     }}
                   >
                     {asset.asset_type.name || "Unknown Type"}
+                    {asset.asset_type.deleted_at ? " (Archived)" : ""}
                   </Badge>
                 )}
               </div>

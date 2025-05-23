@@ -13,7 +13,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import Header from "./Header";
-import OrganizationSwitcher from "@/components/organization/OrganizationSwitcher";
+import CurrentOrganizationDisplay from "@/components/organization/CurrentOrganizationDisplay";
 import UserMenu from "./UserMenu";
 import { 
   Sidebar, 
@@ -142,18 +142,18 @@ const PageLayout = ({ children }: PageLayoutProps) => {
     }
   ];
 
-  const organizationItems = [
-    {
-      title: "Organization Members",
-      icon: <Users className="w-4 h-4" />,
-      path: "/organization/members",
-    },
-    {
-      title: "Organization Settings",
-      icon: <SettingsIcon className="w-4 h-4" />,
-      path: "/organization/settings",
-    }
-  ];
+  // const organizationItems = [
+  //   {
+  //     title: "Organization Members",
+  //     icon: <Users className="w-4 h-4" />,
+  //     path: "/organization/members",
+  //   },
+  //   {
+  //     title: "Organization Settings",
+  //     icon: <SettingsIcon className="w-4 h-4" />,
+  //     path: "/organization/settings",
+  //   }
+  // ];
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -165,7 +165,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
             <SidebarHeader>
               <div className="px-4 py-3 flex flex-col gap-3">
                 <h1 className="text-xl font-bold text-primary text-center">Coming Soon</h1>
-                <OrganizationSwitcher />
+                <CurrentOrganizationDisplay />
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -189,7 +189,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
                 </SidebarGroupContent>
               </SidebarGroup>
               
-              <SidebarGroup>
+              {/* <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {organizationItems.map((item) => (
@@ -207,7 +207,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
                     ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
-              </SidebarGroup>
+              </SidebarGroup> */}
             </SidebarContent>
             
             <SidebarFooter>

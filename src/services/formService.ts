@@ -32,13 +32,42 @@ export async function getForms(organizationId: string) {
   // Handle backward compatibility for form_data/schema
   if (data) {
     data.forEach(form => {
-      // Ensure form_data is available
-      if (form.schema && !form.form_data) {
-        form.form_data = form.schema;
+      // @ts-ignore legacy schema field - or use type assertion if preferred
+      if ((form as any).schema && !form.form_data) {
+        // @ts-ignore
+        form.form_data = (form as any).schema;
       }
     });
   }
 
+  return data;
+}
+
+/**
+ * Get all ARCHIVED forms for an organization (soft-deleted)
+ */
+export async function getArchivedForms(organizationId: string): Promise<Form[] | null> {
+  const { data, error } = await supabase
+    .from('forms')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .not('deleted_at', 'is', null) // Fetch where deleted_at is NOT NULL
+    .order('name');
+
+  if (error) {
+    console.error('[formService] Error fetching archived forms:', error);
+    throw error;
+  }
+
+  // Handle backward compatibility for form_data/schema
+  if (data) {
+    data.forEach(form => {
+      if ((form as any).schema && !form.form_data) {
+        (form as any).form_data = (form as any).schema;
+      }
+    });
+  }
+  console.log(`[formService] Fetched ${data?.length || 0} archived forms.`);
   return data;
 }
 
@@ -131,8 +160,10 @@ export async function getFormById(formId: string) {
 
     // Handle backward compatibility between schema and form_data
     if (data) {
-      if (data.schema && !data.form_data) {
-        data.form_data = data.schema;
+      // @ts-ignore legacy schema field - or use type assertion
+      if ((data as any).schema && !data.form_data) {
+        // @ts-ignore
+        (data as any).form_data = (data as any).schema;
       }
     }
 
@@ -281,8 +312,7 @@ export async function getFormWithRelatedData(formId: string) {
  */
 export async function createForm(form: FormInsert) {
   try {
-    // Make sure we're using form_data instead of schema (which doesn't exist in DB)
-    const formToInsert = { ...form };
+    const formToInsert = { ...form } as any; // Use type assertion for schema access
     if (formToInsert.schema && !formToInsert.form_data) {
       formToInsert.form_data = formToInsert.schema;
       delete formToInsert.schema;
@@ -333,8 +363,7 @@ export async function updateForm(formId: string, form: FormUpdate) {
       throw new Error('Form ID is required');
     }
 
-    // Make sure we're using form_data instead of schema (which doesn't exist in DB)
-    const formToUpdate = { ...form };
+    const formToUpdate = { ...form } as any; // Use type assertion for schema access
     if (formToUpdate.schema && !formToUpdate.form_data) {
       formToUpdate.form_data = formToUpdate.schema;
       delete formToUpdate.schema;
@@ -367,7 +396,8 @@ export async function updateForm(formId: string, form: FormUpdate) {
 }
 
 /**
- * Delete a form
+ * Delete a form (Soft delete by setting deleted_at)
+ * This existing function already performs a soft delete and handles dependencies.
  */
 export async function deleteForm(formId: string) {
   try {
@@ -476,6 +506,40 @@ export async function deleteForm(formId: string) {
   } catch (error) {
     console.error('Error deleting form:', error);
     throw error;
+  }
+}
+
+/**
+ * Restores a soft-deleted form by setting deleted_at to null.
+ * It might also be prudent to set its status (e.g., to 'draft') if it was also 'archived' by status.
+ */
+export async function restoreForm(formId: string): Promise<Form | null> {
+  if (!formId) {
+    console.warn('[formService] restoreForm called with no ID.');
+    return null;
+  }
+  try {
+    // First, update deleted_at to null
+    const { data, error } = await supabase
+      .from('forms')
+      .update({ deleted_at: null /*, status: 'draft' */ }) // Consider resetting status
+      .eq('id', formId)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('[formService] Error restoring form:', error);
+      // Check for unique constraint violation (code 23505 in PostgreSQL)
+      if (error.code === '23505') {
+        throw new Error('An active form with the same name already exists in this organization.');
+      }
+      throw error;
+    }
+    console.log(`[formService] Form ${formId} restored successfully.`);
+    return data;
+  } catch (error) {
+    console.error(`[formService] Failed to restore form ${formId}:`, error);
+    throw error; // Re-throw to be caught by UI
   }
 }
 

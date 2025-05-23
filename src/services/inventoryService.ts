@@ -1158,6 +1158,26 @@ export const createAssetAndInitialInventory = async (
       // Consider if asset/inventory_item should be rolled back or marked
       throw historyError;
     }
+
+    // 4. Log initial price if cost is available in assetData.metadata
+    if (assetData.metadata && typeof assetData.metadata.cost === 'number' && inventoryItem && inventoryItem.id) {
+      try {
+        await supabase
+          .from('inventory_price_history')
+          .insert({
+            inventory_item_id: inventoryItem.id,
+            organization_id: organizationId,
+            price: assetData.metadata.cost,
+            currency: assetData.metadata.currency || 'USD', // Assuming currency might also be in metadata or default
+            effective_date: now.toISOString(),
+            created_by: userId,
+            notes: 'Initial purchase price from asset creation'
+          });
+      } catch (priceHistoryError) {
+        console.error('Error creating initial inventory price history record:', priceHistoryError);
+        // Non-fatal, allow asset creation to succeed but log the error
+      }
+    }
     
     return {
       asset: newAsset,

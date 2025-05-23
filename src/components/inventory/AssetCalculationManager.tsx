@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,8 +50,10 @@ export function AssetCalculationManager({
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // Use either initialFormulas or calculationFormulas
-  const formulasToUse = Object.keys(initialFormulas).length > 0 ? initialFormulas : calculationFormulas;
+  // Use either initialFormulas or calculationFormulas - memoize to prevent infinite re-renders
+  const formulasToUse = useMemo(() => {
+    return Object.keys(initialFormulas).length > 0 ? initialFormulas : calculationFormulas;
+  }, [initialFormulas, calculationFormulas]);
 
   // Convert JSON formulas object to FormEntry array for UI
   useEffect(() => {
@@ -89,9 +91,13 @@ export function AssetCalculationManager({
   // Fetch available form fields
   useEffect(() => {
     const fetchFormFields = async () => {
-      const formId = activeTab === 'intake' 
-        ? formIds?.intakeFormId 
-        : formIds?.inventoryFormId;
+      let formId: string | undefined;
+      
+      if (activeTab === 'intake') {
+        formId = formIds?.intakeFormId;
+      } else if (activeTab === 'inventory') {
+        formId = formIds?.inventoryFormId;
+      }
       
       if (!formId) {
         setAvailableFields([]);
@@ -107,19 +113,36 @@ export function AssetCalculationManager({
         
         if (error) throw error;
         
-        const formData = data?.form_data;
-        const fields = formData?.fields || [];
-        const fieldIds = fields.map(field => field.id);
+        if (!data || !data.form_data) {
+          setAvailableFields([]);
+          return;
+        }
         
+        // Parse form_data if it's a string, similar to other parts of the codebase
+        let formData: any;
+        if (typeof data.form_data === 'string') {
+          try {
+            formData = JSON.parse(data.form_data);
+          } catch (e) {
+            console.error('Error parsing form_data JSON:', e);
+            setAvailableFields([]);
+            return;
+          }
+        } else {
+          formData = data.form_data as any;
+        }
+        
+        const fields = (formData as any)?.fields || [];
+        const fieldIds = fields.map((field: any) => field.id);
         setAvailableFields(fieldIds);
       } catch (error) {
         console.error('Error fetching form fields:', error);
         setAvailableFields([]);
       }
     };
-    
+
     fetchFormFields();
-  }, [activeTab, formIds]);
+  }, [activeTab, formIds?.intakeFormId, formIds?.inventoryFormId]);
   
   const addNewFormula = () => {
     const newId = `formula-${Date.now()}`;
