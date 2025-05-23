@@ -40,7 +40,7 @@
 - **Tables**: `auth.users` (Supabase Auth), `profiles`, `organization_members`
 - **Description**: User accounts and their organization membership
 - **Relationships**:
-  - Users can belong to multiple organizations with different roles
+  - Each user belongs to exactly one organization
 
 ## Inventory Management
 

@@ -1036,6 +1036,7 @@ const ReportBuilder = () => {
                             <Checkbox
                               checked={selectedDataSources.includes(source.id)}
                               onCheckedChange={() => handleDataSourceToggle(source.id)}
+                              onClick={(e) => e.stopPropagation()}
                               className="mt-0.5 flex-shrink-0"
                               aria-labelledby={`ds-label-${source.id}`}
                             />

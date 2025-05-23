@@ -812,7 +812,7 @@ const FormBuilder = () => {
               <h3 className="font-medium text-red-800">No Organization Selected</h3>
               <p className="text-sm text-red-700 mt-1">
                 Please ensure you're connected to an organization before creating or editing a form.
-                Go to the organization switcher in the top bar to select an organization.
+                Contact your administrator to ensure you have the proper organization setup.
               </p>
               <Button 
                 className="mt-3" 

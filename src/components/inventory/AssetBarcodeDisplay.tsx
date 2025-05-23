@@ -30,9 +30,10 @@ export function AssetBarcodeDisplay({ assetId }: AssetBarcodeDisplayProps) {
           throw error;
         }
         
-        if (data) {
-          setBarcodeData(data);
-          generateBarcodeElement(data.barcode, data.barcode_type);
+        if (data && typeof data === 'object' && 'barcode' in data) {
+          const barcodeInfo = data as { barcode: string; barcode_type: string; name: string };
+          setBarcodeData(barcodeInfo);
+          generateBarcodeElement(barcodeInfo.barcode, barcodeInfo.barcode_type);
         }
       } catch (error: any) {
         console.error('Error fetching barcode data:', error);
@@ -53,7 +54,13 @@ export function AssetBarcodeDisplay({ assetId }: AssetBarcodeDisplayProps) {
     if (!barcode) return;
     
     if (type === 'qr') {
-      const element = BarcodeService.generateQRCode(barcode, { size: 200 });
+      // For QR codes, encode a URL that can be scanned on mobile
+      const baseUrl = window.location.origin;
+      const qrData = JSON.stringify({ assetId, barcode });
+      const encodedData = btoa(qrData);
+      const qrValue = `${baseUrl}/qr/${encodedData}`;
+      
+      const element = BarcodeService.generateQRCode(qrValue, { size: 200 });
       setBarcodeElement(element);
     } else {
       const element = BarcodeService.generateBarcode(barcode, {
@@ -73,7 +80,13 @@ export function AssetBarcodeDisplay({ assetId }: AssetBarcodeDisplayProps) {
       let dataUrl;
       
       if (barcodeData.barcode_type === 'qr') {
-        dataUrl = await BarcodeService.generateQRCodeDataURL(barcodeData.barcode, { size: 300 });
+        // For QR codes, encode the URL
+        const baseUrl = window.location.origin;
+        const qrData = JSON.stringify({ assetId, barcode: barcodeData.barcode });
+        const encodedData = btoa(qrData);
+        const qrValue = `${baseUrl}/qr/${encodedData}`;
+        
+        dataUrl = await BarcodeService.generateQRCodeDataURL(qrValue, { size: 300 });
       } else {
         dataUrl = await BarcodeService.generateBarcodeDataURL(barcodeData.barcode, {
           format: 'CODE128',
@@ -141,10 +154,7 @@ export function AssetBarcodeDisplay({ assetId }: AssetBarcodeDisplayProps) {
         <div className="bg-white p-4 border rounded">
           {barcodeElement}
         </div>
-        <div className="text-center mb-2">
-          <p className="text-sm text-muted-foreground">Barcode: {barcodeData.barcode}</p>
-          <p className="text-xs text-muted-foreground mt-1">Type: {barcodeData.barcode_type.toUpperCase()}</p>
-        </div>
+        <div className="text-center mb-2">          <p className="text-sm text-muted-foreground">Barcode: {barcodeData.barcode}</p>          <p className="text-xs text-muted-foreground mt-1">Type: {barcodeData.barcode_type.toUpperCase()}</p>          {barcodeData.barcode_type === 'qr' && (            <p className="text-xs text-primary mt-2">              📱 Scan with your phone for quick access            </p>          )}        </div>
         <Button onClick={handleDownload} className="flex items-center">
           <Download className="mr-2 h-4 w-4" />
           Download Barcode

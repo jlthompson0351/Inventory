@@ -202,14 +202,7 @@ export default function AssetDetail() {
       }
       
       // Transform data
-      const formattedSubmissions: FormSubmission[] = submissions.map(sub => {
-        const user = userMap[sub.submitted_by] || {};
-        return {
-          ...sub,
-          form_name: sub.forms?.name || "Unknown Form",
-          created_by_name: user.full_name || user.email || "Unknown User"
-        };
-      });
+                  const formattedSubmissions: FormSubmission[] = submissions.map(sub => {        const user = userMap[sub.submitted_by] || {};        return {          ...sub,          form_name: sub.forms?.name || "Unknown Form",          created_by: sub.submitted_by,          created_by_name: user.full_name || user.email || "Unknown User"        };      });
       
       setFormSubmissions(formattedSubmissions);
     } catch (error) {
@@ -459,11 +452,14 @@ export default function AssetDetail() {
       {/* QR Code Card - Either display QR code or a message to generate one */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Asset QR Code</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <QrCode className="h-5 w-5" />
+            Asset QR Code
+          </CardTitle>
           <CardDescription>
             {asset.barcode 
-              ? "Scan this code to quickly access asset information" 
-              : "This asset doesn't have a QR code yet"}
+              ? "Scan this code with your phone to quickly perform intake or inventory actions" 
+              : "Generate a QR code to enable mobile scanning for this asset"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center items-center flex-col gap-4">
@@ -483,6 +479,22 @@ export default function AssetDetail() {
                 <p className="text-lg font-semibold mb-1">ID: {asset.id}</p>
                 <p className="text-sm text-muted-foreground mb-1">Barcode: {asset.barcode}</p>
                 <p className="text-sm text-muted-foreground mb-4">Type: {asset.asset_type_name}</p>
+                
+                {/* Mobile Scanning Instructions */}
+                <Alert className="mb-4 max-w-md">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Mobile Scanning</AlertTitle>
+                  <AlertDescription className="text-left space-y-2">
+                    <p>To use mobile scanning:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-sm">
+                      <li>Set up your 4-digit PIN in your profile settings</li>
+                      <li>Scan this QR code with your phone's camera</li>
+                      <li>Enter your PIN when prompted</li>
+                      <li>Choose to add inventory (intake) or perform inventory check</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
+                
                 <Button 
                   variant="outline" 
                   onClick={() => {

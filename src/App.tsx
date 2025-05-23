@@ -37,6 +37,7 @@ import ScanAsset from './pages/ScanAsset';
 import BarcodeDemo from "./pages/BarcodeDemo";
 import SubmitForm from "./pages/SubmitForm";
 import InventoryCheck from "./pages/InventoryCheck";
+import QRScanHandler from "./pages/QRScanHandler";
 
 // New inventory workflow pages
 import InventoryAddSelectionPage from "./pages/InventoryAddSelection";
@@ -96,6 +97,7 @@ const AppRoutes = () => {
         {/* Public routes - accessible without login */}
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
         <Route path="/invitation" element={<InvitationAccept />} />
+        <Route path="/qr/:code" element={<QRScanHandler />} />
         
         {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
         <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />
