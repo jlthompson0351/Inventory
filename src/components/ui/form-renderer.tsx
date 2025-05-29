@@ -257,21 +257,37 @@ export function FormRenderer({
     
     const totalGallons = Number(updatedData[totalField.id]) || 0;
     
-    // Get current inventory from asset metadata (if available)
+    // Get starting inventory from asset metadata (inventory at the beginning of the period)
+    const startingInventory = Number(mappedFields.starting_inventory) || Number(mappedFields.current_inventory) || 0;
     const currentInventory = Number(mappedFields.current_inventory) || 0;
     
-    if (totalGallons > currentInventory * 1.5) { // Allow 50% margin for normal variation
+    // Check if we have any intake fields that add to inventory
+    const intakeFields = fields.filter(field => field.inventory_action === 'add');
+    const totalIntake = intakeFields.reduce((sum, field) => {
+      return sum + (Number(updatedData[field.id]) || 0);
+    }, 0);
+    
+    // Expected max inventory = starting + any intake during the period
+    const expectedMaxInventory = startingInventory + totalIntake;
+    
+    if (totalGallons > expectedMaxInventory * 1.2) { // Allow 20% margin for measurement variations
       setInventoryWarning(
-        `⚠️ Inventory Alert: Counted ${totalGallons.toFixed(2)} gallons, but started with ${currentInventory} gallons. This suggests either:\n` +
+        `⚠️ Inventory Alert: Counted ${totalGallons.toFixed(2)} gallons, but started with ${startingInventory} gallons` +
+        (totalIntake > 0 ? ` and added ${totalIntake} gallons` : '') +
+        `. Maximum expected: ${expectedMaxInventory.toFixed(2)} gallons.\n\n` +
+        `This suggests either:\n` +
         `• Unreported intake (someone added inventory without recording it)\n` +
         `• Counting error\n` +
         `• Data entry mistake\n\n` +
         `Please verify your count or check for missing intake records.`
       );
-    } else if (totalGallons < currentInventory * 0.2) { // Warn if too low (more than 80% consumption)
+    } else if (totalGallons < startingInventory * 0.1 && startingInventory > 0) { // Warn if less than 10% remains
+      const consumption = startingInventory - totalGallons + totalIntake;
+      const consumptionPercent = (consumption / startingInventory * 100).toFixed(1);
       setInventoryWarning(
-        `⚠️ Low Inventory Alert: Only ${totalGallons.toFixed(2)} gallons remaining from ${currentInventory} gallons. ` +
-        `This represents ${((currentInventory - totalGallons) / currentInventory * 100).toFixed(1)}% consumption this period.`
+        `⚠️ Low Inventory Alert: Only ${totalGallons.toFixed(2)} gallons remaining from ${startingInventory} gallons starting inventory.\n` +
+        `This represents ${consumptionPercent}% consumption this period` +
+        (totalIntake > 0 ? ` (after adding ${totalIntake} gallons)` : '') + `.`
       );
     } else {
       setInventoryWarning(null);

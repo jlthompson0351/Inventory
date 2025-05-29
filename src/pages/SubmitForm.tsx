@@ -40,6 +40,7 @@ export default function SubmitForm() {
   const [hasFormulaFields, setHasFormulaFields] = useState(false);
   const [assetMetadata, setAssetMetadata] = useState<Record<string, any>>({});
   const [mergedFormData, setMergedFormData] = useState<Record<string, any>>({});
+  const [fetchedAssetTypeId, setFetchedAssetTypeId] = useState<string | null>(null);
   
   // New states for monthly inventory tracking
   const [existingSubmissionId, setExistingSubmissionId] = useState<string | null>(null);
@@ -98,18 +99,55 @@ export default function SubmitForm() {
             try {
               const { data: fetchedAssetData, error: assetError } = await supabase
                 .from('assets')
-                .select('*, asset_types(*)') // Ensure asset_types data, including conversion_fields, is potentially here
+                .select('*, asset_types(*)')
                 .eq('id', assetId)
                 .single();
                 
               if (!assetError && fetchedAssetData) {
                 assetDataForEffect = fetchedAssetData;
+                // Store the asset type ID for later use
+                if (fetchedAssetData.asset_type_id) {
+                  setFetchedAssetTypeId(fetchedAssetData.asset_type_id);
+                }
                 // Ensure metadata is an object, not a primitive
                 const metadata = fetchedAssetData.metadata;
                 currentAssetMetadata = (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) 
                   ? metadata as Record<string, any>
                   : {};
                 console.log('SubmitForm - Fetched base assetMetadata:', currentAssetMetadata);
+                
+                // Fetch the inventory item for this asset to get the current quantity
+                const { data: inventoryItem, error: inventoryError } = await supabase
+                  .from('inventory_items')
+                  .select('quantity, id')
+                  .eq('asset_id', assetId)
+                  .single();
+                
+                if (!inventoryError && inventoryItem) {
+                  currentAssetMetadata.current_inventory = inventoryItem.quantity;
+                  console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
+                  
+                  // Fetch the most recent inventory history to get the starting point
+                  const currentMonth = new Date().toISOString().slice(0, 7);
+                  const { data: recentHistory, error: historyError } = await supabase
+                    .from('inventory_history')
+                    .select('quantity, month_year, check_date')
+                    .eq('inventory_item_id', inventoryItem.id)
+                    .lt('month_year', currentMonth) // Get history before current month
+                    .order('check_date', { ascending: false })
+                    .limit(1)
+                    .single();
+                  
+                  if (!historyError && recentHistory) {
+                    // Use the most recent past inventory as the starting point
+                    currentAssetMetadata.starting_inventory = recentHistory.quantity;
+                    console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
+                  } else {
+                    // If no previous history, use current inventory as starting point
+                    currentAssetMetadata.starting_inventory = inventoryItem.quantity;
+                    console.log('SubmitForm - No previous history found, using current inventory as starting point');
+                  }
+                }
                 
                 // Check for existing submissions this month
                 const now = new Date();
@@ -154,6 +192,10 @@ export default function SubmitForm() {
                     });
                     
                     console.log('SubmitForm - finalMergedData AFTER merging existing:', { ...finalMergedData });
+                  } else if (!editExisting) {
+                    // For new entries, still need to ensure we have current inventory
+                    // This was already fetched above but make sure it's available
+                    console.log('SubmitForm - Creating new entry with current inventory:', currentAssetMetadata.current_inventory);
                   }
                 }
               } else if (assetError) {
@@ -294,8 +336,16 @@ export default function SubmitForm() {
     try {
       setSubmitting(true);
       
-      // Get asset type ID from navigation state, prefill data, or form configuration
-      const submissionAssetTypeId = assetTypeId || prefillData.asset_type_id || form.asset_type_id;
+      // Get asset type ID from multiple sources
+      const submissionAssetTypeId = assetTypeId || fetchedAssetTypeId || prefillData.asset_type_id || form.asset_type_id;
+      
+      console.log('SubmitForm - AssetTypeId sources:', {
+        fromState: assetTypeId,
+        fromFetchedAsset: fetchedAssetTypeId,
+        fromPrefillData: prefillData.asset_type_id,
+        fromForm: form.asset_type_id,
+        final: submissionAssetTypeId
+      });
       
       if (isEditingExisting && existingSubmissionId) {
         // Update existing submission
@@ -311,6 +361,105 @@ export default function SubmitForm() {
           throw updateError;
         }
         
+        // Still need to run inventory update logic for edited submissions!
+        // The submitForm service handles inventory updates, so we'll use it
+        // but we need to ensure it processes the update correctly
+        if (submissionAssetTypeId && assetId) {
+          // For inventory forms, directly update the inventory
+          if (formType === 'inventory' && form?.form_data) {
+            const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
+            
+            // Find field with inventory_action = 'set'
+            const setField = formSchema.fields?.find((field: any) => field.inventory_action === 'set');
+            if (setField && data[setField.id]) {
+              const newQuantity = Number(data[setField.id]);
+              
+              if (!isNaN(newQuantity)) {
+                // Get inventory item for this asset
+                const { data: inventoryItem, error: fetchError } = await supabase
+                  .from('inventory_items')
+                  .select('id')
+                  .eq('asset_id', assetId)
+                  .single();
+                  
+                if (fetchError) {
+                  console.error('Error fetching inventory item:', fetchError);
+                } else if (inventoryItem) {
+                  // Update inventory quantity (round for integer column)
+                  const roundedQuantity = Math.round(newQuantity);
+                  const { error: updateError } = await supabase
+                    .from('inventory_items')
+                    .update({
+                      quantity: roundedQuantity, // Database expects integer
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', inventoryItem.id);
+                    
+                  if (updateError) {
+                    console.error('Error updating inventory:', updateError);
+                  } else {
+                    console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
+                    
+                    // Also update the asset metadata with the exact decimal value
+                    const { error: assetUpdateError } = await supabase
+                      .from('assets')
+                      .update({
+                        metadata: {
+                          ...assetMetadata,
+                          exact_quantity_gallons: newQuantity,
+                          last_inventory_update: new Date().toISOString()
+                        }
+                      })
+                      .eq('id', assetId);
+                      
+                    if (assetUpdateError) {
+                      console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
+                    }
+                    
+                    // Create inventory history record
+                    const userId = (await supabase.auth.getUser()).data.user?.id;
+                    const { error: historyError } = await supabase
+                      .from('inventory_history')
+                      .insert({
+                        inventory_item_id: inventoryItem.id,
+                        organization_id: currentOrganization.id,
+                        quantity: roundedQuantity, // Database expects integer
+                        event_type: 'check',
+                        check_type: 'periodic',
+                        notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
+                        response_data: {
+                          ...data,
+                          exact_quantity: newQuantity
+                        },
+                        created_by: userId || null,
+                        created_at: new Date().toISOString(),
+                        check_date: new Date().toISOString(),
+                        month_year: new Date().toISOString().slice(0, 7),
+                        location: data.location || '',
+                        status: 'active'
+                      });
+                      
+                    if (historyError) {
+                      console.error('Error creating inventory history:', historyError);
+                    }
+                  }
+                }
+              } else {
+                console.error('Invalid quantity value:', data[setField.id]);
+              }
+            }
+          } else {
+            // For other forms, use the standard submitForm service
+            await submitForm(
+              id,
+              data,
+              currentOrganization.id,
+              submissionAssetTypeId,
+              assetId
+            );
+          }
+        }
+        
         toast({
           title: 'Inventory Updated',
           description: 'Monthly inventory has been updated successfully',
@@ -324,6 +473,91 @@ export default function SubmitForm() {
         submissionAssetTypeId,
         assetId // Pass the asset ID if this is from a QR code scan
       );
+      
+      // For inventory forms, ensure inventory is updated
+      if (formType === 'inventory' && form?.form_data && assetId) {
+        const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
+        
+        // Find field with inventory_action = 'set'
+        const setField = formSchema.fields?.find((field: any) => field.inventory_action === 'set');
+        if (setField && data[setField.id]) {
+          const newQuantity = Number(data[setField.id]);
+          
+          if (!isNaN(newQuantity)) {
+            // Get inventory item for this asset
+            const { data: inventoryItem, error: fetchError } = await supabase
+              .from('inventory_items')
+              .select('id')
+              .eq('asset_id', assetId)
+              .single();
+              
+            if (fetchError) {
+              console.error('Error fetching inventory item:', fetchError);
+            } else if (inventoryItem) {
+              // Update inventory quantity (round for integer column)
+              const roundedQuantity = Math.round(newQuantity);
+              const { error: updateError } = await supabase
+                .from('inventory_items')
+                .update({
+                  quantity: roundedQuantity, // Database expects integer
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', inventoryItem.id);
+                
+              if (updateError) {
+                console.error('Error updating inventory:', updateError);
+              } else {
+                console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
+                
+                // Also update the asset metadata with the exact decimal value
+                const { error: assetUpdateError } = await supabase
+                  .from('assets')
+                  .update({
+                    metadata: {
+                      ...assetMetadata,
+                      exact_quantity_gallons: newQuantity,
+                      last_inventory_update: new Date().toISOString()
+                    }
+                  })
+                  .eq('id', assetId);
+                  
+                if (assetUpdateError) {
+                  console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
+                }
+                
+                // Create inventory history record
+                const userId = (await supabase.auth.getUser()).data.user?.id;
+                const { error: historyError } = await supabase
+                  .from('inventory_history')
+                  .insert({
+                    inventory_item_id: inventoryItem.id,
+                    organization_id: currentOrganization.id,
+                    quantity: roundedQuantity, // Database expects integer
+                    event_type: 'check',
+                    check_type: 'periodic',
+                    notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
+                    response_data: {
+                      ...data,
+                      exact_quantity: newQuantity
+                    },
+                    created_by: userId || null,
+                    created_at: new Date().toISOString(),
+                    check_date: new Date().toISOString(),
+                    month_year: new Date().toISOString().slice(0, 7),
+                    location: data.location || '',
+                    status: 'active'
+                  });
+                  
+                if (historyError) {
+                  console.error('Error creating inventory history:', historyError);
+                }
+              }
+            }
+          } else {
+            console.error('Invalid quantity value:', data[setField.id]);
+          }
+        }
+      }
       
       toast({
         title: 'Form Submitted',
