@@ -46,7 +46,7 @@ export default function ScanAsset() {
         }
       }
       // If only intake exists or none, allow add
-      navigate(`/inventory/add-for-asset/${asset.id}`);
+      navigate(`/inventory/action/${asset.id}`);
     } catch (err) {
       console.error("Error looking up asset:", err);
       setError("Error looking up asset");

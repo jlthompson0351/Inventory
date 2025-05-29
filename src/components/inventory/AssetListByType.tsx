@@ -71,8 +71,8 @@ export function AssetListByType() {
   );
 
   const handleSelectAsset = (assetId: string) => {
-    // Navigate to the inventory form for this asset
-    navigate(`/inventory/add-for-asset/${assetId}`);
+    // Navigate to the action selector where user can choose intake vs inventory check
+    navigate(`/inventory/action/${assetId}`);
   };
 
   return (
@@ -130,10 +130,6 @@ export function AssetListByType() {
             className="pl-10"
           />
         </div>
-        <Button onClick={() => navigate(`/assets/new?type=${assetTypeId}`)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Asset
-        </Button>
       </div>
 
       {loading ? (
@@ -148,11 +144,11 @@ export function AssetListByType() {
           <p className="text-muted-foreground mb-4">
             {searchTerm 
               ? "No assets match your search" 
-              : "You haven't created any assets for this type yet"}
+              : "No assets have been created for this type yet"}
           </p>
-          <Button onClick={() => navigate(`/assets/new?type=${assetTypeId}`)}>
-            Create Asset
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            Assets need to be created in the Assets section before you can manage their inventory.
+          </p>
         </div>
       ) : (
         <ScrollArea className="h-[500px] pr-4">
@@ -181,7 +177,7 @@ export function AssetListByType() {
                     variant="outline" 
                     className="w-full justify-between"
                   >
-                    Add Inventory <ArrowRight className="h-4 w-4 ml-2" />
+                    Manage Inventory <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </CardContent>
               </Card>

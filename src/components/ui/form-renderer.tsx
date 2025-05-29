@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form } from '@/services/formService';
 import { FormValidationRule, FormFieldDependency } from '@/services/formService';
 import { z } from 'zod';
-import { evaluateFormula } from '@/lib/formulaEvaluator';
+import { evaluateFormula, FormulaContext } from '@/lib/formulaEvaluator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface FormField {
   id: string;
@@ -22,6 +24,7 @@ interface FormField {
   formula?: string;
   description?: string;
   defaultValue?: any;
+  inventory_action?: string;
 }
 
 interface FormRendererProps {
@@ -35,6 +38,8 @@ interface FormRendererProps {
   submitButtonIcon?: any;
   submitButtonDisabled?: boolean;
   submitButtonIconProps?: any;
+  mappedFields?: Record<string, any>;
+  assetName?: string;
 }
 
 export function FormRenderer({
@@ -47,27 +52,68 @@ export function FormRenderer({
   submitButtonText,
   submitButtonIcon,
   submitButtonDisabled,
-  submitButtonIconProps
+  submitButtonIconProps,
+  mappedFields = {},
+  assetName
 }: FormRendererProps) {
-  const [formData, setFormData] = useState<any>(initialData);
+  const [formData, setFormData] = useState<any>(() => {
+    // Initialize with initialData on first render
+    console.log('FormRenderer - Initial mount with data:', initialData);
+    return initialData;
+  });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCalculatedFields, setShowCalculatedFields] = useState(false);
+  const [inventoryWarning, setInventoryWarning] = useState<string | null>(null);
   
   // Extract fields from form.form_data
   const fields: FormField[] = (form.form_data as any)?.fields || [];
 
-  // Initialize form data with default values
+  // Update form data when initialData changes (but preserve user edits)
   useEffect(() => {
-    const defaultData = { ...initialData };
-    
-    fields.forEach(field => {
-      if (field.defaultValue !== undefined && defaultData[field.id] === undefined) {
-        defaultData[field.id] = field.defaultValue;
+    console.log('FormRenderer - initialData changed:', initialData);
+    setFormData(prevData => {
+      console.log('FormRenderer - prevData in initialData useEffect:', prevData);
+      // If we have no data yet, use initialData
+      if (!prevData || Object.keys(prevData).length === 0) {
+        const defaultData = { ...initialData };
+        
+        // Add default values for fields that don't have values
+        fields.forEach(field => {
+          if (field.defaultValue !== undefined && defaultData[field.id] === undefined) {
+            defaultData[field.id] = field.defaultValue;
+          }
+          
+          // Ensure numeric fields have proper string representation
+          if (field.type === 'number' && defaultData[field.id] !== undefined && defaultData[field.id] !== '') {
+            defaultData[field.id] = String(defaultData[field.id]);
+          }
+        });
+        
+        console.log('FormRenderer - Setting initial form data from useEffect:', defaultData);
+        return defaultData;
       }
+      
+      // If initialData has more keys than current data, it's probably a new submission being loaded
+      if (Object.keys(initialData).length > Object.keys(prevData).length) {
+        const newData = { ...initialData };
+        
+        // Ensure numeric fields have proper string representation
+        fields.forEach(field => {
+          if (field.type === 'number' && newData[field.id] !== undefined && newData[field.id] !== '') {
+            newData[field.id] = String(newData[field.id]);
+          }
+        });
+        
+        console.log('FormRenderer - New submission data detected, replacing form data in useEffect');
+        return newData;
+      }
+      
+      // Otherwise keep current data
+      console.log('FormRenderer - Keeping previous form data in useEffect:', prevData);
+      return prevData;
     });
-    
-    setFormData(defaultData);
-  }, [form, initialData]);
+  }, [initialData]);
 
   // Determine if a field should be visible based on dependencies
   const isFieldVisible = (fieldId: string): boolean => {
@@ -169,23 +215,117 @@ export function FormRenderer({
     if (!field.formula) return '';
     
     try {
-      // Create variables object for evaluation
-      const variables: Record<string, any> = {};
+      // Create context object for evaluation
+      const context: FormulaContext = {
+        fields: {},
+        mappedFields: {}
+      };
+      
+      // Add all field values to context - ensure numeric values
       fields.forEach(f => {
-        variables[f.id] = formData[f.id] || 0;
+        const value = formData[f.id];
+        // Convert to number, default to 0 for empty/invalid values
+        context.fields[f.id] = (value === '' || value === null || value === undefined) ? 0 : Number(value) || 0;
+      });
+      
+      // Add mapped fields from props
+      Object.entries(mappedFields).forEach(([key, value]) => {
+        // The formulas expect {mapped.field_name} so we need to set the key as 'mapped.field_name'
+        context.mappedFields[`mapped.${key}`] = Number(value) || 0;
       });
       
       // Use secure formula evaluator
-      const result = evaluateFormula(field.formula, variables);
-      return result.toString();
+      const result = evaluateFormula(field.formula, context);
+      if (result.success) {
+        // Format to 2 decimal places for display
+        return Number(result.result).toFixed(2);
+      } else {
+        console.error('Formula evaluation error:', (result as { success: false; error: string }).error);
+        return '0.00';
+      }
     } catch (e) {
       console.error('Formula evaluation error:', e);
-      return 'Error';
+      return '0.00';
     }
   };
 
+  // Check for inventory anomalies (when total inventory seems impossible)
+  const checkInventoryAnomaly = (updatedData: any) => {
+    // Look for the total gallons field (field with inventory_action: 'set')
+    const totalField = fields.find(field => field.inventory_action === 'set');
+    if (!totalField) return;
+    
+    const totalGallons = Number(updatedData[totalField.id]) || 0;
+    
+    // Get current inventory from asset metadata (if available)
+    const currentInventory = Number(mappedFields.current_inventory) || 0;
+    
+    if (totalGallons > currentInventory * 1.5) { // Allow 50% margin for normal variation
+      setInventoryWarning(
+        `⚠️ Inventory Alert: Counted ${totalGallons.toFixed(2)} gallons, but started with ${currentInventory} gallons. This suggests either:\n` +
+        `• Unreported intake (someone added inventory without recording it)\n` +
+        `• Counting error\n` +
+        `• Data entry mistake\n\n` +
+        `Please verify your count or check for missing intake records.`
+      );
+    } else if (totalGallons < currentInventory * 0.2) { // Warn if too low (more than 80% consumption)
+      setInventoryWarning(
+        `⚠️ Low Inventory Alert: Only ${totalGallons.toFixed(2)} gallons remaining from ${currentInventory} gallons. ` +
+        `This represents ${((currentInventory - totalGallons) / currentInventory * 100).toFixed(1)}% consumption this period.`
+      );
+    } else {
+      setInventoryWarning(null);
+    }
+  };
+
+  // Update calculated fields whenever form data changes
+  useEffect(() => {
+    const updatedData = { ...formData };
+    let hasChanges = false;
+    console.log('FormRenderer - formData for calculation:', formData);
+    
+    // Calculate all formula fields
+    fields.forEach(field => {
+      if (field.type === 'calculated' && field.formula) {
+        const calculatedValue = calculateFieldValue(field);
+        console.log(`FormRenderer - Calculated field ${field.id} (${field.label}): formula="${field.formula}", value=${calculatedValue}`);
+        if (updatedData[field.id] !== calculatedValue) {
+          updatedData[field.id] = calculatedValue;
+          hasChanges = true;
+        }
+      }
+    });
+    
+    if (hasChanges) {
+      setFormData(updatedData);
+      // Check for inventory anomalies after calculations
+      checkInventoryAnomaly(updatedData);
+    }
+  }, [formData, fields]);
+
   // Handle form change
   const handleChange = (fieldId: string, value: any) => {
+    console.log(`FormRenderer - handleChange for ${fieldId}, new value: ${value}`);
+    
+    // For numeric fields, ensure we keep valid values even if temporarily empty
+    const field = fields.find(f => f.id === fieldId);
+    if (field?.type === 'number') {
+      // Allow empty string (user is typing) but don't convert to 0
+      if (value === '') {
+        const updatedData = { ...formData, [fieldId]: value };
+        setFormData(updatedData);
+        
+        // Clear error for this field
+        if (errors[fieldId]) {
+          const updatedErrors = { ...errors };
+          delete updatedErrors[fieldId];
+          setErrors(updatedErrors);
+        }
+        
+        return;
+      }
+    }
+    
     const updatedData = { ...formData, [fieldId]: value };
     
     // Calculate formula fields that depend on this field using secure evaluator
@@ -194,19 +334,42 @@ export function FormRenderer({
         try {
           // Check if this formula depends on the changed field
           if (field.formula.includes(`{${fieldId}}`)) {
-            // Create variables object for evaluation
-            const variables: Record<string, any> = {};
+            // Create context object for evaluation
+            const context: FormulaContext = {
+              fields: {},
+              mappedFields: {}
+            };
+            
+            // Add all field values to context
             fields.forEach(f => {
-              variables[f.id] = f.id === fieldId ? value : updatedData[f.id] || 0;
+              context.fields[f.id] = f.id === fieldId ? value : updatedData[f.id] || 0;
+            });
+            
+            // Ensure all values are numeric
+            Object.keys(context.fields).forEach(key => {
+              const val = context.fields[key];
+              const stringVal = String(val);
+              context.fields[key] = (stringVal === '' || val === null || val === undefined) ? 0 : Number(val) || 0;
+            });
+            
+            // Add mapped fields from props
+            Object.entries(mappedFields).forEach(([key, value]) => {
+              // The formulas expect {mapped.field_name} so we need to set the key as 'mapped.field_name'
+              context.mappedFields[`mapped.${key}`] = Number(value) || 0;
             });
             
             // Use secure formula evaluator
-            const result = evaluateFormula(field.formula, variables);
-            updatedData[field.id] = result.toString();
+            const result = evaluateFormula(field.formula, context);
+            if (result.success) {
+              updatedData[field.id] = Number(result.result).toFixed(2);
+            } else {
+              console.error('Formula evaluation error:', (result as { success: false; error: string }).error);
+              updatedData[field.id] = '0.00';
+            }
           }
         } catch (e) {
           console.error('Formula evaluation error:', e);
-          updatedData[field.id] = 'Error';
+          updatedData[field.id] = '0.00';
         }
       }
     });
@@ -311,6 +474,9 @@ export function FormRenderer({
   const renderField = (field: FormField) => {
     if (!isFieldVisible(field.id)) return null;
     
+    // Hide calculated fields if toggle is off
+    if (field.type === 'calculated' && !showCalculatedFields) return null;
+    
     const isDisabled = isFieldDisabled(field.id) || field.type === 'calculated';
     
     return (
@@ -338,6 +504,7 @@ export function FormRenderer({
         {field.type === 'number' && (
           <Input
             id={field.id}
+            key={`field-${field.id}-${formData[field.id]}`} 
             type="number"
             value={formData[field.id] || ''}
             onChange={(e) => handleChange(field.id, e.target.value)}
@@ -404,7 +571,7 @@ export function FormRenderer({
         {field.type === 'calculated' && (
           <Input
             id={field.id}
-            value={calculateFieldValue(field)}
+            value={formData[field.id] || calculateFieldValue(field)}
             readOnly
             disabled
             className="bg-muted"
@@ -437,6 +604,49 @@ export function FormRenderer({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Asset info and calculated fields toggle */}
+      {assetName && (
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <div className="flex justify-between items-center">
+              <span>
+                <strong>Asset:</strong> {assetName}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCalculatedFields(!showCalculatedFields)}
+                className="ml-4"
+              >
+                {showCalculatedFields ? (
+                  <>
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Hide Conversions
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Show Conversions
+                  </>
+                )}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* Inventory Warning */}
+      {inventoryWarning && (
+        <Alert className="mb-4 border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <AlertDescription className="text-orange-800 whitespace-pre-line">
+            {inventoryWarning}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="grid gap-4">
         {fields.map(renderField)}
       </div>

@@ -23,7 +23,7 @@ async function processFormData(
   const processedData = { ...formData };
   const fileUploads = [];
   
-  // Handle file uploads
+  // Handle file uploads and properly serialize complex objects
   for (const [key, value] of Object.entries(formData)) {
     if (value instanceof File) {
       // Queue the file upload and replace the file with placeholder
@@ -40,6 +40,21 @@ async function processFormData(
         size: (value as File).size,
         type: (value as File).type
       };
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+      // Properly serialize objects to prevent [object Object] in database
+      try {
+        // If it's already a plain object with simple properties, keep it
+        // Otherwise, convert to JSON string
+        if (Array.isArray(value) || (value.constructor === Object && Object.keys(value).length > 0)) {
+          processedData[key] = value;
+        } else {
+          // For other complex objects, stringify them
+          processedData[key] = JSON.stringify(value);
+        }
+      } catch (e) {
+        // Fallback to string representation if serialization fails
+        processedData[key] = String(value);
+      }
     }
   }
   
@@ -290,12 +305,12 @@ export async function submitForm(
       }
     }
 
-    // Create form submission record
+    // Create form submission record - use the assetId parameter for existing assets
     const { data: submission, error: submissionError } = await supabase
       .from('form_submissions')
       .insert({
         form_id: formId,
-        asset_id: asset?.id,
+        asset_id: assetId || asset?.id, // Use the passed assetId first, then fall back to newly created asset id
         asset_type_id: assetTypeId,
         organization_id: organizationId,
         submission_data: processedData,

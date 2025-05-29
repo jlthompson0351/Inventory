@@ -46,6 +46,7 @@ import AssetListByTypePage from "./pages/AssetListByType";
 import DynamicInventoryFormPage from "./pages/DynamicInventoryForm";
 import AddInventoryPage from "./pages/AddInventoryPage";
 import AddInventoryForAssetPage from "./pages/AddInventoryForAssetPage";
+import InventoryActionSelectorPage from "./pages/InventoryActionSelectorPage";
 
 import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 
@@ -121,6 +122,7 @@ const AppRoutes = () => {
         
         {/* New inventory workflow routes */}
         <Route path="/inventory/add" element={user ? <PageLayout><InventoryAddSelectionPage /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/action/:assetId" element={user ? <PageLayout><InventoryActionSelectorPage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/add/:assetId" element={user ? <PageLayout><AddInventoryPage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/add-for-asset/:assetId" element={user ? <PageLayout><AddInventoryForAssetPage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/browse-assets" element={user ? <PageLayout><AssetTypeBrowserPage /></PageLayout> : <Navigate to="/login" />} />

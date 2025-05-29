@@ -51,9 +51,24 @@ interface AssetListProps {
   onView?: (asset: Asset) => void;
 }
 
-// Global cache to store fetched assets across component instances
-// This helps prevent refetches when navigating back to the same page
-const assetsCache = new Map<string, { assets: Asset[], timestamp: number }>();
+// Global cache for asset data to prevent redundant fetches
+const assetsCache = new Map<string, { assets: Asset[]; timestamp: number }>();
+
+// Function to clear cache for all organizations/asset types (for inventory updates)
+export const clearAssetCache = () => {
+  console.log("[AssetList] Clearing all asset cache");
+  assetsCache.clear();
+};
+
+// Function to clear cache for specific organization (more targeted)
+export const clearAssetCacheForOrg = (organizationId: string) => {
+  console.log(`[AssetList] Clearing asset cache for org: ${organizationId}`);
+  for (const [key] of assetsCache) {
+    if (key.includes(`org:${organizationId}`)) {
+      assetsCache.delete(key);
+    }
+  }
+};
 
 // Create a cache key from the parameters
 const createCacheKey = (orgId?: string, typeId?: string) => 
@@ -139,8 +154,8 @@ export default function AssetList({
     // Check cache first unless forced refresh
     if (!force) {
       const cached = assetsCache.get(cacheKey);
-      // Use cache if it's less than 2 minutes old
-      if (cached && (Date.now() - cached.timestamp < 120000)) {
+      // Use cache if it's less than 10 seconds old (reduced from 2 minutes for real-time inventory)
+      if (cached && (Date.now() - cached.timestamp < 10000)) {
         console.log("[AssetList] Using cached assets data");
         setAssets(cached.assets);
         hasFetched.current = true;

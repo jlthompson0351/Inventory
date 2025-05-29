@@ -6,15 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Plus, Filter, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import AssetList from "@/components/inventory/AssetList";
-import { getInventoryItems } from "@/services/inventoryService";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Basic minimal Inventory page
 export default function Inventory() {
   const { currentOrganization, isLoading } = useOrganization();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeView, setActiveView] = useState("assets");
 
   console.log("Inventory.tsx minimal version rendering");
   console.log("- isLoading:", isLoading);
@@ -166,35 +163,7 @@ export default function Inventory() {
               </div>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeView} onValueChange={setActiveView}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="assets">Assets</TabsTrigger>
-                  <TabsTrigger value="inventory">Inventory Items</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="assets">
-                  <AssetList organizationId={currentOrganization.id} />
-                </TabsContent>
-                
-                <TabsContent value="inventory">
-                  <p className="text-muted-foreground text-center p-6">
-                    This is a minimal working version of the Inventory page.
-                    <br />
-                    Organization ID: {currentOrganization.id}
-                  </p>
-                  
-                  <div className="border border-dashed rounded-md p-8 text-center mt-4">
-                    <h3 className="font-medium mb-2">No Inventory Items Found</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Get started by adding inventory items to your assets.
-                    </p>
-                    <Button onClick={handleAddInventory}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Inventory
-                    </Button>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <AssetList organizationId={currentOrganization.id} />
             </CardContent>
           </Card>
         </CardContent>

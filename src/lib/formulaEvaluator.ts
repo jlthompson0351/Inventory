@@ -4,43 +4,230 @@
  * Supports:
  * - Regular field references: {field_1}, {field_2}
  * - Mapped field references: {mapped.conversion_rate}, {mapped.tank_inches}
+ * - Safe mathematical expression evaluation
  * - Industrial functions for inventory calculations
- * - Unit conversions and measurement functions
  */
 
 import { create, all } from 'mathjs';
 
-// Create a mathjs instance with limited functionality for safety
+// Create a mathjs instance with all functions
 const math = create(all);
 
-// Configure mathjs to be safe - disable potentially dangerous functions
-const limitedMath = create({
-  // Only include safe math operations
-  addDependencies: true,
-  subtractDependencies: true,
-  multiplyDependencies: true,
-  divideDependencies: true,
-  modDependencies: true,
-  powDependencies: true,
-  sqrtDependencies: true,
-  absDependencies: true,
-  roundDependencies: true,
-  floorDependencies: true,
-  ceilDependencies: true,
-  minDependencies: true,
-  maxDependencies: true,
-  sumDependencies: true,
-  meanDependencies: true,
-  medianDependencies: true,
-  stdDependencies: true,
-  varianceDependencies: true,
-});
+// Custom functions for inventory calculations
+const customFunctions = {
+  // Industrial/Inventory Specific Functions
+  gallons_from_inches: (inches: number, rate: number = 1) => inches * rate,
+  volume_cylinder: (radius: number, height: number) => Math.PI * radius * radius * height,
+  volume_rectangle: (length: number, width: number, height: number) => length * width * height,
+  
+  // Unit Conversions
+  inches_to_feet: (inches: number) => inches / 12,
+  feet_to_inches: (feet: number) => feet * 12,
+  gallons_to_liters: (gallons: number) => gallons * 3.78541,
+  liters_to_gallons: (liters: number) => liters / 3.78541,
+  pounds_to_kg: (pounds: number) => pounds * 0.453592,
+  kg_to_pounds: (kg: number) => kg / 0.453592,
+  
+  // Financial Functions
+  markup: (cost: number, percent: number) => cost * (1 + percent / 100),
+  margin: (price: number, cost: number) => ((price - cost) / price) * 100,
+  discount: (price: number, percent: number) => price * (1 - percent / 100),
+  
+  // Percentage Functions
+  percent_of: (value: number, total: number) => (value / total) * 100,
+  percent_change: (oldVal: number, newVal: number) => ((newVal - oldVal) / oldVal) * 100,
+  
+  // Utility Functions
+  if: (condition: number, trueVal: number, falseVal: number) => condition > 0 ? trueVal : falseVal,
+  clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+};
+
+// Import custom functions into mathjs
+math.import(customFunctions);
 
 export interface FormulaContext {
   fields: Record<string, number>;
   mappedFields: Record<string, number>;
 }
 
+/**
+ * Safely evaluate a formula with field replacements
+ * @param formula The formula string with {field_id} or {mapped.field_id} placeholders
+ * @param context Object containing field values and mapped field values
+ * @returns The calculated result or an error object
+ */
+export function evaluateFormula(
+  formula: string,
+  context: FormulaContext
+): { success: true; result: number } | { success: false; error: string } {
+  if (!formula || formula.trim() === '') {
+    return { success: false, error: 'Empty formula' };
+  }
+
+  try {
+    // Create a working copy of the formula
+    let processedFormula = formula;
+
+    // Replace field references with their values
+    // Handle regular fields like {field_1}
+    Object.entries(context.fields).forEach(([fieldId, value]) => {
+      const regex = new RegExp(`\\{${fieldId}\\}`, 'g');
+      processedFormula = processedFormula.replace(regex, String(value));
+    });
+
+    // Handle mapped fields like {mapped.field_name}
+    Object.entries(context.mappedFields).forEach(([mappedKey, value]) => {
+      const regex = new RegExp(`\\{${mappedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g');
+      processedFormula = processedFormula.replace(regex, String(value));
+    });
+
+    // Check for any remaining unresolved placeholders
+    const unresolvedPlaceholders = processedFormula.match(/\{[^}]+\}/g);
+    if (unresolvedPlaceholders) {
+      return {
+        success: false,
+        error: `Unresolved fields: ${unresolvedPlaceholders.join(', ')}`,
+      };
+    }
+
+    // Remove any comments
+    processedFormula = processedFormula.replace(/\/\*.*?\*\//g, '');
+    processedFormula = processedFormula.replace(/\/\/.*$/gm, '');
+
+    // Basic validation - check for obvious dangerous patterns
+    const dangerousPatterns = [
+      /import\s*\(/,
+      /require\s*\(/,
+      /eval\s*\(/,
+      /Function\s*\(/,
+      /setTimeout/,
+      /setInterval/,
+      /document\./,
+      /window\./,
+      /console\./,
+      /process\./,
+      /global\./,
+      /__proto__/,
+      /constructor\s*\(/,
+      /prototype\./,
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(processedFormula)) {
+        return { success: false, error: 'Formula contains unsafe operations' };
+      }
+    }
+
+    // Use mathjs to safely evaluate the expression
+    // Create a limited scope - don't give access to global variables
+    const scope = {};
+    const result = math.evaluate(processedFormula, scope);
+
+    // Ensure the result is a number
+    if (typeof result !== 'number' || isNaN(result)) {
+      return { success: false, error: 'Formula did not produce a valid number' };
+    }
+
+    return { success: true, result };
+  } catch (error) {
+    // Return a user-friendly error message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown calculation error';
+    return { success: false, error: `Calculation error: ${errorMessage}` };
+  }
+}
+
+/**
+ * Validate a formula without evaluating it
+ * @param formula The formula to validate
+ * @returns Validation result with any errors
+ */
+export function validateFormulaSyntax(formula: string): {
+  isValid: boolean;
+  error?: string;
+  referencedFields: string[];
+  referencedMappedFields: string[];
+} {
+  const result = {
+    isValid: true,
+    referencedFields: [] as string[],
+    referencedMappedFields: [] as string[],
+  };
+
+  try {
+    // Find all field references
+    const fieldMatches = formula.match(/\{field_\d+\}/g) || [];
+    result.referencedFields = fieldMatches.map(m => m.slice(1, -1));
+
+    // Find all mapped field references
+    const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
+    result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
+
+    // Create a test formula with all placeholders replaced with 1
+    let testFormula = formula;
+    [...result.referencedFields, ...result.referencedMappedFields].forEach(ref => {
+      testFormula = testFormula.replace(new RegExp(`\\{${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), '1');
+    });
+
+    // Remove comments
+    testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
+    testFormula = testFormula.replace(/\/\/.*$/gm, '');
+
+    // Check for dangerous patterns
+    const dangerousPatterns = [
+      /import\s*\(/,
+      /require\s*\(/,
+      /eval\s*\(/,
+      /Function\s*\(/,
+      /setTimeout/,
+      /setInterval/,
+      /prototype\./,
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(testFormula)) {
+        result.isValid = false;
+        result.error = 'Formula contains unsafe operations';
+        return result;
+      }
+    }
+
+    // Try to parse with mathjs
+    math.parse(testFormula);
+
+    return result;
+  } catch (error) {
+    result.isValid = false;
+    result.error = error instanceof Error ? error.message : 'Invalid formula syntax';
+    return result;
+  }
+}
+
+/**
+ * Format a number for display
+ * @param value The number to format
+ * @param options Formatting options
+ */
+export function formatCalculatedValue(
+  value: number,
+  options: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    locale?: string;
+  } = {}
+): string {
+  const {
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 4,
+    locale = 'en-US',
+  } = options;
+
+  return value.toLocaleString(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits,
+  });
+}
+
+// Legacy functions to maintain backward compatibility
 // Enhanced mathematical operators with precedence
 const operators: Record<string, { precedence: number, associativity: 'left' | 'right', operation: (a: number, b: number) => number }> = {
   '+': { precedence: 1, associativity: 'left', operation: (a, b) => a + b },
@@ -73,31 +260,8 @@ const functions: Record<string, (...args: number[]) => number> = {
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   },
   
-  // Industrial/Inventory Specific Functions
-  gallons_from_inches: (inches: number, rate: number = 1) => inches * rate,
-  volume_cylinder: (radius: number, height: number) => Math.PI * radius * radius * height,
-  volume_rectangle: (length: number, width: number, height: number) => length * width * height,
-  
-  // Unit Conversions
-  inches_to_feet: (inches: number) => inches / 12,
-  feet_to_inches: (feet: number) => feet * 12,
-  gallons_to_liters: (gallons: number) => gallons * 3.78541,
-  liters_to_gallons: (liters: number) => liters / 3.78541,
-  pounds_to_kg: (pounds: number) => pounds * 0.453592,
-  kg_to_pounds: (kg: number) => kg / 0.453592,
-  
-  // Financial Functions
-  markup: (cost: number, percent: number) => cost * (1 + percent / 100),
-  margin: (price: number, cost: number) => ((price - cost) / price) * 100,
-  discount: (price: number, percent: number) => price * (1 - percent / 100),
-  
-  // Percentage Functions
-  percent_of: (value: number, total: number) => (value / total) * 100,
-  percent_change: (oldVal: number, newVal: number) => ((newVal - oldVal) / oldVal) * 100,
-  
-  // Utility Functions
-  if: (condition: number, trueVal: number, falseVal: number) => condition > 0 ? trueVal : falseVal,
-  clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+  // Copy of custom functions for backward compatibility
+  ...customFunctions,
 };
 
 // Enhanced tokenizer to handle negative numbers, decimals, field references, and function calls
@@ -239,243 +403,6 @@ function evaluatePostfix(tokens: string[]): number {
   }
   
   return stack[0];
-}
-
-/**
- * Safely evaluate a formula with field replacements
- * @param formula The formula string with {field_id} or {mapped.field_id} placeholders
- * @param context Object containing field values and mapped field values
- * @returns The calculated result or an error object
- */
-export function evaluateFormula(
-  formula: string,
-  context: FormulaContext
-): { success: true; result: number } | { success: false; error: string } {
-  if (!formula || formula.trim() === '') {
-    return { success: false, error: 'Empty formula' };
-  }
-
-  try {
-    // Create a working copy of the formula
-    let processedFormula = formula;
-
-    // Replace field references with their values
-    // Handle regular fields like {field_1}
-    Object.entries(context.fields).forEach(([fieldId, value]) => {
-      const regex = new RegExp(`\\{${fieldId}\\}`, 'g');
-      processedFormula = processedFormula.replace(regex, String(value));
-    });
-
-    // Handle mapped fields like {mapped.field_name}
-    Object.entries(context.mappedFields).forEach(([mappedKey, value]) => {
-      const regex = new RegExp(`\\{${mappedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g');
-      processedFormula = processedFormula.replace(regex, String(value));
-    });
-
-    // Check for any remaining unresolved placeholders
-    const unresolvedPlaceholders = processedFormula.match(/\{[^}]+\}/g);
-    if (unresolvedPlaceholders) {
-      return {
-        success: false,
-        error: `Unresolved fields: ${unresolvedPlaceholders.join(', ')}`,
-      };
-    }
-
-    // Remove any comments
-    processedFormula = processedFormula.replace(/\/\*.*?\*\//g, '');
-    processedFormula = processedFormula.replace(/\/\/.*$/gm, '');
-
-    // Validate the formula doesn't contain dangerous patterns
-    const dangerousPatterns = [
-      /import\s/,
-      /require\s*\(/,
-      /eval\s*\(/,
-      /Function\s*\(/,
-      /setTimeout/,
-      /setInterval/,
-      /document\./,
-      /window\./,
-      /console\./,
-      /process\./,
-      /global\./,
-      /__proto__/,
-      /constructor\s*\(/,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(processedFormula)) {
-        return { success: false, error: 'Formula contains unsafe operations' };
-      }
-    }
-
-    // Use mathjs to safely evaluate the expression
-    const result = limitedMath.evaluate(processedFormula);
-
-    // Ensure the result is a number
-    if (typeof result !== 'number' || isNaN(result)) {
-      return { success: false, error: 'Formula did not produce a valid number' };
-    }
-
-    return { success: true, result };
-  } catch (error) {
-    // Return a user-friendly error message
-    const errorMessage = error instanceof Error ? error.message : 'Unknown calculation error';
-    return { success: false, error: `Calculation error: ${errorMessage}` };
-  }
-}
-
-/**
- * Validate a formula without evaluating it
- * @param formula The formula to validate
- * @returns Validation result with any errors
- */
-export function validateFormulaSyntax(formula: string): {
-  isValid: boolean;
-  error?: string;
-  referencedFields: string[];
-  referencedMappedFields: string[];
-} {
-  const result = {
-    isValid: true,
-    referencedFields: [] as string[],
-    referencedMappedFields: [] as string[],
-  };
-
-  try {
-    // Find all field references
-    const fieldMatches = formula.match(/\{field_\d+\}/g) || [];
-    result.referencedFields = fieldMatches.map(m => m.slice(1, -1));
-
-    // Find all mapped field references
-    const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
-    result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
-
-    // Create a test formula with all placeholders replaced with 1
-    let testFormula = formula;
-    [...result.referencedFields, ...result.referencedMappedFields].forEach(ref => {
-      testFormula = testFormula.replace(new RegExp(`\\{${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), '1');
-    });
-
-    // Remove comments
-    testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
-    testFormula = testFormula.replace(/\/\/.*$/gm, '');
-
-    // Check for dangerous patterns
-    const dangerousPatterns = [
-      /import\s/,
-      /require\s*\(/,
-      /eval\s*\(/,
-      /Function\s*\(/,
-      /setTimeout/,
-      /setInterval/,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(testFormula)) {
-        result.isValid = false;
-        result.error = 'Formula contains unsafe operations';
-        return result;
-      }
-    }
-
-    // Try to parse with mathjs
-    limitedMath.parse(testFormula);
-
-    return result;
-  } catch (error) {
-    result.isValid = false;
-    result.error = error instanceof Error ? error.message : 'Invalid formula syntax';
-    return result;
-  }
-}
-
-/**
- * Format a number for display
- * @param value The number to format
- * @param options Formatting options
- */
-export function formatCalculatedValue(
-  value: number,
-  options: {
-    minimumFractionDigits?: number;
-    maximumFractionDigits?: number;
-    locale?: string;
-  } = {}
-): string {
-  const {
-    minimumFractionDigits = 0,
-    maximumFractionDigits = 4,
-    locale = 'en-US',
-  } = options;
-
-  return value.toLocaleString(locale, {
-    minimumFractionDigits,
-    maximumFractionDigits,
-  });
-}
-
-/**
- * Enhanced formula validation with mapped field support
- * 
- * @param {string} formula - The formula to validate
- * @param {string[]} availableFields - List of available field names (regular fields)
- * @param {string[]} availableMappedFields - List of available mapped field names
- * @returns {string|null} - Error message if invalid, null if valid
- */
-export function validateFormula(
-  formula: string, 
-  availableFields: string[] = [],
-  availableMappedFields: string[] = []
-): string | null {
-  try {
-    // Check for balanced parentheses
-    let parenCount = 0;
-    for (const char of formula) {
-      if (char === '(') parenCount++;
-      if (char === ')') parenCount--;
-      if (parenCount < 0) return 'Unbalanced parentheses';
-    }
-    if (parenCount !== 0) return 'Unbalanced parentheses';
-    
-    // Check for invalid field references
-    const fieldMatches = formula.match(/\{([^{}]+)\}/g) || [];
-    for (const match of fieldMatches) {
-      const fieldRef = match.substring(1, match.length - 1);
-      
-      if (fieldRef.startsWith('mapped.')) {
-        const mappedFieldName = fieldRef.substring(7);
-        if (!availableMappedFields.includes(mappedFieldName) && !availableMappedFields.includes(fieldRef)) {
-          return `Unknown mapped field reference: ${fieldRef}`;
-        }
-      } else {
-        if (!availableFields.includes(fieldRef)) {
-          return `Unknown field reference: ${fieldRef}`;
-        }
-      }
-    }
-    
-    // Check for unknown functions
-    const functionMatches = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\()/g) || [];
-    for (const funcName of functionMatches) {
-      if (!Object.keys(functions).includes(funcName)) {
-        return `Unknown function: ${funcName}`;
-      }
-    }
-    
-    // Try to parse and validate syntax by substituting dummy values
-    let testFormula = formula;
-    for (const match of fieldMatches) {
-      testFormula = testFormula.replace(match, '1');
-    }
-    
-    // Try to tokenize and convert to postfix (will throw errors for invalid syntax)
-    const tokens = tokenize(testFormula);
-    infixToPostfix(tokens);
-    
-    return null; // No errors found
-  } catch (error) {
-    return (error as Error).message;
-  }
 }
 
 /**
