@@ -23,6 +23,12 @@ interface Asset {
     color: string;
     deleted_at?: string | null;
   };
+  // Add inventory information
+  has_inventory?: boolean;
+  initial_inventory_created?: boolean;
+  inventory_quantity?: number;
+  inventory_items?: Array<{ id: string; quantity: number; created_at: string }> | null;
+  inventory_created_at?: string;
 }
 
 // Interface for raw asset data from Supabase
@@ -34,6 +40,7 @@ interface RawAssetData {
   serial_number?: string;
   acquisition_date?: string;
   asset_type: any; // This can be an array or object depending on query
+  inventory_items?: Array<{ id: string; quantity: number; created_at: string }> | null;
 }
 
 interface AssetListProps {
@@ -82,7 +89,13 @@ const processAssetData = (rawData: RawAssetData[]): Asset[] => {
       status: item.status,
       serial_number: item.serial_number,
       acquisition_date: item.acquisition_date,
-      asset_type: assetType
+      asset_type: assetType,
+      // Add inventory information from joined data
+      has_inventory: Boolean(item.inventory_items && item.inventory_items.length > 0),
+      initial_inventory_created: Boolean(item.inventory_items && item.inventory_items.length > 0), // If inventory exists, it was initially created
+      inventory_quantity: item.inventory_items && item.inventory_items.length > 0 ? item.inventory_items[0].quantity : undefined,
+      inventory_items: item.inventory_items,
+      inventory_created_at: item.inventory_items && item.inventory_items.length > 0 ? item.inventory_items[0].created_at : undefined
     };
   });
 };
@@ -97,6 +110,7 @@ export default function AssetList({
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [buttonLoading, setButtonLoading] = useState<string | null>(null); // Track which button is loading
   const navigate = useNavigate();
   
   // Track mount state to prevent state updates after unmount
@@ -154,7 +168,8 @@ export default function AssetList({
           status,
           serial_number,
           acquisition_date,
-          asset_type:asset_types(id, name, color, deleted_at)
+          asset_type:asset_types(id, name, color, deleted_at),
+          inventory_items!left(id, quantity, created_at)
         `)
         .eq('organization_id', organizationId)
         .is('deleted_at', null);
@@ -239,17 +254,37 @@ export default function AssetList({
     };
   }, [organizationId, assetTypeId, debouncedFetch]);
 
+  // Effect to clear loading states after navigation
+  useEffect(() => {
+    const clearLoadingStates = () => {
+      setButtonLoading(null);
+    };
+    
+    // Clear loading states when component re-mounts (user navigated back)
+    return clearLoadingStates;
+  }, [assets]); // Reset when assets change
+
   // Memoized handlers for asset actions to prevent recreation on every render
   const handleEdit = useCallback((asset: Asset) => {
     try {
+      setButtonLoading(`edit-${asset.id}`);
       if (onEdit) {
         onEdit(asset);
       } else {
-        navigate(`/assets/${asset.id}/edit`);
+        // NEW: Edit latest inventory record instead of asset
+        if (asset.has_inventory && asset.inventory_items && asset.inventory_items.length > 0) {
+          const inventoryId = asset.inventory_items[0].id;
+          // Navigate to edit the inventory item (latest record)
+          navigate(`/inventory/edit/${inventoryId}`);
+        } else {
+          // No inventory yet - create first inventory for this asset
+          navigate(`/inventory/add-for-asset/${asset.id}`);
+        }
       }
     } catch (err) {
-      console.error("[AssetList] Error navigating to edit asset:", err);
-      setError("Failed to navigate to edit page");
+      console.error("[AssetList] Error navigating to edit inventory:", err);
+      setError("Failed to navigate to inventory edit page");
+      setButtonLoading(null);
     }
   }, [navigate, onEdit]);
 
@@ -287,14 +322,24 @@ export default function AssetList({
 
   const handleView = useCallback((asset: Asset) => {
     try {
+      setButtonLoading(`view-${asset.id}`);
       if (onView) {
         onView(asset);
       } else {
-        navigate(`/assets/${asset.id}`);
+        // NEW: View inventory/intake history instead of asset detail
+        if (asset.has_inventory && asset.inventory_items && asset.inventory_items.length > 0) {
+          const inventoryId = asset.inventory_items[0].id;
+          // Navigate to inventory item detail which shows history
+          navigate(`/inventory/item/${inventoryId}?tab=history`);
+        } else {
+          // No inventory yet - show asset detail with option to create inventory
+          navigate(`/assets/${asset.id}?focus=inventory`);
+        }
       }
     } catch (err) {
-      console.error("[AssetList] Error navigating to view asset:", err);
-      setError("Failed to navigate to view page");
+      console.error("[AssetList] Error navigating to view inventory history:", err);
+      setError("Failed to navigate to inventory history page");
+      setButtonLoading(null);
     }
   }, [navigate, onView]);
 
@@ -335,10 +380,44 @@ export default function AssetList({
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <div>
-                <CardTitle className="text-lg">{asset.name || "Unnamed Asset"}</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {asset.name || "Unnamed Asset"}
+                  {asset.has_inventory && (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 border-green-300">
+                      📦 Inventory
+                    </Badge>
+                  )}
+                </CardTitle>
                 <div className="text-sm text-muted-foreground mt-1">
                   {asset.serial_number && (
                     <p className="font-mono">SN: {asset.serial_number}</p>
+                  )}
+                  {asset.has_inventory && asset.inventory_quantity !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-green-700 font-medium">
+                        Current Stock: {asset.inventory_quantity} units
+                      </p>
+                      {/* Stock status indicator */}
+                      {(() => {
+                        if (asset.inventory_quantity === 0) {
+                          return <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">🚨 Out of Stock</span>;
+                        } else if (asset.inventory_quantity < 10) {
+                          return <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 font-medium">⚠️ Low Stock</span>;
+                        }
+                        return null;
+                      })()}
+                      {/* Freshness indicator */}
+                      {asset.inventory_created_at && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                          {(() => {
+                            const hoursAgo = Math.floor((Date.now() - new Date(asset.inventory_created_at).getTime()) / (1000 * 60 * 60));
+                            if (hoursAgo < 24) return `🟢 ${hoursAgo}h ago`;
+                            if (hoursAgo < 168) return `🟡 ${Math.floor(hoursAgo / 24)}d ago`;
+                            return `🔴 ${Math.floor(hoursAgo / 168)}w ago`;
+                          })()}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -381,33 +460,73 @@ export default function AssetList({
                     Acquired: {new Date(asset.acquisition_date).toLocaleDateString()}
                   </p>
                 )}
+                {asset.has_inventory && asset.initial_inventory_created && (
+                  <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
+                    ✓ Initial inventory created {asset.inventory_created_at ? 
+                      `on ${new Date(asset.inventory_created_at).toLocaleDateString()}` : 
+                      'during asset setup'}
+                  </p>
+                )}
               </div>
-              <div className="flex space-x-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleView(asset)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEdit(asset)}
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive"
-                  onClick={() => handleDelete(asset)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
+              <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2 sm:space-y-0">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleView(asset)}
+                    disabled={buttonLoading === `view-${asset.id}`}
+                    title={asset.has_inventory ? "View inventory history and intake records" : "View asset details and create inventory"}
+                    className="flex-1 sm:flex-none min-w-0"
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    <span className="truncate">{buttonLoading === `view-${asset.id}` ? "Loading..." : asset.has_inventory ? "History" : "View"}</span>
+                  </Button>
+                  {asset.has_inventory && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex-1 sm:flex-none min-w-0"
+                      disabled={buttonLoading === `inventory-${asset.id}`}
+                      onClick={() => {
+                        setButtonLoading(`inventory-${asset.id}`);
+                        // If we have the inventory item ID from the joined data, go directly to the item detail
+                        if (asset.inventory_items && asset.inventory_items.length > 0) {
+                          navigate(`/inventory/item/${asset.inventory_items[0].id}`);
+                        } else {
+                          // Fallback to inventory page with asset filter
+                          navigate(`/inventory?assetId=${asset.id}`);
+                        }
+                      }}
+                      title="View inventory item details and perform checks"
+                    >
+                      <span className="truncate">📦 Inventory</span>
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-1 sm:gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEdit(asset)}
+                    disabled={buttonLoading === `edit-${asset.id}`}
+                    title={asset.has_inventory ? "Edit latest inventory record" : "Create first inventory record"}
+                    className="flex-1 sm:flex-none min-w-0"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    <span className="truncate">{buttonLoading === `edit-${asset.id}` ? "Loading..." : asset.has_inventory ? "Edit Inventory" : "Add Inventory"}</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive flex-1 sm:flex-none min-w-0"
+                    onClick={() => handleDelete(asset)}
+                    disabled={buttonLoading === `delete-${asset.id}`}
+                    title="Delete this asset and all related inventory"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    <span className="truncate">Delete</span>
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>

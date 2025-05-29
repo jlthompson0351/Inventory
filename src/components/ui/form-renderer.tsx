@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form } from '@/services/formService';
 import { FormValidationRule, FormFieldDependency } from '@/services/formService';
 import { z } from 'zod';
+import { evaluateFormula } from '@/lib/formulaEvaluator';
 
 interface FormField {
   id: string;
@@ -53,7 +54,7 @@ export function FormRenderer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Extract fields from form.form_data
-  const fields: FormField[] = form.form_data?.fields || [];
+  const fields: FormField[] = (form.form_data as any)?.fields || [];
 
   // Initialize form data with default values
   useEffect(() => {
@@ -163,20 +164,20 @@ export function FormRenderer({
     });
   };
 
-  // Calculate value for calculated fields
+  // Calculate value for calculated fields using secure evaluator
   const calculateFieldValue = (field: FormField): string => {
     if (!field.formula) return '';
     
     try {
-      let formula = field.formula;
-      
-      // Replace field references with actual values
+      // Create variables object for evaluation
+      const variables: Record<string, any> = {};
       fields.forEach(f => {
-        formula = formula.replace(new RegExp(`\\{${f.id}\\}`, 'g'), formData[f.id] || '0');
+        variables[f.id] = formData[f.id] || 0;
       });
       
-      // eslint-disable-next-line no-eval
-      return eval(formula).toString();
+      // Use secure formula evaluator
+      const result = evaluateFormula(field.formula, variables);
+      return result.toString();
     } catch (e) {
       console.error('Formula evaluation error:', e);
       return 'Error';
@@ -187,25 +188,25 @@ export function FormRenderer({
   const handleChange = (fieldId: string, value: any) => {
     const updatedData = { ...formData, [fieldId]: value };
     
-    // Calculate formula fields that depend on this field
+    // Calculate formula fields that depend on this field using secure evaluator
     fields.forEach(field => {
       if (field.type === 'calculated' && field.formula) {
         try {
-          let formula = field.formula;
-          
           // Check if this formula depends on the changed field
-          if (formula.includes(`{${fieldId}}`)) {
-            // Replace all field references with values
+          if (field.formula.includes(`{${fieldId}}`)) {
+            // Create variables object for evaluation
+            const variables: Record<string, any> = {};
             fields.forEach(f => {
-              const fieldValue = f.id === fieldId ? value : updatedData[f.id] || '0';
-              formula = formula.replace(new RegExp(`\\{${f.id}\\}`, 'g'), fieldValue);
+              variables[f.id] = f.id === fieldId ? value : updatedData[f.id] || 0;
             });
             
-            // eslint-disable-next-line no-eval
-            updatedData[field.id] = eval(formula).toString();
+            // Use secure formula evaluator
+            const result = evaluateFormula(field.formula, variables);
+            updatedData[field.id] = result.toString();
           }
         } catch (e) {
           console.error('Formula evaluation error:', e);
+          updatedData[field.id] = 'Error';
         }
       }
     });
@@ -252,25 +253,25 @@ export function FormRenderer({
       
       switch (rule.rule_type) {
         case 'min':
-          if (field.type === 'number' && Number(value) < rule.rule_value) {
+          if (field.type === 'number' && Number(value) < Number(rule.rule_value)) {
             newErrors[rule.field_id] = rule.error_message || 
               `${field.label} must be at least ${rule.rule_value}`;
-          } else if (typeof value === 'string' && value.length < rule.rule_value) {
+          } else if (typeof value === 'string' && value.length < Number(rule.rule_value)) {
             newErrors[rule.field_id] = rule.error_message || 
               `${field.label} must be at least ${rule.rule_value} characters`;
           }
           break;
         case 'max':
-          if (field.type === 'number' && Number(value) > rule.rule_value) {
+          if (field.type === 'number' && Number(value) > Number(rule.rule_value)) {
             newErrors[rule.field_id] = rule.error_message || 
               `${field.label} must be at most ${rule.rule_value}`;
-          } else if (typeof value === 'string' && value.length > rule.rule_value) {
+          } else if (typeof value === 'string' && value.length > Number(rule.rule_value)) {
             newErrors[rule.field_id] = rule.error_message || 
               `${field.label} must be at most ${rule.rule_value} characters`;
           }
           break;
         case 'pattern':
-          if (typeof value === 'string' && !new RegExp(rule.rule_value).test(value)) {
+          if (typeof value === 'string' && !new RegExp(String(rule.rule_value)).test(value)) {
             newErrors[rule.field_id] = rule.error_message || 
               `${field.label} has an invalid format`;
           }

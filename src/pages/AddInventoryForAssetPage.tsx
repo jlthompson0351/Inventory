@@ -63,19 +63,85 @@ const AddInventoryForAssetPage = () => {
         // 3. Fetch the Asset Type to get the inventory_form_id
         const assetTypeId = inventoryItem?.asset_type_id || assetId;
         const assetTypeData = await getAssetTypeById(assetTypeId);
+        
+        // Handle edge case: no inventory form assigned
         if (!assetTypeData?.inventory_form_id) {
-          throw new Error("Selected asset type does not have an inventory form assigned.");
-        }
-        const formData = await getFormById(assetTypeData.inventory_form_id);
-        setInventoryForm(formData);
-        let parsedSchemaData = null;
-        if (formData.form_data) {
-          parsedSchemaData = typeof formData.form_data === 'string' ? JSON.parse(formData.form_data) : formData.form_data;
-        }
-        if (parsedSchemaData && Array.isArray(parsedSchemaData.fields)) {
-          setDynamicFormSchema({ fields: parsedSchemaData.fields });
+          console.warn(`Asset type ${assetTypeData?.name} has no inventory form. Using fallback basic form.`);
+          
+          // Create a fallback basic inventory form schema
+          const fallbackSchema = {
+            fields: [
+              {
+                id: 'quantity',
+                label: 'Quantity',
+                type: 'number' as const,
+                required: true,
+                placeholder: 'Enter current quantity'
+              },
+              {
+                id: 'location',
+                label: 'Location',
+                type: 'text' as const,
+                required: false,
+                placeholder: 'Where is this item located?'
+              },
+              {
+                id: 'condition',
+                label: 'Condition',
+                type: 'select' as const,
+                required: false,
+                options: [
+                  { value: 'excellent', label: 'Excellent' },
+                  { value: 'good', label: 'Good' },
+                  { value: 'fair', label: 'Fair' },
+                  { value: 'poor', label: 'Poor' }
+                ]
+              },
+              {
+                id: 'notes',
+                label: 'Notes',
+                type: 'textarea' as const,
+                required: false,
+                placeholder: 'Any additional notes about this inventory...'
+              }
+            ]
+          };
+          
+          setDynamicFormSchema(fallbackSchema);
+          
+          // Create a minimal Form object for the fallback
+          const fallbackForm = {
+            id: 'fallback-form',
+            name: `Basic Inventory Form for ${assetTypeData?.name || 'Asset'}`,
+            description: 'This asset type doesn\'t have a custom inventory form. Using basic fields.',
+            // Add required Form properties with default values
+            organization_id: currentOrganization.id,
+            form_type: 'inventory',
+            status: 'active',
+            purpose: 'fallback',
+            is_template: false,
+            version: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            deleted_at: null,
+            asset_types: [],
+            form_data: fallbackSchema
+          };
+          
+          setInventoryForm(fallbackForm);
         } else {
-          throw new Error("Inventory form data is missing or invalid.");
+          // Normal path: asset type has inventory form
+          const formData = await getFormById(assetTypeData.inventory_form_id);
+          setInventoryForm(formData);
+          let parsedSchemaData = null;
+          if (formData.form_data) {
+            parsedSchemaData = typeof formData.form_data === 'string' ? JSON.parse(formData.form_data) : formData.form_data;
+          }
+          if (parsedSchemaData && Array.isArray(parsedSchemaData.fields)) {
+            setDynamicFormSchema({ fields: parsedSchemaData.fields });
+          } else {
+            throw new Error("Inventory form data is missing or invalid.");
+          }
         }
       } catch (err) {
         setError(err.message || "Failed to load required data.");

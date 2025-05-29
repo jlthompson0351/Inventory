@@ -1,4 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+/*
+ * FormBuilder Component - Production Ready
+ * 
+ * A comprehensive form builder for creating dynamic forms with:
+ * - Multiple field types (text, number, select, etc.)
+ * - Calculated fields with formula support
+ * - Asset type integration and mapping
+ * - Drag & drop field reordering
+ * - Real-time preview and validation
+ * 
+ * For complete documentation, see README-FORM-BUILDER.md
+ */
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -14,7 +26,8 @@ import {
   Loader2,
   ArrowLeft,
   InfoIcon,
-  Settings
+  Settings,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +95,7 @@ const initialForm = {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none' as 'none'
+      inventory_action: 'none' as 'add' | 'subtract' | 'set' | 'none'
     },
     {
       id: "field_2",
@@ -94,7 +107,7 @@ const initialForm = {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none' as 'none'
+      inventory_action: 'none' as 'add' | 'subtract' | 'set' | 'none'
     },
   ]
 };
@@ -209,7 +222,11 @@ const FormBuilder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentOrganization, isLoading: isOrgLoading } = useOrganization();
-  const [formData, setFormData] = useState(initialForm);
+  const [formData, setFormData] = useState<{
+    title: string;
+    description: string;
+    fields: FormField[];
+  }>(initialForm);
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [newOptionText, setNewOptionText] = useState("");
   const [fieldBeingDragged, setFieldBeingDragged] = useState<string | null>(null);
@@ -221,6 +238,7 @@ const FormBuilder = () => {
   const [mockMappedValues, setMockMappedValues] = useState<{ [key: string]: string | number }>({});
   const [mockValueSets, setMockValueSets] = useState<MockValueSet[]>([]);
   const [activeMockSetId, setActiveMockSetId] = useState<string | null>(null);
+  const [resetFormulaToTextMode, setResetFormulaToTextMode] = useState(false);
   
   // Asset type selection for new forms
   const [assetTypes, setAssetTypes] = useState<any[]>([]);
@@ -272,7 +290,6 @@ const FormBuilder = () => {
           setAssetTypeLinks(links || []);
         })
         .catch(error => {
-          console.error("Error fetching asset type links:", error);
           setAssetTypeLinks([]);
         })
         .finally(() => {
@@ -325,9 +342,16 @@ const FormBuilder = () => {
                   })
                 : []
             });
+            
+            // Check for asset type links after loading form
+            const links = await getFormAssetTypeLinks(id, currentOrganization.id);
+            
+            if (links && links.length > 0) {
+              const firstLink = links[0];
+              setSelectedAssetTypeId(firstLink.asset_type_id);
+            }
           }
         } catch (error) {
-          console.error("Error loading form:", error);
           toast({
             title: "Error",
             description: "Failed to load form data",
@@ -373,7 +397,7 @@ const FormBuilder = () => {
       formula: "",
       description: "",
       mappable: false,
-      inventory_action: 'none' as const
+      inventory_action: 'none'
     };
     
     setFormData({
@@ -404,7 +428,7 @@ const FormBuilder = () => {
       formula: "",
       description: "",
       mappable: type === "current_inventory" || type === "calculated",
-      inventory_action: 'none' as const
+      inventory_action: 'none'
     };
     
     setFormData({
@@ -528,7 +552,11 @@ const FormBuilder = () => {
   // Save form (now with asset type linking)
   const saveForm = async () => {
     if (!currentOrganization?.id) {
-      console.error("No organization selected");
+      toast({
+        title: "Error",
+        description: "No organization selected. Please ensure you're connected to an organization.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -547,7 +575,7 @@ const FormBuilder = () => {
         name: formData.title,
         description: formData.description,
         organization_id: currentOrganization.id,
-        form_data: { fields: formData.fields },
+        form_data: JSON.parse(JSON.stringify({ fields: formData.fields })),
       };
 
       let savedForm;
@@ -572,10 +600,8 @@ const FormBuilder = () => {
               formPurpose,
               currentOrganization.id
             );
-            console.log(`Form linked to asset type: ${effectiveAssetTypeId} with purpose: ${formPurpose}`);
           } catch (linkError) {
-            console.error("Error linking form to asset type:", linkError);
-            // Don't fail the save, just log the error
+            // Silently handle link error - form was created successfully
           }
         }
 
@@ -589,10 +615,13 @@ const FormBuilder = () => {
           description: id ? "Form updated successfully" : "Form created successfully",
         });
 
+        // Reset formula builders to text mode after save
+        setResetFormulaToTextMode(true);
+        setTimeout(() => setResetFormulaToTextMode(false), 100);
+
         navigate("/forms");
       }
     } catch (error) {
-      console.error("Error saving form:", error);
       toast({
         title: "Error",
         description: "Failed to save form",
@@ -630,7 +659,7 @@ const FormBuilder = () => {
       // eslint-disable-next-line no-eval
       sampleResult = eval(processedFormula).toString();
     } catch (e) {
-      console.error("Formula evaluation error:", e);
+      // Formula evaluation failed
     }
     
     return sampleResult;
@@ -662,37 +691,88 @@ const FormBuilder = () => {
   };
   
   const previewCalculationWithMocks = (formula: string, currentFieldsInForm: FormField[], localMockValues: { [key: string]: string | number }) => {
+    if (!formula || formula.trim() === '') {
+      return "No formula";
+    }
+    
     let processedFormula = formula;
     try {
+      // First, replace mapped field references
       for (const key in localMockValues) {
-        if (processedFormula.includes(`{${key}}`)) {
-          const val = parseFloat(localMockValues[key] as string);
-          processedFormula = processedFormula.replace(new RegExp(`\{${key}\}`, 'g'), isNaN(val) ? '0' : String(val));
+        const value = localMockValues[key];
+        if (value !== '' && value !== undefined && value !== null) {
+          const val = parseFloat(value as string);
+          if (!isNaN(val)) {
+            // Handle mapped fields like {mapped.field_name}
+            if (key.startsWith('mapped.')) {
+              processedFormula = processedFormula.replace(new RegExp(`\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), String(val));
+            } else {
+              // Handle regular form fields like {field_1}
+              processedFormula = processedFormula.replace(new RegExp(`\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), String(val));
+            }
+          }
         }
       }
-  
-      // Ensure fields passed to this function have validated inventory_action
+
+      // Then handle form fields that don't have mock values but are referenced in the formula
       const typeSafeFields = currentFieldsInForm.map(cf => ({
         ...cf,
         inventory_action: validateInventoryAction(cf.inventory_action)
       }));
-  
+
       typeSafeFields.forEach(cf => {
         if (processedFormula.includes(`{${cf.id}}`)) {
-          const placeholderVal = parseFloat(cf.placeholder);
-          const mockVal = isNaN(placeholderVal) ? 1 : placeholderVal; 
-          processedFormula = processedFormula.replace(new RegExp(`\\{${cf.id}\\}`, 'g'), String(mockVal));
+          // Use mock value if available, otherwise use placeholder or default to 1
+          const mockValue = localMockValues[cf.id];
+          if (mockValue !== undefined && mockValue !== '' && mockValue !== null) {
+            const val = parseFloat(mockValue as string);
+            if (!isNaN(val)) {
+              processedFormula = processedFormula.replace(new RegExp(`\\{${cf.id}\\}`, 'g'), String(val));
+            }
+          } else {
+            // Use placeholder value or default to 1
+            const placeholderVal = parseFloat(cf.placeholder);
+            const defaultVal = isNaN(placeholderVal) ? 1 : placeholderVal; 
+            processedFormula = processedFormula.replace(new RegExp(`\\{${cf.id}\\}`, 'g'), String(defaultVal));
+          }
         }
       });
       
+      // Replace any remaining field references with 0
       processedFormula = processedFormula.replace(/\{([a-zA-Z0-9_.]+)\}/g, '0');
+      
+      // Clean up the formula
+      processedFormula = processedFormula.trim().replace(/\s+/g, ' ');
+      
+      // Validation checks
+      if (/[\+\-\*/]\s*$/.test(processedFormula)) {
+        return "Incomplete formula";
+      }
+      
+      const openParens = (processedFormula.match(/\(/g) || []).length;
+      const closeParens = (processedFormula.match(/\)/g) || []).length;
+      if (openParens !== closeParens) {
+        return "Unmatched parentheses";
+      }
+      
+      if (!processedFormula || processedFormula.trim() === '') {
+        return "Empty formula";
+      }
   
       // eslint-disable-next-line no-eval
       const result = eval(processedFormula);
-      return String(result);
+      
+      if (typeof result !== 'number' || isNaN(result)) {
+        return "Invalid result";
+      }
+      
+      // Format the result nicely
+      return Number(result).toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4
+      });
     } catch (e) {
-      console.error("Formula evaluation error:", e, "Processed formula:", processedFormula);
-      return "Error";
+      return "Calculation Error";
     }
   };
 
@@ -767,12 +847,6 @@ const FormBuilder = () => {
         setMappedFields(fields.map(field => ({ ...field, source: 'form' as const })));
       }
     } catch (error) {
-      console.error("Error loading mapped fields:", error);
-      toast({
-        title: "Error Loading Fields",
-        description: "Failed to load conversion and mapped fields",
-        variant: "destructive",
-      });
       setMappedFields([]);
     }
   };
@@ -785,7 +859,7 @@ const FormBuilder = () => {
       const types = await getAssetTypes(currentOrganization.id);
       setAssetTypes(types);
     } catch (error) {
-      console.error("Error loading asset types:", error);
+      // Silently handle error - asset types are optional
     }
   };
 
@@ -832,31 +906,38 @@ const FormBuilder = () => {
 
   return (
     <div className="container py-4 pb-24">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold truncate">
             {id ? "Edit Form" : "Create Form"}
           </h1>
           {currentOrganization && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground truncate">
               Organization: {currentOrganization.name}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => navigate("/forms")} variant="outline">
+        <div className="flex items-center gap-2 shrink-0">
+          <Button onClick={() => navigate("/forms")} variant="outline" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Cancel
           </Button>
           <Button 
             onClick={saveForm} 
             disabled={isSaving || formData.title.trim() === "" || formData.fields.length === 0}
+            size="sm"
           >
             {isSaving ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span className="hidden sm:inline">Saving...</span>
+                <span className="sm:hidden">Save</span>
               </>
             ) : (
-              "Save Form"
+              <>
+                <span className="hidden sm:inline">Save Form</span>
+                <span className="sm:hidden">Save</span>
+              </>
             )}
           </Button>
         </div>
@@ -928,12 +1009,33 @@ const FormBuilder = () => {
                 </div>
               </div>
             )}
+            
+            {/* Show form mapped fields if available */}
+            {mappedFields.filter(f => f.source === 'form').length > 0 && (
+              <div className="mt-3 p-3 bg-green-50 rounded-md border border-green-200">
+                <p className="text-sm text-green-800 font-medium mb-2">
+                  Mapped Fields from Linked Forms:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {mappedFields.filter(f => f.source === 'form').slice(0, 5).map(field => (
+                    <Badge key={field.id} variant="secondary" className="text-xs">
+                      {field.field_label} ({field.form_name})
+                    </Badge>
+                  ))}
+                  {mappedFields.filter(f => f.source === 'form').length > 5 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{mappedFields.filter(f => f.source === 'form').length - 5} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 relative">
+        <div className="xl:col-span-8">
           <Card>
             <CardContent className="p-6">
               <div className="mb-8">
@@ -998,7 +1100,7 @@ const FormBuilder = () => {
                       <SelectValue placeholder="Add specific field type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {fieldTypes.map(type => (
+                      {fieldTypes.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
                           {type.label}
                         </SelectItem>
@@ -1151,18 +1253,45 @@ const FormBuilder = () => {
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, field.id)}
                   >
-                    <div className="flex items-center mb-2">
-                      <div className="cursor-move p-1 text-muted-foreground">
+                    <div className="flex items-start mb-3">
+                      <div className="cursor-move p-1 text-muted-foreground mt-1">
                         <GripVertical className="h-4 w-4" />
                       </div>
-                      <div className="flex-1 ml-2">
-                        <p className="font-medium truncate">{field.label || "Untitled Field"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {fieldTypes.find(t => t.value === field.type)?.label || field.type}
-                          {field.required && " • Required"}
-                        </p>
+                      <div className="flex-1 ml-2 min-w-0">
+                        <p className="font-medium text-sm leading-tight break-words">{field.label || "Untitled Field"}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {fieldTypes.find(t => t.value === field.type)?.label || field.type}
+                          </span>
+                          {field.required && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                              Required
+                            </Badge>
+                          )}
+                          {field.mappable && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                              Mappable
+                            </Badge>
+                          )}
+                          {field.inventory_action && field.inventory_action !== 'none' && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] px-1.5 py-0.5 font-medium ${
+                                field.inventory_action === 'set' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                                field.inventory_action === 'add' ? 'border-green-500 text-green-700 bg-green-50' :
+                                field.inventory_action === 'subtract' ? 'border-orange-500 text-orange-700 bg-orange-50' :
+                                'border-gray-500 text-gray-700 bg-gray-50'
+                              }`}
+                            >
+                              {field.inventory_action === 'set' ? '📋 SET' :
+                               field.inventory_action === 'add' ? '🔼 ADD' :
+                               field.inventory_action === 'subtract' ? '🔽 SUB' :
+                               (field.inventory_action as string).toUpperCase()}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-1 ml-2 shrink-0">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1280,6 +1409,7 @@ const FormBuilder = () => {
                                 formData.fields.filter(f => f.id !== selectedField), 
                                 mockMappedValues
                               )}
+                              resetToTextMode={resetFormulaToTextMode}
                             />
                           </div>
                         </div>
@@ -1303,11 +1433,18 @@ const FormBuilder = () => {
           </Card>
         </div>
         
-        <div className="lg:col-span-4">
-          <div className="sticky top-4">
-            <Card>
-              <CardContent className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Field Properties</h2>
+        <div className="xl:col-span-4">
+          <div className="sticky top-4 space-y-4">
+            <Card className="border-2">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Field Properties</h2>
+                  {selectedField && (
+                    <Badge variant="outline" className="text-xs">
+                      {formData.fields.find(f => f.id === selectedField)?.type || 'field'}
+                    </Badge>
+                  )}
+                </div>
                 
                 {selectedField ? (
                   (() => {
@@ -1317,21 +1454,23 @@ const FormBuilder = () => {
                     return (
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="fieldLabel">Field Label</Label>
+                          <Label htmlFor="fieldLabel" className="text-sm font-medium">Field Label</Label>
                           <Input
                             id="fieldLabel"
                             value={field.label}
                             onChange={(e) => updateField(field.id, 'label', e.target.value)}
+                            className="mt-1"
+                            placeholder="Enter field label"
                           />
                         </div>
                         
                         <div>
-                          <Label htmlFor="fieldType">Field Type</Label>
+                          <Label htmlFor="fieldType" className="text-sm font-medium">Field Type</Label>
                           <Select
                             value={field.type}
                             onValueChange={(value) => updateField(field.id, 'type', value)}
                           >
-                            <SelectTrigger id="fieldType">
+                            <SelectTrigger id="fieldType" className="mt-1">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1346,17 +1485,19 @@ const FormBuilder = () => {
                         
                         {field.type !== "checkbox" && (
                           <div>
-                            <Label htmlFor="fieldPlaceholder">Placeholder</Label>
+                            <Label htmlFor="fieldPlaceholder" className="text-sm font-medium">Placeholder</Label>
                             <Input
                               id="fieldPlaceholder"
                               value={field.placeholder}
                               onChange={(e) => updateField(field.id, 'placeholder', e.target.value)}
+                              className="mt-1"
+                              placeholder="Enter placeholder text"
                             />
                           </div>
                         )}
                         
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="fieldRequired">Required Field</Label>
+                        <div className="flex items-center justify-between py-2">
+                          <Label htmlFor="fieldRequired" className="text-sm font-medium">Required Field</Label>
                           <Switch
                             id="fieldRequired"
                             checked={field.required}
@@ -1365,9 +1506,9 @@ const FormBuilder = () => {
                         </div>
 
                         {/* Add Mappable Field toggle */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <Label htmlFor="fieldMappable" className="mr-1">Mappable Field</Label>
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="fieldMappable" className="text-sm font-medium">Mappable Field</Label>
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1375,7 +1516,7 @@ const FormBuilder = () => {
                                     <InfoIcon className="h-4 w-4 text-muted-foreground" />
                                   </span>
                                 </TooltipTrigger>
-                                <TooltipContent side="right" className="max-w-xs">
+                                <TooltipContent side="left" className="max-w-xs">
                                   <p className="text-sm">
                                     Mark this field as mappable to use it in formula mappings.
                                     Mappable fields can be accessed in inventory calculations.
@@ -1391,13 +1532,118 @@ const FormBuilder = () => {
                           />
                         </div>
 
+                        {/* Enhanced Inventory Action selector for number and calculated fields */}
+                        {(field.type === "number" || field.type === "calculated" || field.type === "current_inventory") && (
+                          <div className="space-y-3">
+                            <Label htmlFor="inventoryAction" className="text-sm font-medium">Inventory Action</Label>
+                            <Select
+                              value={field.inventory_action || 'none'}
+                              onValueChange={(value) => updateField(field.id, 'inventory_action', value)}
+                            >
+                              <SelectTrigger id="inventoryAction" className="mt-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <div className="py-1">
+                                    <div className="font-medium">None - Just track value</div>
+                                    <div className="text-xs text-muted-foreground">Records the value without affecting inventory</div>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="add">
+                                  <div className="py-1">
+                                    <div className="font-medium">Add to current stock</div>
+                                    <div className="text-xs text-muted-foreground">For intake forms: "I got 5 more gallons"</div>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="subtract">
+                                  <div className="py-1">
+                                    <div className="font-medium">Subtract from current stock</div>
+                                    <div className="text-xs text-muted-foreground">For usage forms: "I used 3 gallons"</div>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="set">
+                                  <div className="py-1">
+                                    <div className="font-medium">Set as new stock level</div>
+                                    <div className="text-xs text-muted-foreground">For inventory counts: "I counted 17 gallons total"</div>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            {/* Enhanced descriptions with examples */}
+                            <div className="p-3 rounded-md bg-muted/30 border">
+                              {field.inventory_action === 'add' && (
+                                <div className="text-sm">
+                                  <div className="font-medium text-green-700 mb-1">🔼 ADD Example:</div>
+                                  <div className="text-muted-foreground">
+                                    Current stock: <strong>17 gallons</strong><br/>
+                                    This field value: <strong>5 gallons</strong><br/>
+                                    New stock: <strong>22 gallons</strong> (17 + 5)
+                                  </div>
+                                </div>
+                              )}
+                              {field.inventory_action === 'subtract' && (
+                                <div className="text-sm">
+                                  <div className="font-medium text-orange-700 mb-1">🔽 SUBTRACT Example:</div>
+                                  <div className="text-muted-foreground">
+                                    Current stock: <strong>20 gallons</strong><br/>
+                                    This field value: <strong>3 gallons</strong><br/>
+                                    New stock: <strong>17 gallons</strong> (20 - 3)
+                                  </div>
+                                </div>
+                              )}
+                              {field.inventory_action === 'set' && (
+                                <div className="text-sm">
+                                  <div className="font-medium text-blue-700 mb-1">📋 SET Example:</div>
+                                  <div className="text-muted-foreground">
+                                    Previous stock: <strong>20 gallons</strong><br/>
+                                    This field value: <strong>17 gallons</strong><br/>
+                                    New stock: <strong>17 gallons</strong> (set to this amount)<br/>
+                                    <span className="text-xs text-amber-600">
+                                      📈 Automatically tracks 3 gallons as "used" in history
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              {field.inventory_action === 'none' && (
+                                <div className="text-sm">
+                                  <div className="font-medium text-gray-700 mb-1">📊 TRACK ONLY:</div>
+                                  <div className="text-muted-foreground">
+                                    This field will be recorded in the form submission but won't change inventory levels. 
+                                    Good for notes, measurements, or reference values.
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Warning for calculated fields */}
+                            {field.type === "calculated" && field.inventory_action !== 'none' && (
+                              <div className="p-3 rounded-md bg-blue-50 border border-blue-200">
+                                <div className="flex items-start gap-2">
+                                  <div className="text-blue-600 mt-0.5">💡</div>
+                                  <div className="text-sm">
+                                    <div className="font-medium text-blue-800 mb-1">Perfect for Calculated Fields!</div>
+                                    <div className="text-blue-700">
+                                      This calculated field will use its formula result for the inventory action. 
+                                      Great for totaling up multiple measurements or applying conversions.
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <div>
-                          <Label htmlFor="fieldDescription">Description</Label>
+                          <Label htmlFor="fieldDescription" className="text-sm font-medium">Description</Label>
                           <Textarea
                             id="fieldDescription"
                             value={field.description || ''}
                             onChange={(e) => updateField(field.id, 'description', e.target.value)}
                             placeholder="Help text shown below the field"
+                            className="mt-1 min-h-[80px] resize-y"
+                            rows={3}
                           />
                         </div>
                         
@@ -1412,7 +1658,7 @@ const FormBuilder = () => {
                         
                         {field.type === "select" && (
                           <div>
-                            <Label>Options</Label>
+                            <Label className="text-sm font-medium">Options</Label>
                             <div className="space-y-2 mt-2">
                               {field.options.map((option, index) => (
                                 <div key={index} className="flex items-center">
@@ -1456,118 +1702,6 @@ const FormBuilder = () => {
                           </div>
                         )}
                         
-                        {(() => {
-                          const currentCalcField = formData.fields.find(f => f.id === selectedField);
-                          let mappedDependenciesInFormula: string[] = [];
-                          let formulaValidationRes: { isValid: boolean; error?: string; referencedFields: string[]; referencedMappedFields: string[]; } = { isValid: true, referencedFields: [], referencedMappedFields: [] };
-                          
-                          if (currentCalcField && currentCalcField.type === 'calculated' && currentCalcField.formula) {
-                            mappedDependenciesInFormula = getMappedFieldsFromFormula(currentCalcField.formula);
-                            formulaValidationRes = validateFormula(
-                              currentCalcField.formula, 
-                              formData.fields.filter(f => f.id !== selectedField),
-                              mappedFields
-                            );
-                          }
-
-                          if (mappedDependenciesInFormula.length > 0 || (currentCalcField && currentCalcField.type === 'calculated')) {
-                            return (
-                              <div className="mt-2 space-y-2 p-2 border rounded-md bg-muted/20">
-                                {currentCalcField && currentCalcField.type === 'calculated' && !formulaValidationRes.isValid && (
-                                  <div className="p-2 bg-red-50 border border-red-200 rounded-md mb-3">
-                                    <p className="text-xs font-medium text-red-800">{formulaValidationRes.error}</p>
-                                  </div>
-                                )}
-                                
-                                <div className="flex justify-between items-center">
-                                  <p className="text-xs font-medium text-muted-foreground">Mock values for formula testing:</p>
-                                  <div className="flex gap-2">
-                                    <Select value={activeMockSetId || ''} onValueChange={value => value && loadMockValueSet(value)}>
-                                      <SelectTrigger className="h-7 text-xs w-[130px]">
-                                        <SelectValue placeholder="Load saved values" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {mockValueSets.map(set => (
-                                          <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      className="h-7 text-xs"
-                                      onClick={saveMockValueSet}
-                                      disabled={!mappedDependenciesInFormula.length} // Disable if no mapped dependencies
-                                    >
-                                      Save Values
-                                    </Button>
-                                  </div>
-                                </div>
-                                
-                                {mappedDependenciesInFormula.map(depKey => {
-                                  const originalMappedField = mappedFields.find(mf => `mapped.${mf.field_id}` === depKey);
-                                  const label = originalMappedField ? `${originalMappedField.field_label} (from ${originalMappedField.form_name})` : depKey;
-                                  return (
-                                    <div key={depKey} className="relative">
-                                      <Label htmlFor={`mock-${depKey}`} className="text-xs flex items-center">
-                                        {label}
-                                        {originalMappedField && (
-                                          <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                                            mapped
-                                          </span>
-                                        )}
-                                      </Label>
-                                      <Input
-                                        id={`mock-${depKey}`}
-                                        type="text"
-                                        value={mockMappedValues[depKey] || ""}
-                                        placeholder="Enter mock value"
-                                        className="h-8 text-xs"
-                                        onChange={(e) => handleMockValueChange(depKey, e.target.value)}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                                
-                                {activeMockSetId && (
-                                  <div className="flex justify-end mt-2">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
-                                      onClick={() => deleteMockValueSet(activeMockSetId)}
-                                    >
-                                      Delete Saved Set
-                                    </Button>
-                                  </div>
-                                )}
-                                
-                                {currentCalcField && currentCalcField.type === 'calculated' && currentCalcField.formula && (
-                                   <div className="mt-3 p-2 border border-green-100 bg-green-50 rounded-md">
-                                    <div className="flex justify-between items-center mb-1">
-                                      <p className="text-xs font-semibold text-green-800">Formula Result:</p>
-                                      <Badge variant={formulaValidationRes.isValid ? "success" : "destructive"} className="text-[10px]">
-                                        {formulaValidationRes.isValid ? "Valid" : "Invalid"}
-                                      </Badge>
-                                    </div>
-                                    <p className="font-mono text-sm">
-                                      {formulaValidationRes.isValid
-                                        ? previewCalculationWithMocks(
-                                            currentCalcField!.formula, 
-                                            formData.fields.filter(f => f.id !== selectedField), 
-                                            mockMappedValues
-                                          )
-                                        : "—"
-                                      }
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }
-                          return null; 
-                        })()}
-                        
                         <Separator />
                         
                         <Button 
@@ -1582,24 +1716,194 @@ const FormBuilder = () => {
                     );
                   })()
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-2">
-                      Select a field to edit its properties
-                    </p>
-                    {formData.fields.length > 0 ? (
-                      <Button variant="outline" size="sm" onClick={() => setSelectedField(formData.fields[0].id)}>
-                        Select First Field
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" onClick={() => addFieldOfType("current_inventory")}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Inventory Field
-                      </Button>
-                    )}
+                  <div className="text-center py-12 px-4">
+                    <div className="max-w-sm mx-auto">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
+                        <Settings className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-lg font-medium mb-2">No Field Selected</h3>
+                      <p className="text-muted-foreground text-sm mb-4 leading-relaxed">
+                        Click on a field in the form builder to edit its properties, or create a new field to get started.
+                      </p>
+                      {formData.fields.length > 0 ? (
+                        <Button variant="outline" size="sm" onClick={() => setSelectedField(formData.fields[0].id)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Select First Field
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
+                          <Button variant="outline" size="sm" onClick={() => addFieldOfType("current_inventory")} className="w-full">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Inventory Field
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={addField} className="w-full">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Basic Field
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+            
+            {/* Mock Values Card - separate card that will also follow */}
+            {(() => {
+              const currentCalcField = formData.fields.find(f => f.id === selectedField);
+              let mappedDependenciesInFormula: string[] = [];
+              let fieldDependenciesInFormula: string[] = [];
+              let formulaValidationRes: { isValid: boolean; error?: string; referencedFields: string[]; referencedMappedFields: string[]; } = { isValid: true, referencedFields: [], referencedMappedFields: [] };
+              
+              if (currentCalcField && currentCalcField.type === 'calculated' && currentCalcField.formula) {
+                mappedDependenciesInFormula = getMappedFieldsFromFormula(currentCalcField.formula);
+                formulaValidationRes = validateFormula(
+                  currentCalcField.formula, 
+                  formData.fields.filter(f => f.id !== selectedField),
+                  mappedFields
+                );
+                fieldDependenciesInFormula = formulaValidationRes.referencedFields;
+              }
+
+              const hasAnyDependencies = mappedDependenciesInFormula.length > 0 || fieldDependenciesInFormula.length > 0;
+
+              if (hasAnyDependencies || (currentCalcField && currentCalcField.type === 'calculated')) {
+                return (
+                  <Card className="border-2 border-green-200">
+                    <CardContent className="p-4">
+                      {currentCalcField && currentCalcField.type === 'calculated' && !formulaValidationRes.isValid && (
+                        <div className="p-2 bg-red-50 border border-red-200 rounded-md mb-3">
+                          <p className="text-xs font-medium text-red-800">{formulaValidationRes.error}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between items-center mb-4">
+                        <p className="text-sm font-medium text-muted-foreground">Mock Values for Formula Testing</p>
+                        <div className="flex gap-2">
+                          <Select value={activeMockSetId || ''} onValueChange={value => value && loadMockValueSet(value)}>
+                            <SelectTrigger className="h-8 text-xs w-[130px]">
+                              <SelectValue placeholder="Load saved..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {mockValueSets.map(set => (
+                                <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-xs"
+                            onClick={saveMockValueSet}
+                            disabled={!hasAnyDependencies}
+                          >
+                            Save Values
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Form Fields used in formula */}
+                      {fieldDependenciesInFormula.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <p className="text-xs font-medium text-blue-700">Form Fields:</p>
+                          {fieldDependenciesInFormula.map(fieldId => {
+                            const referencedField = formData.fields.find(f => f.id === fieldId);
+                            const label = referencedField ? referencedField.label : fieldId;
+                            return (
+                              <div key={fieldId} className="relative">
+                                <Label htmlFor={`mock-field-${fieldId}`} className="text-xs flex items-center">
+                                  {label}
+                                  <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                                    form field
+                                  </span>
+                                </Label>
+                                <Input
+                                  id={`mock-field-${fieldId}`}
+                                  type="number"
+                                  value={mockMappedValues[fieldId] || ""}
+                                  placeholder="Enter test value"
+                                  className="h-8 text-xs"
+                                  onChange={(e) => handleMockValueChange(fieldId, e.target.value)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* Mapped Fields used in formula */}
+                      {mappedDependenciesInFormula.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          <p className="text-xs font-medium text-green-700">Mapped Fields:</p>
+                          {mappedDependenciesInFormula.map(depKey => {
+                            const originalMappedField = mappedFields.find(mf => `mapped.${mf.field_id}` === depKey);
+                            const label = originalMappedField ? 
+                              `${originalMappedField.field_label} (from ${originalMappedField.source === 'conversion' ? 'Asset Type Conversions' : originalMappedField.form_name})` : 
+                              depKey;
+                            return (
+                              <div key={depKey} className="relative">
+                                <Label htmlFor={`mock-${depKey}`} className="text-xs flex items-center">
+                                  {label}
+                                  <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-green-100 text-green-800 rounded-full">
+                                    mapped
+                                  </span>
+                                </Label>
+                                <Input
+                                  id={`mock-${depKey}`}
+                                  type="number"
+                                  value={mockMappedValues[depKey] || ""}
+                                  placeholder="Enter test value"
+                                  className="h-8 text-xs"
+                                  onChange={(e) => handleMockValueChange(depKey, e.target.value)}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {activeMockSetId && (
+                        <div className="flex justify-end mt-2 mb-4">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => deleteMockValueSet(activeMockSetId)}
+                          >
+                            Delete Saved Set
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {currentCalcField && currentCalcField.type === 'calculated' && currentCalcField.formula && (
+                         <div className="p-3 border border-green-200 bg-green-50 rounded-md">
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm font-semibold text-green-800">Formula Result:</p>
+                            <Badge variant={formulaValidationRes.isValid ? "success" : "destructive"} className="text-[10px]">
+                              {formulaValidationRes.isValid ? "Valid" : "Invalid"}
+                            </Badge>
+                          </div>
+                          <p className="font-mono text-lg font-semibold text-green-900">
+                            {formulaValidationRes.isValid
+                              ? previewCalculationWithMocks(
+                                  currentCalcField!.formula, 
+                                  formData.fields.filter(f => f.id !== selectedField), 
+                                  mockMappedValues
+                                )
+                              : "—"
+                            }
+                          </p>
+                          <p className="text-xs text-green-700 mt-1">
+                            Real-time calculation using mock values above
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }
+              return null; 
+            })()}
           </div>
         </div>
       </div>

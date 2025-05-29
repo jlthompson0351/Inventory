@@ -52,61 +52,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { getAssetTypes } from "@/services/assetTypeService";
-import { ReportConfig, createReport, updateReport, getReport, executeReport, Report } from "@/services/reportService";
+import { ReportConfig, createReport, updateReport, getReport, executeReport, Report, AVAILABLE_DATA_SOURCES, DATA_SOURCE_COLUMNS } from "@/services/reportService";
 import { supabase } from "@/integrations/supabase/client";
 import { getMappedFieldsForReporting, getAllMappedFieldsForAssetType } from '@/services/mappedFieldService';
 import { createForm, updateForm, getFormById } from "@/services/formService";
 import { Badge } from "@/components/ui/badge";
 import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTypeService';
 import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
+import { ReportVisualization } from '@/components/reporting/ReportVisualization';
+import { SmartInsights } from '@/components/reporting/SmartInsights';
+import { SmartFilter } from '@/components/reporting/SmartFilter';
 import { debounce } from 'lodash';
 import * as XLSX from 'xlsx';
 
-// Available data sources for reports (MaintainX style)
-const availableDataSources = [
-  {
-    id: "assets",
-    name: "Assets",
-    description: "Asset information and details",
-    icon: "📦"
-  },
-  {
-    id: "asset_types",
-    name: "Asset Types",
-    description: "Asset type configurations and settings",
-    icon: "🏷️"
-  },
-  {
-    id: "inventory_items",
-    name: "Inventory Items",
-    description: "Current inventory levels and data",
-    icon: "📋"
-  },
-  {
-    id: "intake_forms",
-    name: "Intake Forms",
-    description: "Intake form submissions and data",
-    icon: "📥"
-  },
-  {
-    id: "inventory_forms",
-    name: "Inventory Forms",
-    description: "Inventory form submissions and data",
-    icon: "📊"
-  },
-  {
-    id: "mapping_forms",
-    name: "Mapping Forms",
-    description: "Mapping form submissions and conversions",
-    icon: "🔗"
-  },
-  {
-    id: "form_submissions",
-    name: "All Form Submissions",
-    description: "All form submission data across types",
-    icon: "📄"
-  }
-];
+// Use enhanced data sources from report service
+const availableDataSources = AVAILABLE_DATA_SOURCES;
 
 // 🎯 SMART REPORT TEMPLATES
 const reportTemplates = [
@@ -292,8 +252,8 @@ const ReportBuilder = () => {
           setSelectedAssetTypes(report.report_config.assetTypes || []);
           
           if (report.report_config.columns && report.report_config.columns.length > 0) {
-            const previewResults = await executeReport(report, 10);
-            setPreviewData(previewResults);
+                      const previewResults = await executeReport(report, 10);
+          setPreviewData(previewResults.data);
           }
         }
       } catch (error) {
@@ -334,67 +294,24 @@ const ReportBuilder = () => {
           });
         }
 
+        // Load columns from the DATA_SOURCE_COLUMNS registry
         selectedDataSources.forEach(sourceId => {
-          if (sourceId === 'assets') {
-            staticColumns.push(
-              { id: 'assets.id', field_label: 'Asset ID', field_type: 'text', form_name: 'Assets', description: 'Unique asset identifier' },
-              { id: 'assets.name', field_label: 'Asset Name', field_type: 'text', form_name: 'Assets', description: 'Name of the asset' },
-              { id: 'assets.description', field_label: 'Asset Description', field_type: 'text', form_name: 'Assets', description: 'Asset description' },
-              { id: 'assets.status', field_label: 'Asset Status', field_type: 'text', form_name: 'Assets', description: 'Current status of asset' },
-              { id: 'assets.serial_number', field_label: 'Serial Number', field_type: 'text', form_name: 'Assets', description: 'Asset serial number' },
-              { id: 'assets.barcode', field_label: 'Barcode', field_type: 'text', form_name: 'Assets', description: 'Asset barcode' },
-              { id: 'assets.acquisition_date', field_label: 'Acquisition Date', field_type: 'date', form_name: 'Assets', description: 'Date asset was acquired' },
-              { id: 'assets.created_at', field_label: 'Created Date', field_type: 'date', form_name: 'Assets', description: 'Date asset record was created' },
-              { id: 'assets.updated_at', field_label: 'Updated Date', field_type: 'date', form_name: 'Assets', description: 'Date asset record was last updated' }
-            );
-          }
-          if (sourceId === 'asset_types') {
-            staticColumns.push(
-              { id: 'asset_types.id', field_label: 'Asset Type ID', field_type: 'text', form_name: 'Asset Types', description: 'Unique asset type identifier' },
-              { id: 'asset_types.name', field_label: 'Asset Type Name', field_type: 'text', form_name: 'Asset Types', description: 'Name of the asset type' },
-              { id: 'asset_types.description', field_label: 'Asset Type Description', field_type: 'text', form_name: 'Asset Types', description: 'Description of asset type' },
-              { id: 'asset_types.color', field_label: 'Asset Type Color', field_type: 'text', form_name: 'Asset Types', description: 'Display color for asset type' }
-            );
-          }
-          if (sourceId === 'inventory_items') {
-            staticColumns.push(
-              { id: 'inventory_items.id', field_label: 'Inventory ID', field_type: 'text', form_name: 'Inventory Items', description: 'Unique inventory item identifier' },
-              { id: 'inventory_items.name', field_label: 'Item Name', field_type: 'text', form_name: 'Inventory Items', description: 'Name of inventory item' },
-              { id: 'inventory_items.sku', field_label: 'SKU', field_type: 'text', form_name: 'Inventory Items', description: 'Stock keeping unit' },
-              { id: 'inventory_items.quantity', field_label: 'Quantity', field_type: 'number', form_name: 'Inventory Items', description: 'Current quantity in stock' },
-              { id: 'inventory_items.current_price', field_label: 'Current Price', field_type: 'number', form_name: 'Inventory Items', description: 'Current price per unit' },
-              { id: 'inventory_items.created_at', field_label: 'Created Date', field_type: 'date', form_name: 'Inventory Items', description: 'Date inventory item was created' },
-              { id: 'inventory_items.updated_at', field_label: 'Updated Date', field_type: 'date', form_name: 'Inventory Items', description: 'Date inventory item was last updated' }
-            );
-          }
-          if (sourceId === 'form_submissions') {
-            staticColumns.push(
-              { id: 'form_submissions.id', field_label: 'Submission ID', field_type: 'text', form_name: 'Form Submissions', description: 'Unique form submission identifier' },
-              { id: 'form_submissions.form_id', field_label: 'Form ID', field_type: 'text', form_name: 'Form Submissions', description: 'ID of the submitted form' },
-              { id: 'form_submissions.created_at', field_label: 'Submitted Date', field_type: 'date', form_name: 'Form Submissions', description: 'When form was submitted' },
-              { id: 'form_submissions.updated_at', field_label: 'Updated Date', field_type: 'date', form_name: 'Form Submissions', description: 'When submission was last updated' }
-            );
-          }
-          if (sourceId === 'intake_forms') {
-            staticColumns.push(
-              { id: 'form_submissions.id', field_label: 'Intake Submission ID', field_type: 'text', form_name: 'Intake Forms', description: 'Unique intake form submission identifier' },
-              { id: 'form_submissions.created_at', field_label: 'Intake Date', field_type: 'date', form_name: 'Intake Forms', description: 'When intake form was submitted' },
-              { id: 'forms.name', field_label: 'Intake Form Name', field_type: 'text', form_name: 'Intake Forms', description: 'Name of the intake form' }
-            );
-          }
-          if (sourceId === 'inventory_forms') {
-            staticColumns.push(
-              { id: 'form_submissions.id', field_label: 'Inventory Submission ID', field_type: 'text', form_name: 'Inventory Forms', description: 'Unique inventory form submission identifier' },
-              { id: 'form_submissions.created_at', field_label: 'Inventory Check Date', field_type: 'date', form_name: 'Inventory Forms', description: 'When inventory form was submitted' },
-              { id: 'forms.name', field_label: 'Inventory Form Name', field_type: 'text', form_name: 'Inventory Forms', description: 'Name of the inventory form' }
-            );
-          }
-          if (sourceId === 'mapping_forms') {
-            staticColumns.push(
-              { id: 'form_submissions.id', field_label: 'Mapping Submission ID', field_type: 'text', form_name: 'Mapping Forms', description: 'Unique mapping form submission identifier' },
-              { id: 'form_submissions.created_at', field_label: 'Mapping Date', field_type: 'date', form_name: 'Mapping Forms', description: 'When mapping form was submitted' },
-              { id: 'forms.name', field_label: 'Mapping Form Name', field_type: 'text', form_name: 'Mapping Forms', description: 'Name of the mapping form' }
-            );
+          const sourceColumns = DATA_SOURCE_COLUMNS[sourceId];
+          if (sourceColumns) {
+            const dataSourceInfo = availableDataSources.find(ds => ds.id === sourceId);
+            const formName = dataSourceInfo?.name || sourceId;
+            
+            staticColumns.push(...sourceColumns.map(col => ({
+              id: col.id,
+              field_label: col.label,
+              field_type: col.type === 'uuid' ? 'text' : col.type,
+              form_name: formName,
+              description: col.description || '',
+              aggregatable: col.aggregatable,
+              sortable: col.sortable,
+              filterable: col.filterable,
+              format: col.format
+            })));
           }
         });
 
@@ -658,26 +575,27 @@ const ReportBuilder = () => {
       
       // 🐛 DEBUG: Log the results
       console.log('🔍 DEBUG - Preview results:', {
-        resultsCount: results.length,
-        firstResult: results[0],
-        allResults: results,
-        executionTimeMs: executionTime
+        resultsCount: results.data.length,
+        firstResult: results.data[0],
+        allResults: results.data,
+        executionTimeMs: executionTime,
+        stats: results.stats
       });
 
-      setPreviewData(results);
+      setPreviewData(results.data);
       
-      if (results.length === 0) {
+      if (results.data.length === 0) {
         toast({
           title: "No Data Found",
           description: "The report configuration returned no results. Check your filters and data sources.",
           variant: "destructive"
         });
-      } else {
-        toast({
-          title: "Preview Generated ⚡",
-          description: `Found ${results.length} record(s) in ${executionTime}ms`,
-        });
-      }
+              } else {
+          toast({
+            title: "Preview Generated ⚡",
+            description: `Found ${results.data.length} record(s) in ${executionTime}ms`,
+          });
+        }
     } catch (error) {
       console.error('Preview generation failed:', error);
       toast({
@@ -718,7 +636,8 @@ const ReportBuilder = () => {
     };
     
     try {
-      const results = await executeReport(tempReport);
+      const response = await executeReport(tempReport);
+      const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
         return;
@@ -824,7 +743,8 @@ const ReportBuilder = () => {
       updated_at: new Date().toISOString()
     };
     try {
-      const results = await executeReport(tempReport); // Full export, no limit
+      const response = await executeReport(tempReport); // Full export, no limit
+      const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
         return;
@@ -961,13 +881,14 @@ const ReportBuilder = () => {
           <Card>
             <CardContent className="p-4 md:p-6">
               <Tabs defaultValue="templates" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-4 grid grid-cols-3 sm:grid-cols-6 w-full h-auto">
+                <TabsList className="mb-4 grid grid-cols-3 sm:grid-cols-7 w-full h-auto">
                   <TabsTrigger value="templates">Templates</TabsTrigger>
                   <TabsTrigger value="data-sources">Sources</TabsTrigger>
                   <TabsTrigger value="columns">Columns</TabsTrigger>
                   <TabsTrigger value="filters">Filters</TabsTrigger>
                   <TabsTrigger value="sorting">Sorting</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
+                  <TabsTrigger value="charts">📊 Charts</TabsTrigger>
                 </TabsList>
 
                 {/* Templates Tab */}
@@ -1115,43 +1036,28 @@ const ReportBuilder = () => {
                 {/* Filters Tab */}
                 <TabsContent value="filters" className="mt-0">
                   <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-xl font-semibold">Filter Criteria</h2>
+                    <h2 className="text-xl font-semibold">🎯 Smart Filters</h2>
                     <Button onClick={addFilterRule} size="sm" variant="outline"><Plus className="mr-1.5 h-4 w-4" />Add Filter</Button>
                   </div>
                   {filterRules.length === 0 ? (
-                    <p className="text-muted-foreground text-sm text-center py-8">No filters applied. Click "Add Filter" to get started.</p>
+                    <div className="text-center py-12 text-muted-foreground">
+                      <div className="mb-4">
+                        <Filter className="mx-auto h-12 w-12 opacity-50" />
+                      </div>
+                      <p className="text-sm mb-2">No filters applied</p>
+                      <p className="text-xs">Click "Add Filter" to start filtering your data like Airtable!</p>
+                    </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {filterRules.map((rule) => (
-                        <div key={rule.id} className="border rounded-md p-3 bg-slate-50">
-                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
-                            <div className="space-y-1">
-                                <Label htmlFor={`filter-field-${rule.id}`} className="text-xs">Field</Label>
-                                <Select value={rule.field} onValueChange={(value) => updateFilterRule(rule.id, "field", value)}>
-                                <SelectTrigger id={`filter-field-${rule.id}`} className="h-9 text-xs"><SelectValue placeholder="Select field" /></SelectTrigger>
-                                <SelectContent>{formFields.filter(f => f.id !== 'record_source').map(f => <SelectItem key={f.id} value={f.id} className="text-xs">{f.field_label}</SelectItem>)}</SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1">
-                               <Label htmlFor={`filter-operator-${rule.id}`} className="text-xs">Operator</Label>
-                                <Select value={rule.operator} onValueChange={(value) => updateFilterRule(rule.id, "operator", value)}>
-                                <SelectTrigger id={`filter-operator-${rule.id}`} className="h-9 text-xs"><SelectValue placeholder="Operator" /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="equals" className="text-xs">Equals</SelectItem>
-                                  <SelectItem value="not_equals" className="text-xs">Not Equals</SelectItem>
-                                  <SelectItem value="contains" className="text-xs">Contains</SelectItem>
-                                  <SelectItem value="greater_than" className="text-xs">Greater Than</SelectItem>
-                                  <SelectItem value="less_than" className="text-xs">Less Than</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                           <div className="space-y-1">
-                                <Label htmlFor={`filter-value-${rule.id}`} className="text-xs">Value</Label>
-                                <Input id={`filter-value-${rule.id}`} className="h-9 text-xs" value={rule.value} onChange={(e) => updateFilterRule(rule.id, "value", e.target.value)} placeholder="Enter value" />
-                           </div>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 mt-auto" onClick={() => removeFilterRule(rule.id)}><Trash className="h-4 w-4 text-destructive" /></Button>
-                          </div>
-                        </div>
+                        <SmartFilter
+                          key={rule.id}
+                          filterRule={rule}
+                          updateFilterRule={updateFilterRule}
+                          removeFilterRule={removeFilterRule}
+                          formFields={formFields}
+                          previewData={previewData}
+                        />
                       ))}
                     </div>
                   )}
@@ -1197,6 +1103,24 @@ const ReportBuilder = () => {
                       ))}
                     </div>
                    )}
+                </TabsContent>
+
+                {/* Charts Tab */}
+                <TabsContent value="charts" className="mt-0">
+                  <ReportVisualization
+                    data={previewData}
+                    columns={selectedColumns}
+                    formFields={formFields}
+                    reportName={reportName}
+                    onExportChart={(chartType, chartData) => {
+                      // TODO: Implement chart export
+                      console.log('Export chart:', chartType, chartData);
+                      toast({
+                        title: "Chart Export",
+                        description: `${chartType} chart exported successfully!`,
+                      });
+                    }}
+                  />
                 </TabsContent>
 
                 {/* Preview Tab */}
@@ -1380,9 +1304,27 @@ const ReportBuilder = () => {
                  <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setActiveTab("columns")}>
                     <TableIcon className="mr-2 h-3.5 w-3.5" />Manage Columns
                 </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setActiveTab("charts")}>
+                    <Sparkles className="mr-2 h-3.5 w-3.5" />View Charts
+                </Button>
               </div>
             </CardContent>
           </Card>
+
+          {/* Smart Insights */}
+          {previewData.length > 0 && (
+            <SmartInsights
+              data={previewData}
+              columns={selectedColumns}
+              formFields={formFields}
+              reportConfig={{
+                dataSources: selectedDataSources,
+                columns: selectedColumns,
+                filters: filterRules,
+                sorts: sortRules
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

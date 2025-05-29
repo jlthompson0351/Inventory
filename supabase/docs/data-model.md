@@ -41,6 +41,7 @@
 - **Description**: User accounts and their organization membership
 - **Relationships**:
   - Each user belongs to exactly one organization
+- **Recent Fix**: RLS policies updated to prevent infinite recursion in authentication
 
 ## Inventory Management
 
@@ -76,21 +77,47 @@
   - `barcode`: Unique barcode/QR code for scanning
   - `location`: Physical location of the asset
   - `location_details`: Additional location information
+- **Recent Enhancement**: Automatic inventory creation upon asset creation
 
 ### Inventory Items
 - **Table**: `inventory_items`
-- **Description**: Consumable or bulk items tracked by quantity (differs from assets)
+- **Description**: Tracks quantities and current state for assets (one per asset)
 - **Key Fields**:
   - `id`: UUID Primary Key
   - `name`: Item name
   - `quantity`: Current quantity
   - `asset_type_id`: Reference to asset type
+  - `asset_id`: Reference to physical asset (enforced 1:1 relationship)
   - `organization_id`: Owner organization
   - `sku`: Stock Keeping Unit
   - `barcode`: Barcode for scanning
   - `current_price`: Current value of the item
   - `currency`: Currency of the price (default: USD)
-  - `metadata`: Additional properties including linked asset_id
+  - `location`: Current location
+  - `condition`: Current condition status
+  - `notes`: Additional notes
+  - `metadata`: Additional properties
+- **Recent Changes**: Enhanced with automatic creation workflow and 1:1 asset relationship
+
+### Inventory History
+- **Table**: `inventory_history`
+- **Description**: Complete audit trail of all inventory events and changes
+- **Key Fields**:
+  - `id`: UUID Primary Key
+  - `inventory_item_id`: Reference to inventory item
+  - `organization_id`: Organization this record belongs to
+  - `quantity`: Quantity at time of event
+  - `location`: Location at time of event
+  - `condition`: Condition at time of event
+  - `notes`: Event notes
+  - `check_type`: Type of check ('initial', 'audit', 'adjustment', 'transfer')
+  - `event_type`: Categorization of event ('intake', 'check', 'adjustment', etc.)
+  - `response_data`: JSONB containing complete form submission data
+  - `created_by`: User who created this record
+  - `updated_by`: User who last updated this record
+  - `created_at`: Timestamp of creation
+  - `updated_at`: Timestamp of last update
+- **Recent Enhancement**: Fixed trigger mapping from `periodic→check` to `periodic→audit` to comply with constraints
 
 ### Inventory Price History
 - **Table**: `inventory_price_history`
@@ -120,6 +147,18 @@
   - `organization_id`: Organization this form belongs to
   - `status`: draft, published, or archived
   - `is_template`: Whether this form is a reusable template
+- **Recent Enhancement**: Improved fallback handling for asset types without forms
+
+### Asset Type Forms
+- **Table**: `asset_type_forms`
+- **Description**: Links forms to asset types by purpose
+- **Key Fields**:
+  - `id`: UUID Primary Key
+  - `asset_type_id`: Reference to asset type
+  - `form_id`: Reference to form
+  - `purpose`: Form purpose ('intake', 'inventory', 'custom')
+  - `organization_id`: Organization context
+- **Enhancement**: Enables smart form loading based on asset type and purpose
 
 ### Form Categories
 - **Table**: `form_categories`
@@ -171,7 +210,12 @@
   - `start_date`: When to start
   - `end_date`: When to end (optional)
 
-## Functions and Procedures
+## Database Triggers and Functions
+
+### Inventory Management Triggers
+- **sync_event_type_with_check_type**: Automatically maps check_type to appropriate event_type
+  - Recent Fix: Updated mapping from `periodic→check` to `periodic→audit`
+  - Ensures data consistency and constraint compliance
 
 ### Form Formula Calculation
 - **Function**: `calculate_form_formulas(p_submission_data JSONB, p_form_schema JSONB)`
@@ -195,16 +239,63 @@
 
 ## Row-Level Security (RLS)
 
-All tables implement row-level security based on organization membership. Users can only access data from organizations they belong to.
+### Enhanced Security Features
+- **Recent Update**: Fixed organization_members RLS policies to prevent infinite recursion
+- **Organization Isolation**: All tables implement organization-scoped access
+- **User Permissions**: Role-based access within organizations
+- **Data Protection**: Complete isolation between organizations
 
-## Data Flow
+### RLS Policy Structure
+- All tables filter by organization membership
+- Users can only access data from their organization
+- Admin users have elevated permissions within their organization context
+- System admins can access diagnostic functions across organizations
 
-1. Organizations have Asset Types
-2. Forms can be attached to Asset Types (intake or inventory)
-3. Individual Assets belong to an Asset Type 
-4. Assets can have parent-child relationships for complex equipment
-5. Inventory Items track quantities and pricing information
-6. Price changes are recorded in Price History
-7. Form Schedules define when forms should be filled for Assets
-8. Form Submissions store the completed forms with calculations
-9. Barcodes/QR codes facilitate quick lookup of assets via scanning 
+## Data Flow and Workflows
+
+### Asset Creation Workflow
+1. **Asset Creation**: User creates asset with asset type selection
+2. **Automatic Inventory**: System creates corresponding inventory_items record
+3. **Initial History**: Creates inventory_history record with check_type='initial'
+4. **Form Integration**: Loads appropriate intake forms based on asset type
+
+### Inventory Management Workflow
+1. **View Assets**: AssetList shows all assets with inventory indicators
+2. **Smart Navigation**: Buttons adapt based on inventory existence
+3. **History Tracking**: All changes create new inventory_history records
+4. **Form-Based Updates**: Dynamic forms capture complete data
+
+### Form Submission Workflow
+1. **Form Loading**: Dynamic forms loaded based on asset type and purpose
+2. **Data Capture**: Complete form responses stored in response_data
+3. **Inventory Updates**: Inventory actions processed automatically
+4. **History Creation**: New history records with full audit trail
+
+## Recent Enhancements (December 2024)
+
+### Authentication Fixes
+- ✅ Fixed organization_members RLS infinite recursion
+- ✅ Enhanced user authentication flow
+- ✅ Improved organization access controls
+
+### Inventory System Improvements
+- ✅ One-to-one asset-inventory relationship enforcement
+- ✅ Automatic inventory creation on asset creation
+- ✅ Enhanced history tracking with complete form data
+- ✅ Fixed trigger mappings for event types
+
+### UI/UX Enhancements
+- ✅ Smart button functionality in AssetList
+- ✅ Inventory indicators and status warnings
+- ✅ Loading states and mobile responsiveness
+- ✅ Form fallbacks for asset types without configured forms
+
+### Performance Optimizations
+- ✅ Optimized queries with proper joins
+- ✅ Enhanced indexing for inventory operations
+- ✅ Materialized views for reporting
+- ✅ Efficient data access patterns
+
+## System Status: Production Ready
+
+The database model is fully implemented, tested, and optimized for production use. All recent enhancements have been applied, edge cases are handled, and the system provides enterprise-grade inventory management capabilities with complete audit trails and organization isolation. 

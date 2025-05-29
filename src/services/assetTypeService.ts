@@ -28,10 +28,6 @@ export interface AssetTypeWithCount extends AssetType {
   mapping_form_id?: string | null;
 }
 
-export type MothershipAssetType = AssetTypeWithCount & {
-  organization_name: string;
-};
-
 export const getAssetTypes = async (
   organizationId: string
 ): Promise<AssetType[]> => {
@@ -65,19 +61,33 @@ export const getAssetTypesWithCounts = async (
   return data || [];
 };
 
-export const getMothershipAssetTypes = async (
+export const checkAssetTypeNameExists = async (
   supabase: ReturnType<typeof createClient<Database>>,
-  userId: string
-): Promise<MothershipAssetType[]> => {
-  const { data, error } = await supabase
-    .rpc('get_mothership_asset_types', { admin_user_id: userId });
-
-  if (error) {
-    console.error('Error fetching mothership asset types:', error);
-    return [];
+  name: string,
+  organizationId: string,
+  excludeId?: string
+): Promise<boolean> => {
+  try {
+    let query = supabase
+      .from('asset_types')
+      .select('id')
+      .eq('name', name)
+      .eq('organization_id', organizationId)
+      .is('deleted_at', null);
+    
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    return (data && data.length > 0);
+  } catch (error) {
+    console.error('Error checking asset type name:', error);
+    throw error;
   }
-
-  return (data as any) || [];
 };
 
 export const createAssetType = async (
@@ -85,6 +95,19 @@ export const createAssetType = async (
   assetType: Partial<AssetType>
 ): Promise<AssetType> => {
   try {
+    // Check if name already exists
+    if (assetType.name && assetType.organization_id) {
+      const nameExists = await checkAssetTypeNameExists(
+        supabase,
+        assetType.name,
+        assetType.organization_id
+      );
+      
+      if (nameExists) {
+        throw new Error(`An asset type named "${assetType.name}" already exists in this organization.`);
+      }
+    }
+    
     const { data, error } = await supabase
       .from('asset_types')
       .insert({
@@ -153,27 +176,6 @@ export const deleteAssetType = async (
     console.error('Error deleting asset type:', error);
     throw error;
   }
-};
-
-export const cloneAssetType = async (
-  supabase: ReturnType<typeof createClient<Database>>,
-  sourceAssetTypeId: string,
-  targetOrganizationId: string,
-  userId: string
-): Promise<string> => {
-  const { data, error } = await supabase
-    .rpc('clone_asset_type', {
-      type_id: sourceAssetTypeId,
-      target_org_id: targetOrganizationId,
-      admin_user_id: userId
-    });
-
-  if (error) {
-    console.error('Error cloning asset type:', error);
-    throw error;
-  }
-
-  return data;
 };
 
 export async function getAssetType(

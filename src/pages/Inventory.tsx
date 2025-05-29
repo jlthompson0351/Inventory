@@ -55,87 +55,148 @@ export default function Inventory() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Inventory</h1>
-          <p className="text-muted-foreground">
-            Inventory for {currentOrganization.name}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleAddInventory}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Inventory
-          </Button>
-          <Button variant="outline" onClick={handleBrowseAssets}>
-            Browse Assets
-          </Button>
-        </div>
-      </div>
-
+    <div className="container py-6">
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <CardHeader>
+          <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Inventory Items</CardTitle>
+              <CardTitle className="text-2xl">Inventory Management</CardTitle>
               <CardDescription>
-                This is a minimal working version of the Inventory page.
+                Track assets and inventory for {currentOrganization.name}
               </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="relative w-full sm:w-64">
-                <Input
-                  placeholder="Search inventory..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-                <div className="absolute left-2.5 top-2.5">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </div>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleBrowseAssets}>
+                <Search className="mr-2 h-4 w-4" />
+                Browse Assets
               </Button>
-              <Button variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+              <Button onClick={handleAddInventory}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Inventory
               </Button>
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
-          <Tabs value={activeView} onValueChange={setActiveView}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="assets">Assets</TabsTrigger>
-              <TabsTrigger value="inventory">Inventory Items</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="assets">
-              <AssetList organizationId={currentOrganization.id} />
-            </TabsContent>
-            
-            <TabsContent value="inventory">
-              <p className="text-muted-foreground text-center p-6">
-                This is a minimal working version of the Inventory page.
-                <br />
-                Organization ID: {currentOrganization.id}
-              </p>
-              
-              <div className="border border-dashed rounded-md p-8 text-center mt-4">
-                <h3 className="font-medium mb-2">No Inventory Items Found</h3>
-                <p className="text-muted-foreground mb-4">
-                  Get started by adding inventory items to your assets.
+          {/* Quick Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Assets</p>
+                    <p className="text-2xl font-bold">-</p>
+                  </div>
+                  <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    📦
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Assets with inventory tracking
                 </p>
-                <Button onClick={handleAddInventory}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Inventory
-                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-green-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Low Stock Items</p>
+                    <p className="text-2xl font-bold">-</p>
+                  </div>
+                  <div className="h-8 w-8 bg-amber-100 rounded-full flex items-center justify-center">
+                    ⚠️
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Items requiring attention
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-red-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">This Month's Usage</p>
+                    <p className="text-2xl font-bold">-</p>
+                  </div>
+                  <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+                    📊
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Total consumed this month
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle>Inventory Items</CardTitle>
+                  <CardDescription>
+                    This is a minimal working version of the Inventory page.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative w-full sm:w-64">
+                    <Input
+                      placeholder="Search inventory..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
+                    <div className="absolute left-2.5 top-2.5">
+                      <Search className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filter
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeView} onValueChange={setActiveView}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="assets">Assets</TabsTrigger>
+                  <TabsTrigger value="inventory">Inventory Items</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="assets">
+                  <AssetList organizationId={currentOrganization.id} />
+                </TabsContent>
+                
+                <TabsContent value="inventory">
+                  <p className="text-muted-foreground text-center p-6">
+                    This is a minimal working version of the Inventory page.
+                    <br />
+                    Organization ID: {currentOrganization.id}
+                  </p>
+                  
+                  <div className="border border-dashed rounded-md p-8 text-center mt-4">
+                    <h3 className="font-medium mb-2">No Inventory Items Found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Get started by adding inventory items to your assets.
+                    </p>
+                    <Button onClick={handleAddInventory}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Inventory
+                    </Button>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
     </div>

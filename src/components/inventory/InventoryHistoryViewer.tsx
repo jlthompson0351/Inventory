@@ -32,6 +32,7 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
   const [editRecord, setEditRecord] = useState<any | null>(null);
   const [editFormValues, setEditFormValues] = useState<any>({});
   const [editLoading, setEditLoading] = useState(false);
+  const [showUsageSummary, setShowUsageSummary] = useState(false);
 
   // Function to load history for a specific month
   const loadHistoryForMonth = async (monthYear: string) => {
@@ -205,6 +206,30 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
 
   const quantityChange = getQuantityChange();
 
+  // Calculate monthly usage summary
+  const getUsageSummary = () => {
+    if (allHistory.length < 2) return null;
+    
+    const usageData = [];
+    for (let i = 1; i < allHistory.length; i++) {
+      const current = allHistory[i];
+      const previous = allHistory[i - 1];
+      const usage = previous.quantity - current.quantity;
+      
+      usageData.push({
+        month: current.month_year,
+        usage: usage,
+        startQuantity: previous.quantity,
+        endQuantity: current.quantity,
+        eventType: current.event_type
+      });
+    }
+    
+    return usageData.reverse(); // Show most recent first
+  };
+
+  const usageSummary = getUsageSummary();
+
   // Filter out form data we want to display at the top level
   const getFormattedResponseData = () => {
     if (!history || !history.response_data) return {};
@@ -285,48 +310,174 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
       </div>
       
       {/* History Timeline */}
-      <div className="overflow-x-auto">
-        <div className="flex space-x-2 py-2 min-w-max">
-          {filteredHistory.map((historyItem, index) => (
-            <Button
-              key={historyItem.month_year}
-              variant={historyItem.month_year === currentMonth ? "default" : "outline"}
+      <div className="bg-muted/50 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center">
+            <LineChart className="h-4 w-4 mr-2 text-muted-foreground" />
+            <span className="text-sm font-medium">History Timeline</span>
+          </div>
+          {usageSummary && usageSummary.length > 0 && (
+            <Button 
+              variant="outline" 
               size="sm"
-              className="px-3 py-1 h-auto"
-              onClick={() => setCurrentMonth(historyItem.month_year)}
+              onClick={() => setShowUsageSummary(!showUsageSummary)}
+              className="h-7"
             >
-              <Badge 
-                variant="outline" 
-                className={`mr-2 ${
-                  historyItem.event_type === 'intake' ? 'bg-blue-50 border-blue-200' : 
-                  historyItem.event_type === 'check' ? 'bg-green-50 border-green-200' : 
-                  'bg-gray-50 border-gray-200'
-                }`}
-              >
-                {historyItem.event_type === 'intake' ? 'I' : 
-                 historyItem.event_type === 'check' ? 'C' : 'O'}
-              </Badge>
-              {format(parseISO(`${historyItem.month_year}-01`), 'MMM yyyy')}
-              {/* Edit button for each record */}
-              {historyItem.event_type !== 'intake' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-2 text-xs"
-                  onClick={e => {
-                    e.stopPropagation();
-                    setEditRecord(historyItem);
-                    setEditFormValues(historyItem.response_data || {});
-                  }}
-                >
-                  Edit
-                </Button>
-              )}
+              {showUsageSummary ? 'Hide' : 'Show'} Usage Summary
             </Button>
-          ))}
-          {filteredHistory.length === 0 && !loading && (
-            <div className="text-sm text-muted-foreground">No history records found</div>
           )}
+        </div>
+
+        {/* Usage Summary Card */}
+        {usageSummary && usageSummary.length > 0 && showUsageSummary && (
+          <Card className="mb-4 border-l-4 border-l-amber-500">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                📊 Monthly Usage Summary
+                <Badge variant="outline" className="text-xs">
+                  {usageSummary.length} months tracked
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Track consumption patterns and usage trends over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {usageSummary.slice(0, 6).map((item, index) => (
+                  <div 
+                    key={item.month} 
+                    className={`p-3 rounded-md border ${
+                      item.usage > 0 ? 'bg-red-50 border-red-200' : 
+                      item.usage < 0 ? 'bg-green-50 border-green-200' : 
+                      'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">
+                        {format(parseISO(`${item.month}-01`), 'MMM yyyy')}
+                      </span>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${
+                          item.usage > 0 ? 'border-red-300 text-red-700' : 
+                          item.usage < 0 ? 'border-green-300 text-green-700' : 
+                          'border-gray-300 text-gray-700'
+                        }`}
+                      >
+                        {item.eventType === 'check' ? 'Monthly Check' : item.eventType}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Started:</span>
+                        <span className="font-medium">{item.startQuantity}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Ended:</span>
+                        <span className="font-medium">{item.endQuantity}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {item.usage > 0 ? 'Used:' : item.usage < 0 ? 'Added:' : 'Change:'}
+                        </span>
+                        <span className={`font-bold ${
+                          item.usage > 0 ? 'text-red-600' : 
+                          item.usage < 0 ? 'text-green-600' : 
+                          'text-gray-600'
+                        }`}>
+                          {item.usage > 0 ? `${item.usage}` : 
+                           item.usage < 0 ? `+${Math.abs(item.usage)}` : 
+                           '0'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {usageSummary.length > 6 && (
+                <div className="mt-3 text-center">
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    View all {usageSummary.length} months →
+                  </Button>
+                </div>
+              )}
+              
+              {/* Quick Stats */}
+              {usageSummary.length > 1 && (
+                <div className="mt-4 pt-3 border-t border-amber-200">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Avg Monthly Usage</div>
+                      <div className="font-semibold text-red-600">
+                        {(usageSummary.filter(u => u.usage > 0).reduce((sum, u) => sum + u.usage, 0) / 
+                          Math.max(1, usageSummary.filter(u => u.usage > 0).length)).toFixed(1)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Highest Usage</div>
+                      <div className="font-semibold text-red-600">
+                        {Math.max(...usageSummary.map(u => u.usage), 0)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Total Used</div>
+                      <div className="font-semibold text-red-600">
+                        {usageSummary.filter(u => u.usage > 0).reduce((sum, u) => sum + u.usage, 0)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Timeline Navigation */}
+        <div className="overflow-x-auto">
+          <div className="flex space-x-2 py-2 min-w-max">
+            {filteredHistory.map((historyItem, index) => (
+              <Button
+                key={historyItem.month_year}
+                variant={historyItem.month_year === currentMonth ? "default" : "outline"}
+                size="sm"
+                className="px-3 py-1 h-auto"
+                onClick={() => setCurrentMonth(historyItem.month_year)}
+              >
+                <Badge 
+                  variant="outline" 
+                  className={`mr-2 ${
+                    historyItem.event_type === 'intake' ? 'bg-blue-50 border-blue-200' : 
+                    historyItem.event_type === 'check' ? 'bg-green-50 border-green-200' : 
+                    'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {historyItem.event_type === 'intake' ? 'I' : 
+                   historyItem.event_type === 'check' ? 'C' : 'O'}
+                </Badge>
+                {format(parseISO(`${historyItem.month_year}-01`), 'MMM yyyy')}
+                {/* Edit button for each record */}
+                {historyItem.event_type !== 'intake' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-2 text-xs"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setEditRecord(historyItem);
+                      setEditFormValues(historyItem.response_data || {});
+                    }}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </Button>
+            ))}
+            {filteredHistory.length === 0 && !loading && (
+              <div className="text-sm text-muted-foreground">No history records found</div>
+            )}
+          </div>
         </div>
       </div>
       

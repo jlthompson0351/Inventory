@@ -95,4 +95,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - File upload management
 - Basic reporting with CSV export
 - Formula evaluator for calculations
-- Conditional logic in forms 
+- Conditional logic in forms
+
+## [1.5.0] - 2024-12-19
+
+### Enhanced Form Builder - Major Release
+
+#### 🚀 New Features
+- **Advanced Formula System**: Complete overhaul of formula creation with dual-mode editor
+  - Text Editor Mode (recommended): Direct text editing with syntax validation
+  - Visual Builder Mode: Drag-and-drop interface for formula construction
+- **Asset Type Integration**: Forms can be automatically linked to asset types during creation
+  - Access to conversion fields from linked asset types
+  - Cross-form field references for complex calculations
+  - Visual asset type information panel with field counts
+- **Enhanced Inventory Actions**: Expanded inventory action system
+  - Add to inventory: Field value is added to current stock
+  - Subtract from inventory: Field value is subtracted from current stock
+  - Set inventory amount: Field value replaces current stock
+  - None: Field is recorded but doesn't affect inventory
+- **Mock Value Testing System**: Test formulas with sample data before deployment
+  - Set test values for conversion fields and form fields
+  - Save and load mock value sets for different scenarios
+  - Real-time calculation preview with validation
+- **Bulk Operations Suite**: 
+  - Export all fields or mappable fields only as JSON
+  - Import field definitions from JSON files
+  - Clear all fields with confirmation dialog
+
+#### 🛠️ Major Improvements
+- **Stability & Performance**: Eliminated flickering and excessive re-renders
+  - Fixed infinite re-render loops in calculated fields
+  - Enhanced formula validation with incomplete formula detection
+  - Prevented console spam from repeated error logging
+- **User Experience**: Comprehensive UX improvements
+  - Text editor mode defaults for stability
+  - "Recommended" badges for optimal settings
+  - Auto-reset to text mode after successful saves
+  - Enhanced field selection and navigation
+- **Formula Validation**: Robust validation system
+  - Real-time syntax checking
+  - Field reference validation
+  - Unmatched parentheses detection
+  - Incomplete formula prevention
+- **Asset Type Management**: Enhanced asset type workflow
+  - Asset type selection dialog for new forms
+  - Form purpose selection (intake, inventory, adjustment, transfer, audit, other)
+  - Visual representation of conversion fields and mapped fields
+
+#### 🐛 Bug Fixes
+- **Formula Evaluation**: Fixed critical formula evaluation issues
+  - Resolved "1 *" incomplete formula causing syntax errors
+  - Added validation for formulas ending with operators
+  - Enhanced error handling in eval() functions
+- **Visual Builder**: Stabilized visual formula builder
+  - Fixed excessive re-renders when formula was the last field
+  - Prevented infinite loops in formula dependency tracking
+  - Improved dropdown reset functionality
+- **Code Cleanup**: Comprehensive debugging code removal
+  - Removed all console.log debugging statements
+  - Cleaned up console.error spam
+  - Optimized error handling and validation
+
+#### 📖 Documentation
+- **Comprehensive Documentation**: New Form Builder Documentation
+  - Complete feature overview with examples
+  - Step-by-step guides for all functionality
+  - Best practices and troubleshooting guides
+  - API integration and security considerations
+- **Updated README**: Enhanced main documentation
+  - Added Form Builder enhancement section
+  - Updated feature descriptions with new capabilities
+  - Added links to comprehensive documentation
+
+#### 🔧 Technical Changes
+- **Code Quality**: Major cleanup and optimization
+  - Removed debugging artifacts and console spam
+  - Enhanced error handling and validation
+  - Improved performance with reduced re-renders
+- **TypeScript**: Enhanced type safety
+  - Improved inventory_action type validation
+  - Better formula validation interfaces
+  - Enhanced field type definitions
+
+### Migration Notes
+- Existing forms will continue to work without changes
+- Visual formula builders will default to text editor mode for stability
+- All debugging console output has been removed - use browser dev tools for debugging
+- Form purpose field is optional and can be set when linking forms to asset types
+
+### Breaking Changes
+- None - this release is fully backward compatible
+
+---
+
+## Previous Versions
+
+For previous version history, see the git commit history or previous CHANGELOG entries.
+
+---
+
+*Last updated: December 19, 2024* 

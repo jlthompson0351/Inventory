@@ -49,17 +49,40 @@ export function AssetCalculationManager({
   const [isLoading, setIsLoading] = useState(false);
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const { toast } = useToast();
-
+  
   // Use either initialFormulas or calculationFormulas - memoize to prevent infinite re-renders
   const formulasToUse = useMemo(() => {
     return Object.keys(initialFormulas).length > 0 ? initialFormulas : calculationFormulas;
   }, [initialFormulas, calculationFormulas]);
 
+  // Memoize formIds to ensure stable reference
+  const stableFormIds = useMemo(() => ({
+    intakeFormId: formIds?.intakeFormId,
+    inventoryFormId: formIds?.inventoryFormId
+  }), [formIds?.intakeFormId, formIds?.inventoryFormId]);
+
+  // Create a stable stringified version for dependency comparison
+  const formulasJsonString = useMemo(() => {
+    try {
+      return JSON.stringify(formulasToUse || {});
+    } catch {
+      return '{}';
+    }
+  }, [formulasToUse]);
+
   // Convert JSON formulas object to FormEntry array for UI
   useEffect(() => {
+    // Parse the stringified formulas
+    let parsedFormulas: Record<string, any> = {};
+    try {
+      parsedFormulas = JSON.parse(formulasJsonString);
+    } catch {
+      parsedFormulas = {};
+    }
+    
     const formulaEntries: FormulaEntry[] = [];
     
-    Object.entries(formulasToUse || {}).forEach(([field, value]) => {
+    Object.entries(parsedFormulas).forEach(([field, value]) => {
       // Try to parse the formula description
       try {
         const formulaObj = typeof value === 'string' ? JSON.parse(value) : value;
@@ -85,18 +108,33 @@ export function AssetCalculationManager({
       }
     });
     
-    setFormulas(formulaEntries);
-  }, [formulasToUse]);
+    // Only update if the formulas actually changed
+    setFormulas(prevFormulas => {
+      // Compare the new formulas with the previous ones
+      const prevJson = JSON.stringify(prevFormulas.map(f => ({ 
+        field: f.targetField, 
+        type: f.formulaType,
+        description: f.description 
+      })));
+      const newJson = JSON.stringify(formulaEntries.map(f => ({ 
+        field: f.targetField, 
+        type: f.formulaType,
+        description: f.description 
+      })));
+      
+      return prevJson === newJson ? prevFormulas : formulaEntries;
+    });
+  }, [formulasJsonString]); // Use stringified version for stable comparison
   
-  // Fetch available form fields
+  // Fetch available form fields - now using stable form IDs
   useEffect(() => {
     const fetchFormFields = async () => {
       let formId: string | undefined;
       
       if (activeTab === 'intake') {
-        formId = formIds?.intakeFormId;
+        formId = stableFormIds.intakeFormId;
       } else if (activeTab === 'inventory') {
-        formId = formIds?.inventoryFormId;
+        formId = stableFormIds.inventoryFormId;
       }
       
       if (!formId) {
@@ -142,7 +180,7 @@ export function AssetCalculationManager({
     };
 
     fetchFormFields();
-  }, [activeTab, formIds?.intakeFormId, formIds?.inventoryFormId]);
+  }, [activeTab, stableFormIds.intakeFormId, stableFormIds.inventoryFormId]);
   
   const addNewFormula = () => {
     const newId = `formula-${Date.now()}`;
@@ -415,7 +453,7 @@ export function AssetCalculationManager({
           </TabsList>
           
           <TabsContent value="intake">
-            {!formIds?.intakeFormId ? (
+            {!stableFormIds.intakeFormId ? (
               <div className="text-center p-4 border border-dashed rounded-md">
                 <p className="text-muted-foreground">
                   No intake form configured for this asset type.
@@ -438,7 +476,7 @@ export function AssetCalculationManager({
           </TabsContent>
           
           <TabsContent value="inventory">
-            {!formIds?.inventoryFormId ? (
+            {!stableFormIds.inventoryFormId ? (
               <div className="text-center p-4 border border-dashed rounded-md">
                 <p className="text-muted-foreground">
                   No inventory form configured for this asset type.

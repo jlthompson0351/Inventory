@@ -68,7 +68,7 @@ interface AssetType {
   barcode_prefix?: string;
   deleted_at?: string | null;
   mapping_form_id?: string | null;
-  conversion_fields?: any[];
+  conversion_fields?: any;
 }
 
 interface Asset {
@@ -174,13 +174,19 @@ export default function NewAsset() {
             setLoadingIntakeForm(true);
             try {
               // Load conversion fields directly from asset type
-              if (assetType.conversion_fields && Array.isArray(assetType.conversion_fields)) {
+              const conversionFields = Array.isArray(assetType.conversion_fields) 
+                ? assetType.conversion_fields 
+                : (typeof assetType.conversion_fields === 'string' 
+                    ? JSON.parse(assetType.conversion_fields) 
+                    : []);
+              
+              if (conversionFields && Array.isArray(conversionFields) && conversionFields.length > 0) {
                 // Create a mock form structure from conversion fields
                 const conversionForm = {
                   id: 'conversion_fields',
                   name: 'Conversion Fields',
                   form_data: {
-                    fields: assetType.conversion_fields.map((field: any) => ({
+                    fields: conversionFields.map((field: any) => ({
                       id: field.field_name,
                       label: field.label,
                       type: field.type,
@@ -513,7 +519,7 @@ export default function NewAsset() {
         .from('assets')
         .select(`
           *,
-          asset_type:asset_types(id, name, color, intake_form_id)
+          asset_type:asset_types(id, name, color, intake_form_id, conversion_fields)
         `)
         .eq('id', assetId)
         .single();
@@ -532,6 +538,21 @@ export default function NewAsset() {
         return;
       }
       
+      // Parse metadata first
+      let metadataObject: Record<string, any> = {};
+      if (data.metadata) {
+        if (typeof data.metadata === 'string') {
+          try {
+            metadataObject = JSON.parse(data.metadata);
+          } catch (e) {
+            console.error('Error parsing metadata JSON:', e);
+            metadataObject = {};
+          }
+        } else if (typeof data.metadata === 'object' && !Array.isArray(data.metadata)) {
+          metadataObject = data.metadata as Record<string, any>;
+        }
+      }
+
       // Set form values from asset data
       form.reset({
         name: data.name,
@@ -541,26 +562,67 @@ export default function NewAsset() {
         serial_number: data.serial_number || "",
         acquisition_date: data.acquisition_date ? new Date(data.acquisition_date) : undefined,
         parent_asset_id: data.parent_asset_id || "",
-        location: data.metadata?.location || "",
-        location_details: data.metadata?.location_details || "",
-        cost: data.metadata?.cost,
-        unit_type: data.metadata?.unit_type || "",
-        current_inventory: data.metadata?.current_inventory || 0,
+        location: metadataObject.location || "",
+        location_details: metadataObject.location_details || "",
+        cost: metadataObject.cost,
+        unit_type: metadataObject.unit_type || "",
+        current_inventory: metadataObject.current_inventory || 0,
       });
       
       // Set selected asset type
       if (data.asset_type) {
         setSelectedAssetType(data.asset_type);
         
-        // Fetch the intake form if available
-        if (data.asset_type.intake_form_id) {
-          fetchIntakeForm(data.asset_type.intake_form_id);
+        // Load conversion fields directly from asset type
+        const conversionFields = Array.isArray(data.asset_type.conversion_fields) 
+          ? data.asset_type.conversion_fields 
+          : (typeof data.asset_type.conversion_fields === 'string' 
+              ? JSON.parse(data.asset_type.conversion_fields) 
+              : []);
+        
+        if (conversionFields && Array.isArray(conversionFields) && conversionFields.length > 0) {
+          setLoadingIntakeForm(true);
+          try {
+            // Create a mock form structure from conversion fields
+            const conversionForm = {
+              id: 'conversion_fields',
+              name: 'Conversion Fields',
+              form_data: {
+                fields: conversionFields.map((field: any) => ({
+                  id: field.field_name,
+                  label: field.label,
+                  type: field.type,
+                  required: field.required || false,
+                  mappable: field.mappable || true,
+                  description: field.description,
+                  placeholder: field.placeholder,
+                  options: field.options || []
+                }))
+              }
+            };
+            
+            setIntakeForm(conversionForm);
+            setIntakeFormSchemaJson(conversionForm.form_data);
+          } catch (error) {
+            console.error('Error loading conversion fields for existing asset:', error);
+            setIntakeForm(null);
+            setIntakeFormSchemaJson(null);
+          } finally {
+            setLoadingIntakeForm(false);
+          }
+        } else {
+          // Fetch the intake form if available and no conversion fields
+          if (data.asset_type.intake_form_id) {
+            fetchIntakeForm(data.asset_type.intake_form_id);
+          } else {
+            setIntakeForm(null);
+            setIntakeFormSchemaJson(null);
+          }
         }
       }
       
-      // Set dynamic form values from metadata
-      if (data.metadata && typeof data.metadata === 'object' && !Array.isArray(data.metadata)) {
-        const metadataObject = data.metadata as Record<string, any>; // Type assertion
+      // Set dynamic form values from metadata (metadataObject already parsed above)
+      if (Object.keys(metadataObject).length > 0) {
         form.setValue('location', metadataObject.location || "");
         form.setValue('location_details', metadataObject.location_details || "");
         form.setValue('cost', metadataObject.cost);
@@ -578,7 +640,6 @@ export default function NewAsset() {
         setFormValues(dynamicFormValues);
       } else {
         // If metadata is not an object or is null, set defaults for form values
-        // and empty object for dynamicFormValues to prevent spread errors.
         form.setValue('location', "");
         form.setValue('location_details', "");
         form.setValue('cost', undefined);

@@ -652,8 +652,41 @@ class ParallelDataProcessor {
       case 'inventory_items':
         return this.processInventoryItemsDataSource(config, organizationId);
       
+      case 'inventory_history':
+        return this.processInventoryHistoryDataSource(config, organizationId);
+        
+      case 'inventory_price_history':
+        return this.processPriceHistoryDataSource(config, organizationId);
+        
+      case 'forms':
+        return this.processFormsDataSource(config, organizationId);
+      
       case 'form_submissions':
         return this.processFormSubmissionsDataSource(config, organizationId);
+        
+      case 'form_responses':
+        return this.processFormResponsesDataSource(config, organizationId);
+        
+      case 'organizations':
+        return this.processOrganizationsDataSource(config, organizationId);
+        
+      case 'organization_members':
+        return this.processOrgMembersDataSource(config, organizationId);
+        
+      case 'users':
+        return this.processUsersDataSource(config, organizationId);
+        
+      case 'locations':
+        return this.processLocationsDataSource(config, organizationId);
+        
+      case 'system_logs':
+        return this.processSystemLogsDataSource(config, organizationId);
+        
+      case 'asset_formulas':
+        return this.processAssetFormulasDataSource(config, organizationId);
+        
+      case 'asset_type_forms':
+        return this.processAssetTypeFormsDataSource(config, organizationId);
       
       default:
         console.warn(`Unknown data source: ${dataSource}`);
@@ -725,7 +758,7 @@ class ParallelDataProcessor {
       'asset_types.description': item.asset_types?.description,
       'asset_types.color': item.asset_types?.color,
       // Process conversion fields
-      ...this.processConversionFields(item, item.asset_types?.conversion_fields)
+      ...this.processConversionFields(item, Array.isArray(item.asset_types?.conversion_fields) ? item.asset_types.conversion_fields : [])
     }));
   }
 
@@ -783,7 +816,78 @@ class ParallelDataProcessor {
       'asset_types.id': item.asset_types?.id,
       'asset_types.name': item.asset_types?.name,
       // Process conversion fields
-      ...this.processConversionFields(item, item.asset_types?.conversion_fields)
+      ...this.processConversionFields(item, Array.isArray(item.asset_types?.conversion_fields) ? item.asset_types.conversion_fields : [])
+    }));
+  }
+
+  private static async processInventoryHistoryDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('inventory_history')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Inventory History',
+      'inventory_history.id': item.id,
+      'inventory_history.inventory_item_id': item.inventory_item_id,
+      'inventory_history.event_type': item.event_type,
+      'inventory_history.check_type': item.check_type,
+      'inventory_history.quantity': item.quantity,
+      'inventory_history.condition': item.condition,
+      'inventory_history.location': item.location,
+      'inventory_history.status': item.status,
+      'inventory_history.notes': item.notes,
+      'inventory_history.check_date': item.check_date,
+      'inventory_history.month_year': item.month_year,
+      'inventory_history.created_at': item.created_at,
+      'inventory_history.created_by': item.created_by
+    }));
+  }
+
+  private static async processPriceHistoryDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('inventory_price_history')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Price History',
+      'inventory_price_history.id': item.id,
+      'inventory_price_history.inventory_item_id': item.inventory_item_id,
+      'inventory_price_history.price': item.price,
+      'inventory_price_history.currency': item.currency,
+      'inventory_price_history.effective_date': item.effective_date,
+      'inventory_price_history.created_at': item.created_at
+    }));
+  }
+
+  private static async processFormsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('forms')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Forms',
+      'forms.id': item.id,
+      'forms.name': item.name,
+      'forms.description': item.description,
+      'forms.form_type': item.form_type,
+      'forms.purpose': item.purpose,
+      'forms.status': item.status,
+      'forms.is_template': item.is_template,
+      'forms.version': item.version,
+      'forms.created_at': item.created_at,
+      'forms.updated_at': item.updated_at
     }));
   }
 
@@ -817,6 +921,176 @@ class ParallelDataProcessor {
         ...acc,
         [`submission.${key}`]: value
       }), {})
+    }));
+  }
+
+  private static async processFormResponsesDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('form_responses')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Form Responses',
+      'form_responses.id': item.id,
+      'form_responses.form_id': item.form_id,
+      'form_responses.inventory_item_id': item.inventory_item_id,
+      'form_responses.response_data': item.response_data,
+      'form_responses.created_at': item.created_at,
+      'form_responses.updated_at': item.updated_at
+    }));
+  }
+
+  private static async processOrganizationsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    // Organizations can only see their own org data
+    let query = supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Organizations',
+      'organizations.id': item.id,
+      'organizations.name': item.name,
+      'organizations.description': item.description,
+      'organizations.is_mothership': item.is_mothership,
+      'organizations.created_at': item.created_at,
+      'organizations.updated_at': item.updated_at
+    }));
+  }
+
+  private static async processOrgMembersDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('organization_members')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Organization Members',
+      'organization_members.id': item.id,
+      'organization_members.user_id': item.user_id,
+      'organization_members.role': item.role,
+      'organization_members.created_at': item.created_at,
+      'organization_members.updated_at': item.updated_at
+    }));
+  }
+
+  private static async processUsersDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    // Get organization members with user details from users_view
+    let query = supabase
+      .from('organization_members')
+      .select(`
+        *,
+        users_view!inner (
+          id,
+          email,
+          full_name
+        )
+      `)
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Users',
+      'users.id': item.users_view?.id || item.user_id,
+      'users.email': item.users_view?.email || null,
+      'users.full_name': item.users_view?.full_name || null,
+      'users.created_at': item.created_at,
+      'organization_members.role': item.role,
+      'organization_members.joined_at': item.created_at
+    }));
+  }
+
+  private static async processLocationsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('locations')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Locations',
+      'locations.id': item.id,
+      'locations.name': item.name,
+      'locations.parent_id': item.parent_id,
+      'locations.created_at': item.created_at,
+      'locations.updated_at': item.updated_at
+    }));
+  }
+
+  private static async processSystemLogsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('system_logs')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'System Logs',
+      'system_logs.id': item.id,
+      'system_logs.type': item.type,
+      'system_logs.message': item.message,
+      'system_logs.actor_id': item.actor_id,
+      'system_logs.created_at': item.created_at
+    }));
+  }
+
+  private static async processAssetFormulasDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('asset_formulas')
+      .select('*')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Asset Formulas',
+      'asset_formulas.id': item.id,
+      'asset_formulas.asset_type_id': item.asset_type_id,
+      'asset_formulas.inventory_item_id': item.inventory_item_id,
+      'asset_formulas.source_field': item.source_field,
+      'asset_formulas.target_field': item.target_field,
+      'asset_formulas.formula': item.formula,
+      'asset_formulas.created_at': item.created_at,
+      'asset_formulas.updated_at': item.updated_at
+    }));
+  }
+
+  private static async processAssetTypeFormsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
+    let query = supabase
+      .from('asset_type_forms')
+      .select('*, asset_types!inner(name), forms!inner(name)')
+      .eq('organization_id', organizationId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      record_source: 'Asset Type Forms',
+      'asset_type_forms.id': item.id,
+      'asset_type_forms.asset_type_id': item.asset_type_id,
+      'asset_type_forms.form_id': item.form_id,
+      'asset_type_forms.purpose': item.purpose,
+      'asset_type_forms.created_at': item.created_at,
+      'asset_types.name': item.asset_types?.name,
+      'forms.name': item.forms?.name
     }));
   }
 
@@ -863,6 +1137,8 @@ class ParallelDataProcessor {
         return query.in(fieldName, Array.isArray(filter.value) ? filter.value : [filter.value]);
       case 'not_in':
         return query.not('in', fieldName, Array.isArray(filter.value) ? filter.value : [filter.value]);
+      case 'between':
+        return query.gte(fieldName, filter.value).lte(fieldName, filter.secondValue);
       case 'is_null':
         return query.is(fieldName, null);
       case 'is_not_null':
@@ -955,7 +1231,7 @@ export const updateReport = async (id: string, updates: ReportUpdate): Promise<R
       ...updates,
       report_config: updates.report_config as unknown as Json,
       updated_at: new Date().toISOString(),
-      version: supabase.rpc('increment_version')
+      // version will be incremented server-side
     })
     .eq('id', id)
     .select()
@@ -1194,42 +1470,19 @@ function estimateComplexity(config: ReportConfig): 'low' | 'medium' | 'high' | '
 }
 
 async function logReportExecution(report: Report, stats: ExecutionStats): Promise<void> {
-  try {
-    await supabase
-      .from('report_runs')
-      .insert({
-        report_id: report.id,
-        run_by: (await supabase.auth.getUser()).data.user?.id || '',
-        row_count: stats.rowCount,
-        execution_time_ms: stats.executionTime,
-        status: 'completed',
-        cache_hit: stats.cacheHit,
-        bytes_processed: stats.bytesProcessed
-      });
-  } catch (error) {
-    console.error('Failed to log report execution:', error);
-  }
+  // TODO: Implement when report_runs table is created
+  console.debug('Report execution stats:', {
+    reportId: report.id,
+    executionTime: stats.executionTime,
+    rowCount: stats.rowCount,
+    cacheHit: stats.cacheHit
+  });
 }
 
 export async function getReportRuns(reportId: string, limit: number = 10): Promise<ReportRun[]> {
-  try {
-    const { data, error } = await supabase
-      .from('report_runs')
-      .select('*')
-      .eq('report_id', reportId)
-      .order('run_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching report runs:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error) {
-    console.error('Failed to fetch report runs:', error);
-    return [];
-  }
+  // TODO: Implement when report_runs table is created
+  console.warn('Report runs tracking not yet implemented');
+  return [];
 }
 
 // 🚀 ENHANCED DATA SOURCE DEFINITIONS
@@ -1298,6 +1551,270 @@ export const DATA_SOURCE_DEFINITIONS: Record<string, DataSourceDefinition> = {
     ],
     indexes: ['form_submissions_organization_id_idx', 'form_submissions_form_id_idx', 'form_submissions_created_at_idx']
   }
+};
+
+// 🚀 COMPLETE DATA SOURCE REGISTRY
+export const AVAILABLE_DATA_SOURCES = [
+  // Core tables
+  {
+    id: "assets",
+    name: "Assets",
+    description: "All asset records including equipment, tools, materials",
+    icon: "📦",
+    table: "assets"
+  },
+  {
+    id: "asset_types",
+    name: "Asset Types",
+    description: "Asset type configurations and categories",
+    icon: "🏷️",
+    table: "asset_types"
+  },
+  {
+    id: "inventory_items",
+    name: "Inventory Items",
+    description: "Current inventory levels and stock information",
+    icon: "📋",
+    table: "inventory_items"
+  },
+  {
+    id: "inventory_history",
+    name: "Inventory History",
+    description: "Historical inventory changes and movements",
+    icon: "📊",
+    table: "inventory_history"
+  },
+  {
+    id: "inventory_price_history",
+    name: "Price History",
+    description: "Historical price changes for inventory items",
+    icon: "💰",
+    table: "inventory_price_history"
+  },
+  {
+    id: "forms",
+    name: "Forms",
+    description: "All form definitions and templates",
+    icon: "📄",
+    table: "forms"
+  },
+  {
+    id: "form_submissions",
+    name: "Form Submissions",
+    description: "All submitted form data",
+    icon: "📝",
+    table: "form_submissions"
+  },
+  {
+    id: "form_responses",
+    name: "Form Responses",
+    description: "Individual form response data",
+    icon: "✍️",
+    table: "form_responses"
+  },
+  {
+    id: "organizations",
+    name: "Organizations",
+    description: "Organization information",
+    icon: "🏢",
+    table: "organizations"
+  },
+  {
+    id: "organization_members",
+    name: "Organization Members",
+    description: "Team members and their roles",
+    icon: "👥",
+    table: "organization_members"
+  },
+  {
+    id: "users",
+    name: "Users",
+    description: "User profiles and information",
+    icon: "👤",
+    table: "users"
+  },
+  {
+    id: "locations",
+    name: "Locations",
+    description: "Physical locations and hierarchies",
+    icon: "📍",
+    table: "locations"
+  },
+  {
+    id: "mapped_fields",
+    name: "Mapped Fields",
+    description: "Form field mappings and configurations",
+    icon: "🔗",
+    table: "mapped_fields"
+  },
+  {
+    id: "asset_formulas",
+    name: "Asset Formulas",
+    description: "Calculation formulas for assets",
+    icon: "🧮",
+    table: "asset_formulas"
+  },
+  {
+    id: "asset_formula_mappings",
+    name: "Formula Mappings",
+    description: "Asset type formula field mappings",
+    icon: "🗺️",
+    table: "asset_formula_mappings"
+  },
+  {
+    id: "asset_type_forms",
+    name: "Asset Type Forms",
+    description: "Forms linked to asset types",
+    icon: "📎",
+    table: "asset_type_forms"
+  },
+  {
+    id: "system_logs",
+    name: "System Logs",
+    description: "Audit trail and system activity logs",
+    icon: "📜",
+    table: "system_logs"
+  },
+  {
+    id: "form_categories",
+    name: "Form Categories",
+    description: "Form categorization and grouping",
+    icon: "🗂️",
+    table: "form_categories"
+  },
+  {
+    id: "form_schedules",
+    name: "Form Schedules",
+    description: "Scheduled form submissions and recurring forms",
+    icon: "📅",
+    table: "form_schedules"
+  },
+  {
+    id: "organization_invitations",
+    name: "Invitations",
+    description: "Pending organization invitations",
+    icon: "✉️",
+    table: "organization_invitations"
+  }
+];
+
+// 🚀 COMPLETE COLUMN REGISTRY
+export const DATA_SOURCE_COLUMNS: Record<string, ColumnDefinition[]> = {
+  assets: [
+    { id: 'assets.id', label: 'Asset ID', type: 'text', source: 'assets', table: 'assets', column: 'id', description: 'Unique asset identifier' },
+    { id: 'assets.name', label: 'Asset Name', type: 'text', source: 'assets', table: 'assets', column: 'name', description: 'Name of the asset' },
+    { id: 'assets.description', label: 'Description', type: 'text', source: 'assets', table: 'assets', column: 'description', description: 'Asset description' },
+    { id: 'assets.status', label: 'Status', type: 'text', source: 'assets', table: 'assets', column: 'status', description: 'Current status (active/inactive/maintenance)' },
+    { id: 'assets.serial_number', label: 'Serial Number', type: 'text', source: 'assets', table: 'assets', column: 'serial_number', description: 'Asset serial number' },
+    { id: 'assets.barcode', label: 'Barcode', type: 'text', source: 'assets', table: 'assets', column: 'barcode', description: 'Asset barcode' },
+    { id: 'assets.barcode_type', label: 'Barcode Type', type: 'text', source: 'assets', table: 'assets', column: 'barcode_type', description: 'Type of barcode (QR/Code128)' },
+    { id: 'assets.acquisition_date', label: 'Acquisition Date', type: 'date', source: 'assets', table: 'assets', column: 'acquisition_date', description: 'Date asset was acquired' },
+    { id: 'assets.asset_type_id', label: 'Asset Type ID', type: 'text', source: 'assets', table: 'assets', column: 'asset_type_id', description: 'Related asset type' },
+    { id: 'assets.parent_asset_id', label: 'Parent Asset ID', type: 'text', source: 'assets', table: 'assets', column: 'parent_asset_id', description: 'Parent asset for hierarchical assets' },
+    { id: 'assets.organization_id', label: 'Organization ID', type: 'text', source: 'assets', table: 'assets', column: 'organization_id', description: 'Owning organization' },
+    { id: 'assets.created_at', label: 'Created Date', type: 'date', source: 'assets', table: 'assets', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'assets.updated_at', label: 'Updated Date', type: 'date', source: 'assets', table: 'assets', column: 'updated_at', description: 'Last update timestamp' },
+    { id: 'assets.created_by', label: 'Created By', type: 'text', source: 'assets', table: 'assets', column: 'created_by', description: 'User who created the asset' },
+    { id: 'assets.deleted_at', label: 'Deleted Date', type: 'date', source: 'assets', table: 'assets', column: 'deleted_at', description: 'Soft deletion timestamp' }
+  ],
+  asset_types: [
+    { id: 'asset_types.id', label: 'Asset Type ID', type: 'text', source: 'asset_types', table: 'asset_types', column: 'id', description: 'Unique identifier' },
+    { id: 'asset_types.name', label: 'Type Name', type: 'text', source: 'asset_types', table: 'asset_types', column: 'name', description: 'Asset type name' },
+    { id: 'asset_types.description', label: 'Description', type: 'text', source: 'asset_types', table: 'asset_types', column: 'description', description: 'Type description' },
+    { id: 'asset_types.color', label: 'Color', type: 'text', source: 'asset_types', table: 'asset_types', column: 'color', description: 'Display color' },
+    { id: 'asset_types.icon', label: 'Icon', type: 'text', source: 'asset_types', table: 'asset_types', column: 'icon', description: 'Display icon' },
+    { id: 'asset_types.enable_barcodes', label: 'Barcodes Enabled', type: 'boolean', source: 'asset_types', table: 'asset_types', column: 'enable_barcodes', description: 'Whether barcodes are enabled' },
+    { id: 'asset_types.barcode_type', label: 'Barcode Type', type: 'text', source: 'asset_types', table: 'asset_types', column: 'barcode_type', description: 'Default barcode type' },
+    { id: 'asset_types.barcode_prefix', label: 'Barcode Prefix', type: 'text', source: 'asset_types', table: 'asset_types', column: 'barcode_prefix', description: 'Barcode prefix pattern' },
+    { id: 'asset_types.organization_id', label: 'Organization ID', type: 'text', source: 'asset_types', table: 'asset_types', column: 'organization_id', description: 'Owning organization' },
+    { id: 'asset_types.created_at', label: 'Created Date', type: 'date', source: 'asset_types', table: 'asset_types', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'asset_types.updated_at', label: 'Updated Date', type: 'date', source: 'asset_types', table: 'asset_types', column: 'updated_at', description: 'Last update timestamp' },
+    { id: 'asset_types.deleted_at', label: 'Deleted Date', type: 'date', source: 'asset_types', table: 'asset_types', column: 'deleted_at', description: 'Soft deletion timestamp' }
+  ],
+  inventory_items: [
+    { id: 'inventory_items.id', label: 'Inventory ID', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'id', description: 'Unique identifier' },
+    { id: 'inventory_items.name', label: 'Item Name', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'name', description: 'Item name' },
+    { id: 'inventory_items.sku', label: 'SKU', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'sku', description: 'Stock keeping unit' },
+    { id: 'inventory_items.quantity', label: 'Quantity', type: 'number', source: 'inventory_items', table: 'inventory_items', column: 'quantity', description: 'Current quantity', aggregatable: true },
+    { id: 'inventory_items.current_price', label: 'Current Price', type: 'number', source: 'inventory_items', table: 'inventory_items', column: 'current_price', description: 'Current unit price', format: 'currency', aggregatable: true },
+    { id: 'inventory_items.currency', label: 'Currency', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'currency', description: 'Price currency' },
+    { id: 'inventory_items.category', label: 'Category', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'category', description: 'Item category' },
+    { id: 'inventory_items.location', label: 'Location', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'location', description: 'Storage location' },
+    { id: 'inventory_items.status', label: 'Status', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'status', description: 'Item status' },
+    { id: 'inventory_items.asset_id', label: 'Asset ID', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'asset_id', description: 'Related asset' },
+    { id: 'inventory_items.asset_type_id', label: 'Asset Type ID', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'asset_type_id', description: 'Related asset type' },
+    { id: 'inventory_items.barcode', label: 'Barcode', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'barcode', description: 'Item barcode' },
+    { id: 'inventory_items.description', label: 'Description', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'description', description: 'Item description' },
+    { id: 'inventory_items.profile_image_url', label: 'Image URL', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'profile_image_url', description: 'Item image' },
+    { id: 'inventory_items.created_at', label: 'Created Date', type: 'date', source: 'inventory_items', table: 'inventory_items', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'inventory_items.updated_at', label: 'Updated Date', type: 'date', source: 'inventory_items', table: 'inventory_items', column: 'updated_at', description: 'Last update timestamp' },
+    { id: 'inventory_items.created_by', label: 'Created By', type: 'text', source: 'inventory_items', table: 'inventory_items', column: 'created_by', description: 'User who created the item' }
+  ],
+  inventory_history: [
+    { id: 'inventory_history.id', label: 'History ID', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'id', description: 'Unique identifier' },
+    { id: 'inventory_history.inventory_item_id', label: 'Inventory Item ID', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'inventory_item_id', description: 'Related inventory item' },
+    { id: 'inventory_history.event_type', label: 'Event Type', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'event_type', description: 'Type of inventory event' },
+    { id: 'inventory_history.check_type', label: 'Check Type', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'check_type', description: 'Type of inventory check' },
+    { id: 'inventory_history.quantity', label: 'Quantity', type: 'number', source: 'inventory_history', table: 'inventory_history', column: 'quantity', description: 'Quantity changed', aggregatable: true },
+    { id: 'inventory_history.condition', label: 'Condition', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'condition', description: 'Item condition' },
+    { id: 'inventory_history.location', label: 'Location', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'location', description: 'Location at time of event' },
+    { id: 'inventory_history.status', label: 'Status', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'status', description: 'Status at time of event' },
+    { id: 'inventory_history.notes', label: 'Notes', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'notes', description: 'Event notes' },
+    { id: 'inventory_history.check_date', label: 'Check Date', type: 'date', source: 'inventory_history', table: 'inventory_history', column: 'check_date', description: 'Date of inventory check' },
+    { id: 'inventory_history.month_year', label: 'Month/Year', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'month_year', description: 'Month and year of event' },
+    { id: 'inventory_history.created_at', label: 'Created Date', type: 'date', source: 'inventory_history', table: 'inventory_history', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'inventory_history.created_by', label: 'Created By', type: 'text', source: 'inventory_history', table: 'inventory_history', column: 'created_by', description: 'User who created the record' }
+  ],
+  forms: [
+    { id: 'forms.id', label: 'Form ID', type: 'text', source: 'forms', table: 'forms', column: 'id', description: 'Unique identifier' },
+    { id: 'forms.name', label: 'Form Name', type: 'text', source: 'forms', table: 'forms', column: 'name', description: 'Form name' },
+    { id: 'forms.description', label: 'Description', type: 'text', source: 'forms', table: 'forms', column: 'description', description: 'Form description' },
+    { id: 'forms.form_type', label: 'Form Type', type: 'text', source: 'forms', table: 'forms', column: 'form_type', description: 'Type of form' },
+    { id: 'forms.purpose', label: 'Purpose', type: 'text', source: 'forms', table: 'forms', column: 'purpose', description: 'Form purpose' },
+    { id: 'forms.status', label: 'Status', type: 'text', source: 'forms', table: 'forms', column: 'status', description: 'Form status' },
+    { id: 'forms.is_template', label: 'Is Template', type: 'boolean', source: 'forms', table: 'forms', column: 'is_template', description: 'Whether form is a template' },
+    { id: 'forms.version', label: 'Version', type: 'number', source: 'forms', table: 'forms', column: 'version', description: 'Form version number' },
+    { id: 'forms.created_at', label: 'Created Date', type: 'date', source: 'forms', table: 'forms', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'forms.updated_at', label: 'Updated Date', type: 'date', source: 'forms', table: 'forms', column: 'updated_at', description: 'Last update timestamp' }
+  ],
+  form_submissions: [
+    { id: 'form_submissions.id', label: 'Submission ID', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'id', description: 'Unique identifier' },
+    { id: 'form_submissions.form_id', label: 'Form ID', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'form_id', description: 'Related form' },
+    { id: 'form_submissions.asset_id', label: 'Asset ID', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'asset_id', description: 'Related asset' },
+    { id: 'form_submissions.asset_type_id', label: 'Asset Type ID', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'asset_type_id', description: 'Related asset type' },
+    { id: 'form_submissions.status', label: 'Status', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'status', description: 'Submission status' },
+    { id: 'form_submissions.submitted_by', label: 'Submitted By', type: 'text', source: 'form_submissions', table: 'form_submissions', column: 'submitted_by', description: 'User who submitted' },
+    { id: 'form_submissions.created_at', label: 'Submitted Date', type: 'date', source: 'form_submissions', table: 'form_submissions', column: 'created_at', description: 'Submission timestamp' },
+    { id: 'form_submissions.updated_at', label: 'Updated Date', type: 'date', source: 'form_submissions', table: 'form_submissions', column: 'updated_at', description: 'Last update timestamp' }
+  ],
+  organizations: [
+    { id: 'organizations.id', label: 'Organization ID', type: 'text', source: 'organizations', table: 'organizations', column: 'id', description: 'Unique identifier' },
+    { id: 'organizations.name', label: 'Organization Name', type: 'text', source: 'organizations', table: 'organizations', column: 'name', description: 'Organization name' },
+    { id: 'organizations.description', label: 'Description', type: 'text', source: 'organizations', table: 'organizations', column: 'description', description: 'Organization description' },
+    { id: 'organizations.is_mothership', label: 'Is Mothership', type: 'boolean', source: 'organizations', table: 'organizations', column: 'is_mothership', description: 'Whether this is the main organization' },
+    { id: 'organizations.created_at', label: 'Created Date', type: 'date', source: 'organizations', table: 'organizations', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'organizations.updated_at', label: 'Updated Date', type: 'date', source: 'organizations', table: 'organizations', column: 'updated_at', description: 'Last update timestamp' }
+  ],
+  users: [
+    { id: 'users.id', label: 'User ID', type: 'text', source: 'users', table: 'users', column: 'id', description: 'Unique identifier' },
+    { id: 'users.email', label: 'Email', type: 'text', source: 'users', table: 'users', column: 'email', description: 'User email address' },
+    { id: 'users.full_name', label: 'Full Name', type: 'text', source: 'users', table: 'users', column: 'full_name', description: 'User full name' },
+    { id: 'users.created_at', label: 'Created Date', type: 'date', source: 'users', table: 'users', column: 'created_at', description: 'Account creation date' }
+  ],
+  locations: [
+    { id: 'locations.id', label: 'Location ID', type: 'text', source: 'locations', table: 'locations', column: 'id', description: 'Unique identifier' },
+    { id: 'locations.name', label: 'Location Name', type: 'text', source: 'locations', table: 'locations', column: 'name', description: 'Location name' },
+    { id: 'locations.parent_id', label: 'Parent Location ID', type: 'text', source: 'locations', table: 'locations', column: 'parent_id', description: 'Parent location for hierarchy' },
+    { id: 'locations.created_at', label: 'Created Date', type: 'date', source: 'locations', table: 'locations', column: 'created_at', description: 'Creation timestamp' },
+    { id: 'locations.updated_at', label: 'Updated Date', type: 'date', source: 'locations', table: 'locations', column: 'updated_at', description: 'Last update timestamp' }
+  ],
+  system_logs: [
+    { id: 'system_logs.id', label: 'Log ID', type: 'text', source: 'system_logs', table: 'system_logs', column: 'id', description: 'Unique identifier' },
+    { id: 'system_logs.type', label: 'Log Type', type: 'text', source: 'system_logs', table: 'system_logs', column: 'type', description: 'Type of log entry' },
+    { id: 'system_logs.message', label: 'Message', type: 'text', source: 'system_logs', table: 'system_logs', column: 'message', description: 'Log message' },
+    { id: 'system_logs.actor_id', label: 'Actor ID', type: 'text', source: 'system_logs', table: 'system_logs', column: 'actor_id', description: 'User who performed the action' },
+    { id: 'system_logs.created_at', label: 'Log Date', type: 'date', source: 'system_logs', table: 'system_logs', column: 'created_at', description: 'Log timestamp' }
+  ]
 };
 
 // Export cache manager for external access

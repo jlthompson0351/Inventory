@@ -140,31 +140,60 @@ export const syncMappedFieldsForAssetType = async (
     );
     if (atfError) throw atfError;
     const formIds = (atf || []).map((row) => row.form_id);
+    
+    // Track errors but don't stop the entire sync
+    const errors: any[] = [];
+    
     // For each form, get its fields and register mappable ones
     for (const formId of formIds) {
-      const { data: form, error: formError } = await supabase
-        .from('forms')
-        .select('form_data')
-        .eq('id', formId)
-        .single();
-      if (formError || !form) continue;
-      const fields = (form.form_data?.fields || []);
-      for (const field of fields) {
-        if (field.mappable) {
-          await registerMappedField({
-            organization_id: organizationId,
-            form_id: formId,
-            field_id: field.id,
-            field_label: field.label,
-            field_type: field.type || 'text',
-            description: field.description,
-            inventory_action: field.inventory_action || 'none'
-          });
-        } else {
-          await unregisterMappedField(formId, field.id);
+      try {
+        const { data: form, error: formError } = await supabase
+          .from('forms')
+          .select('form_data')
+          .eq('id', formId)
+          .single();
+          
+        if (formError || !form) {
+          console.warn(`Could not fetch form ${formId}:`, formError);
+          continue;
         }
+        
+        const fields = (form.form_data?.fields || []);
+        
+        for (const field of fields) {
+          try {
+            if (field.mappable) {
+              await registerMappedField({
+                organization_id: organizationId,
+                form_id: formId,
+                field_id: field.id,
+                field_label: field.label,
+                field_type: field.type || 'text',
+                description: field.description,
+                inventory_action: field.inventory_action || 'none'
+              });
+            } else {
+              // Only try to unregister if the field exists
+              await unregisterMappedField(formId, field.id);
+            }
+          } catch (fieldError) {
+            // Log field-level errors but continue processing
+            console.warn(`Error processing field ${field.id} in form ${formId}:`, fieldError);
+            errors.push({ formId, fieldId: field.id, error: fieldError });
+          }
+        }
+      } catch (formError) {
+        // Log form-level errors but continue processing
+        console.error(`Error processing form ${formId}:`, formError);
+        errors.push({ formId, error: formError });
       }
     }
+    
+    // If we had errors, log them but still return success if some fields were processed
+    if (errors.length > 0) {
+      console.warn(`Sync completed with ${errors.length} errors:`, errors);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error syncing mapped fields for asset type:', error);

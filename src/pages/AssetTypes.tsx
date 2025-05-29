@@ -57,19 +57,17 @@ import { BarcodeToggle } from "@/components/inventory/BarcodeToggle";
 import { 
   AssetType, 
   AssetTypeWithCount,
-  MothershipAssetType,
   getAssetTypesWithCounts, 
   getArchivedAssetTypesWithCounts,
-  getMothershipAssetTypes,
   createAssetType, 
   updateAssetType, 
   deleteAssetType,
   restoreAssetType,
-  cloneAssetType,
   createDefaultFormsForAssetType,
   removeAssetTypeFormLink,
   addAssetTypeFormLink,
-  getAssetTypeForms
+  getAssetTypeForms,
+  checkAssetTypeNameExists
 } from "@/services/assetTypeService";
 import { supabase } from "@/integrations/supabase/client"; // Import the supabase client directly
 import { useNavigate } from "react-router-dom";
@@ -261,18 +259,27 @@ const AssetTypes = () => {
 
   const handleBarcodeSettingsChange = (settings: {
     enabled: boolean;
-    type: string;
-    prefix?: string;
+    barcodeType: string;
+    prefix: string;
   }) => {
     setBarcodeSettings({
       enabled: settings.enabled,
-      type: settings.type,
+      type: settings.barcodeType,
       prefix: settings.prefix || "",
     });
   };
 
   const handleAddEdit = async () => {
-    if (!currentOrganization?.id) {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Asset type name is required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!currentOrganization) {
       toast({
         title: "Error",
         description: "No organization selected",
@@ -281,37 +288,40 @@ const AssetTypes = () => {
       return;
     }
 
-    if (formData.name.trim() === "") {
-      toast({
-        title: "Error",
-        description: "Asset type name is required",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     setIsSubmitting(true);
-    
     try {
       if (editingAssetType) {
-        const result = await updateAssetType(supabase, editingAssetType.id, {
-          name: formData.name,
-          description: formData.description,
-          color: formData.color,
+        // Check for duplicate name when editing
+        const nameExists = await checkAssetTypeNameExists(
+          supabase,
+          formData.name,
+          currentOrganization.id,
+          editingAssetType.id
+        );
+        
+        if (nameExists) {
+          toast({
+            title: "Validation Error", 
+            description: `An asset type named "${formData.name}" already exists in this organization.`,
+            variant: "destructive"
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Update existing asset type
+        await updateAssetType(supabase, editingAssetType.id, {
+          ...formData,
           enable_barcodes: barcodeSettings.enabled,
           barcode_type: barcodeSettings.type,
-          barcode_prefix: barcodeSettings.prefix,
-          updated_at: new Date().toISOString()
+          barcode_prefix: barcodeSettings.prefix
         });
-        
-        if (result) {
-          toast({
-            title: "Asset Type Updated",
-            description: `${formData.name} has been updated successfully.`
-          });
-          await fetchDataBasedOnViewMode();
-        }
+        toast({
+          title: "Asset Type Updated",
+          description: `"${formData.name}" has been updated successfully.`
+        });
       } else {
+        // Create new asset type - validation is in the service
         const result = await createAssetType(supabase, {
           name: formData.name,
           description: formData.description,
@@ -321,34 +331,32 @@ const AssetTypes = () => {
           barcode_type: barcodeSettings.type,
           barcode_prefix: barcodeSettings.prefix
         });
+
+        // Create default forms for this asset type
+        await createDefaultFormsForAssetType(supabase, result.id);
         
-        if (result) {
-          try {
-            await createDefaultFormsForAssetType(supabase, result.id);
-            toast({
-              title: "Asset Type Added",
-              description: `${formData.name} has been added with default forms.`
-            });
-          } catch (formError) {
-            console.error("Error creating default forms:", formError);
-            toast({
-              title: "Asset Type Added",
-              description: `${formData.name} has been added, but default forms could not be created.`,
-              variant: "default"
-            });
-          }
-          
-          await fetchDataBasedOnViewMode();
-          setViewMode("active");
-        }
+        toast({
+          title: "Asset Type Created",
+          description: `"${formData.name}" has been created successfully. Default forms have been generated.`
+        });
       }
       
       resetForm();
-    } catch (error) {
+      fetchDataBasedOnViewMode();
+    } catch (error: any) {
       console.error("Error saving asset type:", error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to save asset type";
+      if (error.message?.includes("already exists")) {
+        errorMessage = error.message;
+      } else if (error.code === '23505') {
+        errorMessage = `An asset type named "${formData.name}" already exists in this organization.`;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to save asset type",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -824,7 +832,9 @@ const AssetTypes = () => {
               </div>
             </div>
             <BarcodeToggle
-              settings={barcodeSettings}
+              enabled={barcodeSettings.enabled}
+              barcodeType={barcodeSettings.type}
+              prefix={barcodeSettings.prefix}
               onChange={handleBarcodeSettingsChange}
             />
           </div>

@@ -117,7 +117,7 @@ export async function submitForm(
           .from('assets')
           .update({
             metadata: processedData,
-            updated_at: new Date()
+            updated_at: new Date().toISOString()
           })
           .eq('id', assetId)
           .is('deleted_at', null)
@@ -136,9 +136,9 @@ export async function submitForm(
             organization_id: organizationId,
             metadata: processedData,
             created_by: (await supabase.auth.getUser()).data.user?.id,
-            created_at: new Date(),
-            updated_at: new Date()
-          })
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as any) // Type cast to avoid column name issues
           .select()
           .single();
         if (error) throw error;
@@ -159,7 +159,7 @@ export async function submitForm(
       }
     }
 
-    // Inventory logic: apply inventory_action fields
+    // Inventory logic: apply inventory_action fields (Enhanced)
     if (assetTypeId && asset) {
       // Find the inventory item for this asset
       const { data: inventoryItem, error: invItemError } = await supabase
@@ -169,61 +169,140 @@ export async function submitForm(
         .single();
       if (invItemError || !inventoryItem) throw invItemError || new Error('Inventory item not found');
 
+      // Process inventory actions from the FORM FIELDS (supports calculated fields)
       let newQuantity = inventoryItem.quantity;
-      // For each mapped field with inventory_action, update quantity
-      assetTypeMappedFields.forEach((field) => {
-        const value = processedData[field.field_id];
-        if (value !== undefined && field.inventory_action) {
-          switch (field.inventory_action) {
-            case 'add':
-              newQuantity += Number(value);
-              break;
-            case 'subtract':
-              newQuantity -= Number(value);
-              break;
-            case 'set':
-              newQuantity = Number(value);
-              break;
-            // 'none' or undefined: do nothing
+      let foundInventoryAction = false;
+      let inventoryChanges: Array<{action: string, field: string, value: number, description: string}> = [];
+      
+      // Get the form schema to find fields with inventory actions
+      const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
+      
+      if (formSchema && formSchema.fields) {
+        // Priority 1: Check for 'set' actions first (they override everything)
+        const setField = formSchema.fields.find(field => 
+          field.inventory_action === 'set' && 
+          processedData[field.id] !== undefined &&
+          processedData[field.id] !== null
+        );
+        
+        if (setField) {
+          const setValue = Number(processedData[setField.id]);
+          if (!isNaN(setValue)) {
+            const previousQuantity = newQuantity;
+            newQuantity = setValue;
+            foundInventoryAction = true;
+            
+            // Calculate usage/difference for history tracking
+            const difference = previousQuantity - setValue;
+            const changeDescription = difference > 0 
+              ? `${difference} units used/consumed` 
+              : difference < 0 
+                ? `${Math.abs(difference)} units added`
+                : 'No change in quantity';
+            
+            inventoryChanges.push({
+              action: 'set',
+              field: setField.label || setField.id,
+              value: setValue,
+              description: `Stock count set to ${setValue} (was ${previousQuantity}). ${changeDescription}`
+            });
+            
+            console.log(`Inventory SET action: ${previousQuantity} → ${setValue} (field: ${setField.label})`);
           }
+        } else {
+          // Priority 2: Process add/subtract actions
+          formSchema.fields.forEach(field => {
+            const value = processedData[field.id];
+            if (value !== undefined && value !== null && field.inventory_action && field.inventory_action !== 'none') {
+              const numValue = Number(value);
+              if (!isNaN(numValue) && numValue !== 0) {
+                switch (field.inventory_action) {
+                  case 'add':
+                    newQuantity += numValue;
+                    foundInventoryAction = true;
+                    inventoryChanges.push({
+                      action: 'add',
+                      field: field.label || field.id,
+                      value: numValue,
+                      description: `Added ${numValue} units via ${field.label}`
+                    });
+                    console.log(`Inventory ADD action: +${numValue} (field: ${field.label})`);
+                    break;
+                  case 'subtract':
+                    newQuantity -= numValue;
+                    foundInventoryAction = true;
+                    inventoryChanges.push({
+                      action: 'subtract',
+                      field: field.label || field.id,
+                      value: numValue,
+                      description: `Subtracted ${numValue} units via ${field.label}`
+                    });
+                    console.log(`Inventory SUBTRACT action: -${numValue} (field: ${field.label})`);
+                    break;
+                }
+              }
+            }
+          });
         }
-      });
-      // Update inventory item
-      await supabase
-        .from('inventory_items')
-        .update({ quantity: newQuantity, updated_at: new Date() })
-        .eq('id', inventoryItem.id);
+      }
+      
+      // Update inventory item if any actions were found
+      if (foundInventoryAction) {
+        // Ensure quantity doesn't go negative
+        const finalQuantity = Math.max(0, newQuantity);
+        
+        await supabase
+          .from('inventory_items')
+          .update({ 
+            quantity: finalQuantity, 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', inventoryItem.id);
 
-      // Record in inventory_history
-      await supabase
-        .from('inventory_history')
-        .insert({
-          inventory_item_id: inventoryItem.id,
-          organization_id: organizationId,
-          quantity: newQuantity,
-          event_type: form.purpose || 'generic',
-          check_type: form.purpose || 'generic',
-          response_data: processedData,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-          created_at: new Date(),
-          month_year: new Date().toISOString().slice(0, 7)
-        });
+        // Enhanced history record with detailed change tracking
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        const changesSummary = inventoryChanges.map(change => change.description).join('; ');
+        const notesWithChanges = `Form: ${form.name}. Changes: ${changesSummary}`;
+        
+        await supabase
+          .from('inventory_history')
+          .insert({
+            inventory_item_id: inventoryItem.id,
+            organization_id: organizationId,
+            quantity: finalQuantity,
+            event_type: 'form_submission',
+            check_type: form.purpose || 'form_submission',
+            notes: notesWithChanges,
+            response_data: {
+              ...processedData,
+              _inventory_changes: inventoryChanges,
+              _previous_quantity: inventoryItem.quantity
+            },
+            created_by: userId,
+            created_at: new Date().toISOString(),
+            check_date: new Date().toISOString(),
+            month_year: new Date().toISOString().slice(0, 7),
+            location: processedData.location || inventoryItem.location || ''
+          });
+          
+        console.log(`✅ Inventory updated: ${inventoryItem.quantity} → ${finalQuantity} for asset ${asset.name}`);
+        console.log(`📝 Changes tracked: ${changesSummary}`);
+      }
     }
 
-    // Save form submission
+    // Create form submission record
     const { data: submission, error: submissionError } = await supabase
       .from('form_submissions')
       .insert({
         form_id: formId,
-        asset_id: asset?.id || assetId,
+        asset_id: asset?.id,
         asset_type_id: assetTypeId,
         organization_id: organizationId,
-        submitted_by: (await supabase.auth.getUser()).data.user?.id,
         submission_data: processedData,
-        status: 'submitted',
-        created_at: new Date(),
-        updated_at: new Date()
-      })
+        submitted_by: (await supabase.auth.getUser()).data.user?.id,
+        created_at: new Date().toISOString(),
+        status: 'completed'
+      } as any) // Type cast to avoid column name issues
       .select()
       .single();
     if (submissionError) throw submissionError;

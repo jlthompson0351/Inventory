@@ -44,6 +44,7 @@ interface VisualFormulaBuilderProps {
   mappedFields: MappedField[];
   onPreview?: (formula: string) => string;
   className?: string;
+  resetToTextMode?: boolean;
 }
 
 const OPERATORS = [
@@ -70,10 +71,11 @@ export default function VisualFormulaBuilder({
   currentFields,
   mappedFields,
   onPreview,
-  className = ""
+  className = "",
+  resetToTextMode = false
 }: VisualFormulaBuilderProps) {
   const [elements, setElements] = useState<FormulaElement[]>([]);
-  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [showTextEditor, setShowTextEditor] = useState(true);
   const [textFormula, setTextFormula] = useState(formula);
   const [numberInput, setNumberInput] = useState('');
   
@@ -86,6 +88,13 @@ export default function VisualFormulaBuilder({
   useEffect(() => {
     parseFormulaToElements(formula);
   }, [formula]);
+
+  // Handle reset to text mode from parent
+  useEffect(() => {
+    if (resetToTextMode) {
+      setShowTextEditor(true);
+    }
+  }, [resetToTextMode]);
 
   // Update text formula when elements change (but not if we're in text mode)
   useEffect(() => {
@@ -235,6 +244,9 @@ export default function VisualFormulaBuilder({
                 checked={showTextEditor}
                 onCheckedChange={setShowTextEditor}
               />
+              {showTextEditor && (
+                <span className="text-xs text-green-600 font-medium">Recommended</span>
+              )}
             </div>
           </div>
         </CardHeader>
