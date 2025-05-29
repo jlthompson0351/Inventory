@@ -8,6 +8,39 @@
  * - Unit conversions and measurement functions
  */
 
+import { create, all } from 'mathjs';
+
+// Create a mathjs instance with limited functionality for safety
+const math = create(all);
+
+// Configure mathjs to be safe - disable potentially dangerous functions
+const limitedMath = create({
+  // Only include safe math operations
+  addDependencies: true,
+  subtractDependencies: true,
+  multiplyDependencies: true,
+  divideDependencies: true,
+  modDependencies: true,
+  powDependencies: true,
+  sqrtDependencies: true,
+  absDependencies: true,
+  roundDependencies: true,
+  floorDependencies: true,
+  ceilDependencies: true,
+  minDependencies: true,
+  maxDependencies: true,
+  sumDependencies: true,
+  meanDependencies: true,
+  medianDependencies: true,
+  stdDependencies: true,
+  varianceDependencies: true,
+});
+
+export interface FormulaContext {
+  fields: Record<string, number>;
+  mappedFields: Record<string, number>;
+}
+
 // Enhanced mathematical operators with precedence
 const operators: Record<string, { precedence: number, associativity: 'left' | 'right', operation: (a: number, b: number) => number }> = {
   '+': { precedence: 1, associativity: 'left', operation: (a, b) => a + b },
@@ -209,75 +242,176 @@ function evaluatePostfix(tokens: string[]): number {
 }
 
 /**
- * Enhanced formula evaluation with support for mapped fields
- * 
- * @param {string} formula - The formula to evaluate (e.g., "{field1} + {mapped.conversion_rate} * 10")
- * @param {Record<string, any>} variables - Object containing variable values to substitute
- * @returns {number} - The result of the formula evaluation
+ * Safely evaluate a formula with field replacements
+ * @param formula The formula string with {field_id} or {mapped.field_id} placeholders
+ * @param context Object containing field values and mapped field values
+ * @returns The calculated result or an error object
  */
-export function evaluateFormula(formula: string, variables: Record<string, any>): number {
+export function evaluateFormula(
+  formula: string,
+  context: FormulaContext
+): { success: true; result: number } | { success: false; error: string } {
+  if (!formula || formula.trim() === '') {
+    return { success: false, error: 'Empty formula' };
+  }
+
   try {
-    // Early return for empty formula
-    if (!formula || formula.trim() === '') {
-      return 0;
+    // Create a working copy of the formula
+    let processedFormula = formula;
+
+    // Replace field references with their values
+    // Handle regular fields like {field_1}
+    Object.entries(context.fields).forEach(([fieldId, value]) => {
+      const regex = new RegExp(`\\{${fieldId}\\}`, 'g');
+      processedFormula = processedFormula.replace(regex, String(value));
+    });
+
+    // Handle mapped fields like {mapped.field_name}
+    Object.entries(context.mappedFields).forEach(([mappedKey, value]) => {
+      const regex = new RegExp(`\\{${mappedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g');
+      processedFormula = processedFormula.replace(regex, String(value));
+    });
+
+    // Check for any remaining unresolved placeholders
+    const unresolvedPlaceholders = processedFormula.match(/\{[^}]+\}/g);
+    if (unresolvedPlaceholders) {
+      return {
+        success: false,
+        error: `Unresolved fields: ${unresolvedPlaceholders.join(', ')}`,
+      };
     }
 
-    // Pre-process formula by replacing variable placeholders
-    let processedFormula = formula;
-    
-    // Replace field references with their values
-    for (const [fieldId, value] of Object.entries(variables)) {
-      // Handle both regular field references {field_id} and mapped field references {mapped.field_name}
-      const patterns = [
-        new RegExp(`\\{${fieldId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\}`, 'g'),
-        new RegExp(`\\{mapped\\.${fieldId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\}`, 'g')
-      ];
-      
-      patterns.forEach(pattern => {
-        const valueAsNumber = parseFloat(String(value)) || 0;
-        processedFormula = processedFormula.replace(pattern, valueAsNumber.toString());
-      });
+    // Remove any comments
+    processedFormula = processedFormula.replace(/\/\*.*?\*\//g, '');
+    processedFormula = processedFormula.replace(/\/\/.*$/gm, '');
+
+    // Validate the formula doesn't contain dangerous patterns
+    const dangerousPatterns = [
+      /import\s/,
+      /require\s*\(/,
+      /eval\s*\(/,
+      /Function\s*\(/,
+      /setTimeout/,
+      /setInterval/,
+      /document\./,
+      /window\./,
+      /console\./,
+      /process\./,
+      /global\./,
+      /__proto__/,
+      /constructor\s*\(/,
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(processedFormula)) {
+        return { success: false, error: 'Formula contains unsafe operations' };
+      }
     }
-    
-    // Also handle any remaining mapped field references by key lookup
-    processedFormula = processedFormula.replace(/\{mapped\.([^}]+)\}/g, (match, fieldName) => {
-      const mappedValue = variables[`mapped.${fieldName}`] || variables[fieldName] || 0;
-      const valueAsNumber = parseFloat(String(mappedValue)) || 0;
-      return valueAsNumber.toString();
-    });
-    
-    // Replace any remaining field references with 0 (fallback)
-    processedFormula = processedFormula.replace(/\{[^}]+\}/g, '0');
-    
-    // Check for incomplete formulas (ending with operator)
-    const trimmedFormula = processedFormula.trim();
-    if (trimmedFormula.match(/[\+\-\*\/\%\^]\s*$/)) {
-      throw new Error('Incomplete formula: ends with an operator');
+
+    // Use mathjs to safely evaluate the expression
+    const result = limitedMath.evaluate(processedFormula);
+
+    // Ensure the result is a number
+    if (typeof result !== 'number' || isNaN(result)) {
+      return { success: false, error: 'Formula did not produce a valid number' };
     }
-    
-    // Check for operators at the beginning (except minus for negative numbers)
-    if (trimmedFormula.match(/^[\+\*\/\%\^]/)) {
-      throw new Error('Incomplete formula: starts with an operator');
-    }
-    
-    // Tokenize, convert to postfix, and evaluate
-    const tokens = tokenize(processedFormula);
-    
-    // If no tokens, return 0
-    if (tokens.length === 0) {
-      return 0;
-    }
-    
-    const postfix = infixToPostfix(tokens);
-    return evaluatePostfix(postfix);
+
+    return { success: true, result };
   } catch (error) {
-    // Don't log errors for incomplete formulas during typing
-    const errorMessage = (error as Error).message;
-    if (!errorMessage.includes('Incomplete formula')) {
-      console.error('Formula evaluation error:', error, 'Formula:', formula, 'Variables:', variables);
-    }
-    throw error;
+    // Return a user-friendly error message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown calculation error';
+    return { success: false, error: `Calculation error: ${errorMessage}` };
   }
+}
+
+/**
+ * Validate a formula without evaluating it
+ * @param formula The formula to validate
+ * @returns Validation result with any errors
+ */
+export function validateFormulaSyntax(formula: string): {
+  isValid: boolean;
+  error?: string;
+  referencedFields: string[];
+  referencedMappedFields: string[];
+} {
+  const result = {
+    isValid: true,
+    referencedFields: [] as string[],
+    referencedMappedFields: [] as string[],
+  };
+
+  try {
+    // Find all field references
+    const fieldMatches = formula.match(/\{field_\d+\}/g) || [];
+    result.referencedFields = fieldMatches.map(m => m.slice(1, -1));
+
+    // Find all mapped field references
+    const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
+    result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
+
+    // Create a test formula with all placeholders replaced with 1
+    let testFormula = formula;
+    [...result.referencedFields, ...result.referencedMappedFields].forEach(ref => {
+      testFormula = testFormula.replace(new RegExp(`\\{${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), '1');
+    });
+
+    // Remove comments
+    testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
+    testFormula = testFormula.replace(/\/\/.*$/gm, '');
+
+    // Check for dangerous patterns
+    const dangerousPatterns = [
+      /import\s/,
+      /require\s*\(/,
+      /eval\s*\(/,
+      /Function\s*\(/,
+      /setTimeout/,
+      /setInterval/,
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(testFormula)) {
+        result.isValid = false;
+        result.error = 'Formula contains unsafe operations';
+        return result;
+      }
+    }
+
+    // Try to parse with mathjs
+    limitedMath.parse(testFormula);
+
+    return result;
+  } catch (error) {
+    result.isValid = false;
+    result.error = error instanceof Error ? error.message : 'Invalid formula syntax';
+    return result;
+  }
+}
+
+/**
+ * Format a number for display
+ * @param value The number to format
+ * @param options Formatting options
+ */
+export function formatCalculatedValue(
+  value: number,
+  options: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    locale?: string;
+  } = {}
+): string {
+  const {
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 4,
+    locale = 'en-US',
+  } = options;
+
+  return value.toLocaleString(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits,
+  });
 }
 
 /**
