@@ -229,4 +229,47 @@ limitedMath.evaluate(processedFormula)
 
 ## 📋 Summary
 
-The FormBuilder optimization project has transformed a monolithic, security-vulnerable component into a modular, secure, and performant system. The improvements benefit both developers and users, providing a solid foundation for future enhancements while maintaining backward compatibility. 
+The FormBuilder optimization project has transformed a monolithic, security-vulnerable component into a modular, secure, and performant system. The improvements benefit both developers and users, providing a solid foundation for future enhancements while maintaining backward compatibility.
+
+## 🔧 January 2025 Updates - Inventory Form Integration
+
+### Enhanced Inventory Calculation Support
+
+**Problem**: Forms were not properly synchronized with actual inventory data, causing discrepancies in calculations.
+
+**Solutions Implemented**:
+
+#### 1. Current Inventory Integration
+- Forms now receive `current_inventory` metadata from the asset
+- Calculations can reference actual inventory quantities
+- Prevents discrepancies between form display and inventory cards
+
+#### 2. Starting Inventory Logic
+- Monthly inventory forms use previous month's ending quantity as starting point
+- `starting_inventory` metadata passed to forms for accurate period calculations
+- Smart warnings based on expected vs actual inventory changes
+
+#### 3. Decimal Precision Handling
+- Forms support decimal input (e.g., 44.20 gallons)
+- System stores rounded values in database (integer constraint)
+- Exact decimal preserved in asset metadata as `exact_quantity_gallons`
+- Full precision maintained in inventory history records
+
+#### 4. Inventory Action Improvements
+- Form submissions with `inventory_action: 'set'` now properly update inventory
+- Both new and edited submissions trigger inventory updates
+- Direct integration between form calculations and inventory system
+
+### Technical Implementation
+- **SubmitForm.tsx**: Enhanced to fetch and pass inventory data
+- **FormRenderer.tsx**: Updated anomaly detection to use starting inventory
+- **Asset Metadata**: Enriched with inventory tracking fields
+- **History Records**: Preserve exact decimal values for reporting
+
+### User Benefits
+- Accurate inventory displays in forms
+- No more false warning messages
+- Support for liquid measurements with decimal precision
+- Seamless edit/update workflow for monthly checks
+
+See `docs/INVENTORY-FORM-FIXES.md` for detailed technical implementation. 

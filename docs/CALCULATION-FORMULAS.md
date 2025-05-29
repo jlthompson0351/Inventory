@@ -100,4 +100,51 @@ The formulas are stored in a JSONB object with the following structure:
 }
 ```
 
-This structure allows for flexibility in formula types while maintaining a consistent interface for both storage and application. 
+This structure allows for flexibility in formula types while maintaining a consistent interface for both storage and application.
+
+## Decimal Precision Handling (January 2025 Update)
+
+### Overview
+
+The system now fully supports decimal values in calculations, particularly important for liquid inventory measurements (e.g., gallons, liters).
+
+### Implementation Details
+
+1. **Form Input:**
+   - Forms accept decimal values (e.g., 44.20 gallons)
+   - Calculations preserve full decimal precision during processing
+
+2. **Database Storage:**
+   - Inventory quantity columns store integer values (database constraint)
+   - System automatically rounds decimal values for storage (e.g., 44.20 → 44)
+   - Exact decimal values preserved in multiple locations:
+     - Asset metadata: `exact_quantity_gallons`
+     - Inventory history: `response_data.exact_quantity`
+     - History notes: "Exact quantity: 44.20 gallons"
+
+3. **Display and Reporting:**
+   - UI shows rounded integer values in inventory cards
+   - Forms and reports can access exact decimal values from metadata
+   - Historical precision maintained for audit trails
+
+### Example Workflow
+
+1. **User enters:** 44.20 gallons in form
+2. **System stores:**
+   - `inventory_items.quantity`: 44 (rounded)
+   - `assets.metadata.exact_quantity_gallons`: 44.20
+   - `inventory_history.response_data`: { "total_gallons": 44.20, "exact_quantity": 44.20 }
+3. **Display shows:** "44 units" with exact value available for detailed views
+
+### Best Practices
+
+- Always use decimal-aware calculations for liquid measurements
+- Reference `exact_quantity_gallons` from metadata for precise reporting
+- Include units in field labels to clarify measurement type
+- Consider displaying both rounded and exact values in critical reports
+
+### Future Enhancements
+
+- Database schema migration to support decimal columns when possible
+- UI enhancement to display "44 units (44.20 gallons)" format
+- Configurable rounding rules per asset type 
