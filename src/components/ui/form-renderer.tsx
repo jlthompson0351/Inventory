@@ -115,6 +115,30 @@ export function FormRenderer({
     });
   }, [initialData]);
 
+  // Initialize calculated fields on first load
+  useEffect(() => {
+    if (Object.keys(formData).length > 0 && fields.length > 0) {
+      const updatedData = { ...formData };
+      let hasChanges = false;
+      
+      // Calculate all formula fields for initial display
+      fields.forEach(field => {
+        if (field.type === 'calculated' && field.formula) {
+          const calculatedValue = calculateFieldValue(field);
+          if (!updatedData[field.id] || updatedData[field.id] === '0.00') {
+            updatedData[field.id] = calculatedValue;
+            hasChanges = true;
+          }
+        }
+      });
+      
+      if (hasChanges) {
+        setFormData(updatedData);
+        checkInventoryAnomaly(updatedData);
+      }
+    }
+  }, [fields.length]); // Only run when fields are first loaded
+
   // Determine if a field should be visible based on dependencies
   const isFieldVisible = (fieldId: string): boolean => {
     const dependencies = fieldDependencies.filter(dep => dep.target_field_id === fieldId);
@@ -294,30 +318,7 @@ export function FormRenderer({
     }
   };
 
-  // Update calculated fields whenever form data changes
-  useEffect(() => {
-    const updatedData = { ...formData };
-    let hasChanges = false;
-    console.log('FormRenderer - formData for calculation:', formData);
-    
-    // Calculate all formula fields
-    fields.forEach(field => {
-      if (field.type === 'calculated' && field.formula) {
-        const calculatedValue = calculateFieldValue(field);
-        console.log(`FormRenderer - Calculated field ${field.id} (${field.label}): formula="${field.formula}", value=${calculatedValue}`);
-        if (updatedData[field.id] !== calculatedValue) {
-          updatedData[field.id] = calculatedValue;
-          hasChanges = true;
-        }
-      }
-    });
-    
-    if (hasChanges) {
-      setFormData(updatedData);
-      // Check for inventory anomalies after calculations
-      checkInventoryAnomaly(updatedData);
-    }
-  }, [formData, fields]);
+  // Calculations are now handled directly in handleChange to prevent double re-renders
 
   // Handle form change
   const handleChange = (fieldId: string, value: any) => {
@@ -391,6 +392,9 @@ export function FormRenderer({
     });
     
     setFormData(updatedData);
+    
+    // Check for inventory anomalies after calculations
+    checkInventoryAnomaly(updatedData);
     
     // Clear error for this field
     if (errors[fieldId]) {
@@ -520,7 +524,6 @@ export function FormRenderer({
         {field.type === 'number' && (
           <Input
             id={field.id}
-            key={`field-${field.id}-${formData[field.id]}`} 
             type="number"
             value={formData[field.id] || ''}
             onChange={(e) => handleChange(field.id, e.target.value)}
@@ -587,7 +590,7 @@ export function FormRenderer({
         {field.type === 'calculated' && (
           <Input
             id={field.id}
-            value={formData[field.id] || calculateFieldValue(field)}
+            value={formData[field.id] || '0.00'}
             readOnly
             disabled
             className="bg-muted"
