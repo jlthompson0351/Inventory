@@ -9,7 +9,11 @@ import {
   Info,
   AlertCircle,
   QrCode,
-  ClipboardCheck
+  ClipboardCheck,
+  Package,
+  Plus,
+  History,
+  Settings
 } from "lucide-react";
 import { 
   Card, 
@@ -37,17 +41,37 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/integrations/supabase/client";
-import { Asset } from "./Assets";
 import { generateAssetBarcode } from "@/services/inventoryService";
+import MobileQRCodeDisplay from "@/components/asset/MobileQRCodeDisplay";
 import QRCode from "qrcode.react";
 import { softDeleteAsset } from "@/services/assetService";
+
+// Local Asset interface definition
+interface Asset {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  serial_number?: string;
+  acquisition_date?: string;
+  barcode?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  organization_id: string;
+  asset_type_id: string;
+  parent_asset_id?: string;
+  created_by?: string;
+  asset_type_name?: string;
+  asset_type_color?: string;
+}
 
 interface FormSubmission {
   id: string;
   form_id: string;
   form_name?: string;
-  submission_data: Record<string, any>;
-  calculation_results: Record<string, any>;
+  submission_data: any; // Changed from Record<string, any> to handle Json type
+  calculation_results: any; // Changed from Record<string, any> to handle Json type
   status: string;
   created_at: string;
   created_by: string;
@@ -69,6 +93,7 @@ export default function AssetDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasInventoryItem, setHasInventoryItem] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   
   useEffect(() => {
     if (id && currentOrganization) {
@@ -133,17 +158,7 @@ export default function AssetDetail() {
       await fetchPendingForms(id);
       
       // Check if this asset already has an inventory item
-      const { data: inventoryData, error: inventoryError } = await supabase
-        .from('inventory_items')
-        .select('id')
-        .eq('asset_id', id)
-        .maybeSingle();
-        
-      if (inventoryError) {
-        console.error("Error checking inventory items:", inventoryError);
-      } else {
-        setHasInventoryItem(!!inventoryData);
-      }
+      await fetchInventoryData(id);
       
     } catch (error) {
       console.error("Error fetching asset data:", error);
@@ -232,6 +247,33 @@ export default function AssetDetail() {
       setPendingForms(data || []);
     } catch (error) {
       console.error("Error fetching pending forms:", error);
+    }
+  };
+  
+  const fetchInventoryData = async (assetId: string) => {
+    try {
+      const { data: inventoryData, error } = await supabase
+        .from('inventory_items')
+        .select(`
+          id,
+          quantity,
+          unit_type,
+          notes,
+          created_at,
+          updated_at,
+          created_by,
+          last_checked_at,
+          profiles!created_by(full_name, email)
+        `)
+        .eq('asset_id', assetId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setInventoryItems(inventoryData || []);
+      setHasInventoryItem(inventoryData && inventoryData.length > 0);
+    } catch (error) {
+      console.error("Error fetching inventory data:", error);
     }
   };
   
@@ -413,8 +455,8 @@ export default function AssetDetail() {
             variant="outline" 
             onClick={() => navigate(`/assets/${asset.id}/edit`)}
           >
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Asset
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
           </Button>
           
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -449,100 +491,11 @@ export default function AssetDetail() {
         </div>
       </div>
       
-      {/* QR Code Card - Either display QR code or a message to generate one */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
-            Asset QR Code
-          </CardTitle>
-          <CardDescription>
-            {asset.barcode 
-              ? "Scan this code with your phone to quickly perform intake or inventory actions" 
-              : "Generate a QR code to enable mobile scanning for this asset"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center items-center flex-col gap-4">
-          {asset.barcode ? (
-            <>
-              <div className="p-4 bg-white rounded-lg border">
-                <QRCode 
-                  value={asset.barcode} 
-                  size={200} 
-                  level="H" 
-                  includeMargin={true}
-                  renderAs="canvas"
-                  id="asset-qrcode"
-                />
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold mb-1">ID: {asset.id}</p>
-                <p className="text-sm text-muted-foreground mb-1">Barcode: {asset.barcode}</p>
-                <p className="text-sm text-muted-foreground mb-4">Type: {asset.asset_type_name}</p>
-                
-                {/* Mobile Scanning Instructions */}
-                <Alert className="mb-4 max-w-md">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Mobile Scanning</AlertTitle>
-                  <AlertDescription className="text-left space-y-2">
-                    <p>To use mobile scanning:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-sm">
-                      <li>Set up your 4-digit PIN in your profile settings</li>
-                      <li>Scan this QR code with your phone's camera</li>
-                      <li>Enter your PIN when prompted</li>
-                      <li>Choose to add inventory (intake) or perform inventory check</li>
-                    </ol>
-                  </AlertDescription>
-                </Alert>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    // Get the canvas element and convert it to a data URL
-                    const canvas = document.getElementById('asset-qrcode') as HTMLCanvasElement;
-                    if (canvas) {
-                      const dataUrl = canvas.toDataURL('image/png');
-                      const link = document.createElement('a');
-                      link.href = dataUrl;
-                      link.download = `${asset.id}-qrcode.png`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }
-                  }}
-                >
-                  Download QR Code
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <div className="mb-4 text-muted-foreground">
-                No QR code is available for this asset. QR codes are automatically generated for asset types that have them enabled.
-              </div>
-              <div className="flex justify-center gap-3">
-                <Button
-                  variant="default"
-                  onClick={handleGenerateBarcode}
-                >
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Generate QR Code
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/assets/${asset.id}/edit`)}
-                >
-                  Edit Asset
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="qr-code">QR Code</TabsTrigger>
           <TabsTrigger value="forms">Forms</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
@@ -557,81 +510,6 @@ export default function AssetDetail() {
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-1">Description</h3>
                   <p>{asset.description}</p>
-                </div>
-              )}
-              
-              {/* Inventory Section - Show current inventory and add check button */}
-              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-sm font-medium text-blue-800">Inventory Management</h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-blue-300 text-blue-800 hover:bg-blue-100"
-                    onClick={() => navigate(`/assets/${asset.id}/inventory-check`)}
-                  >
-                    <ClipboardCheck className="mr-2 h-4 w-4" />
-                    Perform Inventory Check
-                  </Button>
-                </div>
-                
-                {asset.metadata?.current_inventory !== undefined ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-lg font-semibold text-blue-900">
-                        {asset.metadata.current_inventory} {asset.metadata.unit_type || 'units'}
-                      </span>
-                      {asset.metadata.last_inventory_check && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Last checked: {new Date(asset.metadata.last_inventory_check).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-blue-700">
-                    No inventory records yet. Create one by performing an inventory check.
-                  </p>
-                )}
-              </div>
-              
-              {/* Add Inventory Button - only show if no inventory item exists */}
-              {!hasInventoryItem && assetType?.inventory_form_id && (
-                <div className="bg-green-50 p-4 rounded-md border border-green-200 mb-4">
-                  <h3 className="text-sm font-medium text-green-800 mb-1">Inventory Record</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-green-900">
-                      No inventory record exists for this asset
-                    </span>
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                      onClick={() => navigate(`/inventory/add-for-asset/${asset.id}`)}
-                    >
-                      Add Inventory
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              {/* If inventory exists, show a link to view it */}
-              {hasInventoryItem && (
-                <div className="bg-green-50 p-4 rounded-md border border-green-200 mb-4">
-                  <h3 className="text-sm font-medium text-green-800 mb-1">Inventory Record</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-green-900">
-                      This asset has an inventory record
-                    </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-green-300 text-green-800 hover:bg-green-100"
-                      onClick={() => navigate(`/inventory?assetId=${asset.id}`)}
-                    >
-                      View Inventory
-                    </Button>
-                  </div>
                 </div>
               )}
               
@@ -688,6 +566,156 @@ export default function AssetDetail() {
           </Card>
         </TabsContent>
         
+        <TabsContent value="inventory" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Quick Actions */}
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  className="w-full"
+                  onClick={() => navigate(`/inventory/add-for-asset/${asset.id}`)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Inventory
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate(`/assets/${asset.id}/inventory-check`)}
+                >
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  Inventory Check
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate(`/inventory?assetId=${asset.id}`)}
+                >
+                  <History className="mr-2 h-4 w-4" />
+                  View All Records
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Current Inventory Status */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Current Inventory Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {inventoryItems.length > 0 ? (
+                  <div className="space-y-4">
+                    {inventoryItems.slice(0, 3).map((item) => (
+                      <div key={item.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-semibold text-lg">
+                              {item.quantity} {item.unit_type || 'units'}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Added: {new Date(item.created_at).toLocaleDateString()}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              By: {item.profiles?.full_name || item.profiles?.email || 'Unknown'}
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => navigate(`/inventory/item/${item.id}`)}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                        {item.notes && (
+                          <div className="text-sm text-muted-foreground mt-2">
+                            Notes: {item.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {inventoryItems.length > 3 && (
+                      <Button 
+                        variant="ghost" 
+                        className="w-full"
+                        onClick={() => navigate(`/inventory?assetId=${asset.id}`)}
+                      >
+                        View {inventoryItems.length - 3} more records...
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <h3 className="text-lg font-semibold mb-2">No Inventory Records</h3>
+                    <p className="text-muted-foreground mb-4">
+                      This asset doesn't have any inventory records yet.
+                    </p>
+                    <Button onClick={() => navigate(`/inventory/add-for-asset/${asset.id}`)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add First Inventory Record
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="qr-code" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5" />
+                Mobile QR Code
+              </CardTitle>
+              <CardDescription>
+                Generate and manage QR codes for mobile asset workflow
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MobileQRCodeDisplay 
+                assetId={asset.id}
+                assetName={asset.name}
+                size="large"
+                showControls={true}
+                className="w-full"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Mobile Workflow Instructions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Mobile Workflow Instructions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>How to use Mobile QR Workflow</AlertTitle>
+                <AlertDescription className="space-y-2 mt-2">
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Set up your 4-digit PIN in your profile settings</li>
+                    <li>Print or display the QR code above</li>
+                    <li>Scan the QR code with any smartphone camera</li>
+                    <li>Enter your PIN when prompted</li>
+                    <li>Choose from available workflow options (inventory check, intake forms, etc.)</li>
+                  </ol>
+                  <p className="mt-3 text-sm font-medium">
+                    ✅ No app installation required - works in any mobile browser!
+                  </p>
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="forms" className="space-y-6">
           {pendingForms.length > 0 && (
             <Card>

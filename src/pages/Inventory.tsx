@@ -5,15 +5,18 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus, Filter, Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import AssetList from "@/components/inventory/AssetList";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import InventoryList from "@/components/inventory/InventoryList";
 
-// Basic minimal Inventory page
+// Inventory management page focused on inventory items, not assets
 export default function Inventory() {
   const { currentOrganization, isLoading } = useOrganization();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  console.log("Inventory.tsx minimal version rendering");
+  console.log("Inventory.tsx rendering with InventoryList component");
   console.log("- isLoading:", isLoading);
   console.log("- currentOrganization:", currentOrganization);
 
@@ -23,6 +26,10 @@ export default function Inventory() {
 
   const handleBrowseAssets = () => {
     navigate("/inventory/browse-assets");
+  };
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
   };
 
   if (isLoading) {
@@ -95,7 +102,7 @@ export default function Inventory() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-green-500">
+            <Card className="border-l-4 border-l-amber-500">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -136,7 +143,7 @@ export default function Inventory() {
                 <div>
                   <CardTitle>Inventory Items</CardTitle>
                   <CardDescription>
-                    This is a minimal working version of the Inventory page.
+                    Manage your inventory with quantity tracking, stock levels, and usage monitoring.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -151,11 +158,19 @@ export default function Inventory() {
                       <Search className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                  </Button>
-                  <Button variant="outline" size="sm">
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="Paint">Paint</SelectItem>
+                      <SelectItem value="Tools">Tools</SelectItem>
+                      <SelectItem value="Materials">Materials</SelectItem>
+                      <SelectItem value="Supplies">Supplies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={handleRefresh}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
@@ -163,7 +178,12 @@ export default function Inventory() {
               </div>
             </CardHeader>
             <CardContent>
-              <AssetList organizationId={currentOrganization.id} />
+              <InventoryList 
+                key={refreshKey}
+                organizationId={currentOrganization.id}
+                searchTerm={searchTerm}
+                categoryFilter={categoryFilter === "all" ? "" : categoryFilter}
+              />
             </CardContent>
           </Card>
         </CardContent>

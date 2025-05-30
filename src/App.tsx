@@ -38,6 +38,7 @@ import BarcodeDemo from "./pages/BarcodeDemo";
 import SubmitForm from "./pages/SubmitForm";
 import InventoryCheck from "./pages/InventoryCheck";
 import QRScanHandler from "./pages/QRScanHandler";
+import MobileAssetWorkflow from "./pages/MobileAssetWorkflow";
 
 // New inventory workflow pages
 import InventoryAddSelectionPage from "./pages/InventoryAddSelection";
@@ -47,6 +48,7 @@ import DynamicInventoryFormPage from "./pages/DynamicInventoryForm";
 import AddInventoryPage from "./pages/AddInventoryPage";
 import AddInventoryForAssetPage from "./pages/AddInventoryForAssetPage";
 import InventoryActionSelectorPage from "./pages/InventoryActionSelectorPage";
+import InventoryHistory from "./pages/InventoryHistory";
 
 import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 
@@ -100,6 +102,9 @@ const AppRoutes = () => {
         <Route path="/invitation" element={<InvitationAccept />} />
         <Route path="/qr/:code" element={<QRScanHandler />} />
         
+        {/* Mobile QR Workflow - accessible without traditional login (uses PIN) */}
+        <Route path="/mobile/asset/:assetId" element={<MobileAssetWorkflow />} />
+        
         {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
         <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />
         
@@ -128,6 +133,7 @@ const AppRoutes = () => {
         <Route path="/inventory/browse-assets" element={user ? <PageLayout><AssetTypeBrowserPage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/asset-type/:assetTypeId" element={user ? <PageLayout><AssetListByTypePage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/item/:id" element={user ? <PageLayout><InventoryItemDetail /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/:inventoryItemId/history" element={user ? <PageLayout><InventoryHistory /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/edit/:id" element={user ? <PageLayout><EditInventoryItem /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Form Management Routes */}

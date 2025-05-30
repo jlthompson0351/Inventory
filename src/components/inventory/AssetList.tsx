@@ -279,26 +279,19 @@ export default function AssetList({
     return clearLoadingStates;
   }, [assets]); // Reset when assets change
 
-  // Memoized handlers for asset actions to prevent recreation on every render
+  // Simplified handler for asset edit - goes to comprehensive asset detail page
   const handleEdit = useCallback((asset: Asset) => {
     try {
       setButtonLoading(`edit-${asset.id}`);
       if (onEdit) {
         onEdit(asset);
       } else {
-        // NEW: Edit latest inventory record instead of asset
-        if (asset.has_inventory && asset.inventory_items && asset.inventory_items.length > 0) {
-          const inventoryId = asset.inventory_items[0].id;
-          // Navigate to edit the inventory item (latest record)
-          navigate(`/inventory/edit/${inventoryId}`);
-        } else {
-          // No inventory yet - create first inventory for this asset
-          navigate(`/inventory/add-for-asset/${asset.id}`);
-        }
+        // Navigate to comprehensive asset detail page
+        navigate(`/assets/${asset.id}`);
       }
     } catch (err) {
-      console.error("[AssetList] Error navigating to edit inventory:", err);
-      setError("Failed to navigate to inventory edit page");
+      console.error("[AssetList] Error navigating to asset detail:", err);
+      setError("Failed to navigate to asset detail page");
       setButtonLoading(null);
     }
   }, [navigate, onEdit]);
@@ -391,7 +384,7 @@ export default function AssetList({
   return (
     <div className="space-y-4">
       {displayAssets.map((asset) => (
-        <Card key={asset.id} className="overflow-hidden">
+        <Card key={asset.id} className="overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex justify-between items-start">
               <div>
@@ -483,65 +476,18 @@ export default function AssetList({
                   </p>
                 )}
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2 sm:space-y-0">
-                <div className="flex flex-wrap gap-1 sm:gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleView(asset)}
-                    disabled={buttonLoading === `view-${asset.id}`}
-                    title={asset.has_inventory ? "View inventory history and intake records" : "View asset details and create inventory"}
-                    className="flex-1 sm:flex-none min-w-0"
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    <span className="truncate">{buttonLoading === `view-${asset.id}` ? "Loading..." : asset.has_inventory ? "History" : "View"}</span>
-                  </Button>
-                  {asset.has_inventory && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-green-300 text-green-700 hover:bg-green-50 flex-1 sm:flex-none min-w-0"
-                      disabled={buttonLoading === `inventory-${asset.id}`}
-                      onClick={() => {
-                        setButtonLoading(`inventory-${asset.id}`);
-                        // If we have the inventory item ID from the joined data, go directly to the item detail
-                        if (asset.inventory_items && asset.inventory_items.length > 0) {
-                          navigate(`/inventory/item/${asset.inventory_items[0].id}`);
-                        } else {
-                          // Fallback to inventory page with asset filter
-                          navigate(`/inventory?assetId=${asset.id}`);
-                        }
-                      }}
-                      title="View inventory item details and perform checks"
-                    >
-                      <span className="truncate">📦 Inventory</span>
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-1 sm:gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleEdit(asset)}
-                    disabled={buttonLoading === `edit-${asset.id}`}
-                    title={asset.has_inventory ? "Edit latest inventory record" : "Create first inventory record"}
-                    className="flex-1 sm:flex-none min-w-0"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    <span className="truncate">{buttonLoading === `edit-${asset.id}` ? "Loading..." : asset.has_inventory ? "Edit Inventory" : "Add Inventory"}</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive flex-1 sm:flex-none min-w-0"
-                    onClick={() => handleDelete(asset)}
-                    disabled={buttonLoading === `delete-${asset.id}`}
-                    title="Delete this asset and all related inventory"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    <span className="truncate">Delete</span>
-                  </Button>
-                </div>
+              <div className="flex items-center">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => handleEdit(asset)}
+                  disabled={buttonLoading === `edit-${asset.id}`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  title="Edit asset details, manage inventory, forms, and QR codes"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {buttonLoading === `edit-${asset.id}` ? "Loading..." : "Edit"}
+                </Button>
               </div>
             </div>
           </CardContent>
