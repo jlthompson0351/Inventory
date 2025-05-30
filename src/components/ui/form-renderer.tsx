@@ -119,20 +119,27 @@ export function FormRenderer({
   useEffect(() => {
     if (Object.keys(formData).length > 0 && fields.length > 0) {
       const updatedData = { ...formData };
-      let hasChanges = false;
+      let hasChanges = true;
+      let iterations = 0;
+      const MAX_ITERATIONS = 10;
       
-      // Calculate all formula fields for initial display
-      fields.forEach(field => {
-        if (field.type === 'calculated' && field.formula) {
-          const calculatedValue = calculateFieldValue(field);
-          if (!updatedData[field.id] || updatedData[field.id] === '0.00') {
-            updatedData[field.id] = calculatedValue;
-            hasChanges = true;
+      // Calculate all formula fields with cascading support
+      while (hasChanges && iterations < MAX_ITERATIONS) {
+        hasChanges = false;
+        iterations++;
+        
+        fields.forEach(field => {
+          if (field.type === 'calculated' && field.formula) {
+            const calculatedValue = calculateFieldValue(field);
+            if (!updatedData[field.id] || updatedData[field.id] !== calculatedValue) {
+              updatedData[field.id] = calculatedValue;
+              hasChanges = true;
+            }
           }
-        }
-      });
+        });
+      }
       
-      if (hasChanges) {
+      if (hasChanges || iterations > 1) {
         setFormData(updatedData);
         checkInventoryAnomaly(updatedData);
       }
@@ -318,8 +325,6 @@ export function FormRenderer({
     }
   };
 
-  // Calculations are now handled directly in handleChange to prevent double re-renders
-
   // Handle form change
   const handleChange = (fieldId: string, value: any) => {
     console.log(`FormRenderer - handleChange for ${fieldId}, new value: ${value}`);
@@ -345,28 +350,33 @@ export function FormRenderer({
     
     const updatedData = { ...formData, [fieldId]: value };
     
-    // Calculate formula fields that depend on this field using secure evaluator
-    fields.forEach(field => {
-      if (field.type === 'calculated' && field.formula) {
-        try {
-          // Check if this formula depends on the changed field
-          if (field.formula.includes(`{${fieldId}}`)) {
-            // Create context object for evaluation
+    // Calculate ALL formula fields with cascading support
+    // This ensures all calculated fields update properly, even with complex dependencies
+    let hasChanges = true;
+    let iterations = 0;
+    const MAX_ITERATIONS = 10; // Prevent infinite loops
+    
+    console.log('FormRenderer - Starting calculation pass for all calculated fields');
+    
+    while (hasChanges && iterations < MAX_ITERATIONS) {
+      hasChanges = false;
+      iterations++;
+      console.log(`FormRenderer - Calculation iteration ${iterations}`);
+      
+      fields.forEach(field => {
+        if (field.type === 'calculated' && field.formula) {
+          try {
+            // Create context object for evaluation with ALL current values
             const context: FormulaContext = {
               fields: {},
               mappedFields: {}
             };
             
-            // Add all field values to context
+            // Add all field values to context (including other calculated fields)
             fields.forEach(f => {
-              context.fields[f.id] = f.id === fieldId ? value : updatedData[f.id] || 0;
-            });
-            
-            // Ensure all values are numeric
-            Object.keys(context.fields).forEach(key => {
-              const val = context.fields[key];
-              const stringVal = String(val);
-              context.fields[key] = (stringVal === '' || val === null || val === undefined) ? 0 : Number(val) || 0;
+              const currentValue = updatedData[f.id];
+              // Convert to number, default to 0 for empty/invalid values
+              context.fields[f.id] = (currentValue === '' || currentValue === null || currentValue === undefined) ? 0 : Number(currentValue) || 0;
             });
             
             // Add mapped fields from props
@@ -378,18 +388,31 @@ export function FormRenderer({
             // Use secure formula evaluator
             const result = evaluateFormula(field.formula, context);
             if (result.success) {
-              updatedData[field.id] = Number(result.result).toFixed(2);
+              const newValue = Number(result.result).toFixed(2);
+              
+              // Check if value changed
+              if (updatedData[field.id] !== newValue) {
+                console.log(`FormRenderer - Calculated field ${field.id} changed from ${updatedData[field.id]} to ${newValue}`);
+                updatedData[field.id] = newValue;
+                hasChanges = true; // Mark that we need another iteration
+              }
             } else {
               console.error('Formula evaluation error:', (result as { success: false; error: string }).error);
               updatedData[field.id] = '0.00';
             }
+          } catch (e) {
+            console.error('Formula evaluation error:', e);
+            updatedData[field.id] = '0.00';
           }
-        } catch (e) {
-          console.error('Formula evaluation error:', e);
-          updatedData[field.id] = '0.00';
         }
-      }
-    });
+      });
+    }
+    
+    if (iterations >= MAX_ITERATIONS) {
+      console.warn('FormRenderer - Maximum calculation iterations reached. Possible circular dependency.');
+    } else {
+      console.log(`FormRenderer - Calculations completed in ${iterations} iteration(s)`);
+    }
     
     setFormData(updatedData);
     
@@ -620,6 +643,31 @@ export function FormRenderer({
       </div>
     );
   };
+
+  // Debug helper - expose current form state to window for debugging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__debugFormState = () => {
+        console.log('=== Form Debug Info ===');
+        console.log('Form Data:', formData);
+        console.log('Mapped Fields:', mappedFields);
+        console.log('Fields:', fields);
+        console.log('Calculated Fields:', fields.filter(f => f.type === 'calculated').map(f => ({
+          id: f.id,
+          label: f.label,
+          formula: f.formula,
+          value: formData[f.id]
+        })));
+        console.log('======================');
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).__debugFormState;
+      }
+    };
+  }, [formData, mappedFields, fields]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

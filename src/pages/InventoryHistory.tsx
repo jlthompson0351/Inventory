@@ -204,18 +204,58 @@ export default function InventoryHistory() {
     return Array.from(years).sort().reverse();
   }, [allEvents]);
 
-  // Get quantity change for an event
+  // Get quantity change for an event with anomaly detection
   const getQuantityChange = (event: InventoryEvent, index: number) => {
     if (index === allEvents.length - 1) return null; // First event (intake)
     
     const previousEvent = allEvents[index + 1];
     const change = event.quantity - previousEvent.quantity;
     
+    // Anomaly detection
+    const anomalies = [];
+    
+    // Check for massive unexpected increases
+    if (change > 50) {
+      anomalies.push({
+        type: 'massive_increase',
+        message: `Huge increase (+${change} units) - possible typo?`,
+        severity: 'high'
+      });
+    }
+    
+    // Check for exact multiples of 100 (common typing errors)
+    if (Math.abs(change) === 100) {
+      anomalies.push({
+        type: 'exact_hundred',
+        message: 'Exact 100 unit change - possible extra digit?',
+        severity: 'medium'
+      });
+    }
+    
+    // Check for impossible increases without intake
+    if (change > 20 && event.event_type !== 'intake' && event.event_type !== 'addition') {
+      anomalies.push({
+        type: 'unexpected_increase',
+        message: 'Inventory increased without recorded intake',
+        severity: 'medium'
+      });
+    }
+    
+    // Check for percentage jumps > 150%
+    if (previousEvent.quantity > 0 && (event.quantity / previousEvent.quantity) > 2.5) {
+      anomalies.push({
+        type: 'percentage_jump',
+        message: `${Math.round((event.quantity / previousEvent.quantity) * 100)}% increase - verify accuracy`,
+        severity: 'high'
+      });
+    }
+    
     return {
       value: Math.abs(change),
       isPositive: change >= 0,
       previous: previousEvent.quantity,
-      current: event.quantity
+      current: event.quantity,
+      anomalies: anomalies
     };
   };
 
@@ -390,12 +430,29 @@ export default function InventoryHistory() {
                 const change = getQuantityChange(event, filteredEvents.length - 1 - index);
                 
                 return (
-                  <Card key={event.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <Card key={event.id} className={`overflow-hidden hover:shadow-md transition-shadow ${
+                    change?.anomalies && change.anomalies.length > 0 
+                      ? change.anomalies.some(a => a.severity === 'high') 
+                        ? 'border-red-300 bg-red-50' 
+                        : 'border-orange-300 bg-orange-50'
+                      : ''
+                  }`}>
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between mb-2">
-                        <Badge className={eventInfo.color}>
-                          {eventInfo.icon} {eventInfo.label}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className={eventInfo.color}>
+                            {eventInfo.icon} {eventInfo.label}
+                          </Badge>
+                          {change?.anomalies && change.anomalies.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {change.anomalies.some(a => a.severity === 'high') ? (
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                              ) : (
+                                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {event.event_type !== 'intake' && (
                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                             <Edit className="h-3 w-3" />
@@ -408,6 +465,22 @@ export default function InventoryHistory() {
                     </CardHeader>
                     
                     <CardContent className="pt-0 space-y-3">
+                      {/* Anomaly Warnings */}
+                      {change?.anomalies && change.anomalies.length > 0 && (
+                        <div className="space-y-1">
+                          {change.anomalies.map((anomaly, i) => (
+                            <div key={i} className={`text-xs p-2 rounded flex items-center gap-1 ${
+                              anomaly.severity === 'high' 
+                                ? 'bg-red-100 text-red-800 border border-red-200' 
+                                : 'bg-orange-100 text-orange-800 border border-orange-200'
+                            }`}>
+                              <AlertTriangle className="h-3 w-3" />
+                              {anomaly.message}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Quantity Change */}
                       <div className="space-y-2">
                         {change && (
@@ -420,7 +493,11 @@ export default function InventoryHistory() {
                           <span className="text-lg font-bold">{event.quantity} units</span>
                           {change && (
                             <div className={`flex items-center gap-1 ${
-                              change.isPositive ? 'text-green-600' : 'text-red-600'
+                              change.anomalies && change.anomalies.length > 0
+                                ? change.anomalies.some(a => a.severity === 'high') 
+                                  ? 'text-red-600' 
+                                  : 'text-orange-600'
+                                : change.isPositive ? 'text-green-600' : 'text-red-600'
                             }`}>
                               {change.isPositive ? (
                                 <ArrowUp className="h-3 w-3" />
