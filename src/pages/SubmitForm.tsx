@@ -9,10 +9,12 @@ import {
   Calculator,
   Calendar,
   Plus,
-  Edit 
+  Edit,
+  Package
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { getFormWithRelatedData } from "@/services/formService";
 import { submitForm } from "@/services/formSubmissionService";
@@ -41,6 +43,7 @@ export default function SubmitForm() {
   const [assetMetadata, setAssetMetadata] = useState<Record<string, any>>({});
   const [mergedFormData, setMergedFormData] = useState<Record<string, any>>({});
   const [fetchedAssetTypeId, setFetchedAssetTypeId] = useState<string | null>(null);
+  const [assetDetails, setAssetDetails] = useState<any>(null); // Store full asset details
   
   // New states for monthly inventory tracking
   const [existingSubmissionId, setExistingSubmissionId] = useState<string | null>(null);
@@ -54,8 +57,8 @@ export default function SubmitForm() {
   
   // Retrieve QR code scan context if available (from navigation state or URL params)
   const assetId = location.state?.assetId || urlAssetId;
-  const assetName = location.state?.assetName;
-  const assetTypeId = location.state?.assetTypeId;
+  const assetName = location.state?.assetName || assetDetails?.name;
+  const assetTypeId = location.state?.assetTypeId || assetDetails?.asset_type_id;
   const formType = location.state?.formType || urlFormType || 'generic';
   
   // Stabilize these objects to prevent infinite re-renders
@@ -105,6 +108,8 @@ export default function SubmitForm() {
                 
               if (!assetError && fetchedAssetData) {
                 assetDataForEffect = fetchedAssetData;
+                setAssetDetails(fetchedAssetData); // Store asset details for header
+                
                 // Store the asset type ID for later use
                 if (fetchedAssetData.asset_type_id) {
                   setFetchedAssetTypeId(fetchedAssetData.asset_type_id);
@@ -225,14 +230,25 @@ export default function SubmitForm() {
                 console.log('SubmitForm - Found conversion_fields in asset_type:', assetTypeData.conversion_fields);
                 const conversionFields = assetTypeData.conversion_fields as any[];
                 const metadataWithDefaults = { ...currentAssetMetadata }; // Start with current asset's metadata
-                conversionFields.forEach(cf => {
-                  if (cf.field_name && !(cf.field_name in metadataWithDefaults)) {
-                    console.warn(`SubmitForm - Adding default (0) for missing conversion field: ${cf.field_name}`);
-                    metadataWithDefaults[cf.field_name] = 0; 
-                  }
-                });
+                
+                // Process conversion fields and add them to metadata
+                if (Array.isArray(conversionFields)) {
+                  conversionFields.forEach(cf => {
+                    if (cf.field_name) {
+                      // Check if the field exists in asset metadata, otherwise use default
+                      if (!(cf.field_name in metadataWithDefaults)) {
+                        const defaultValue = cf.default_value !== undefined ? cf.default_value : 0;
+                        console.warn(`SubmitForm - Adding default (${defaultValue}) for missing conversion field: ${cf.field_name}`);
+                        metadataWithDefaults[cf.field_name] = defaultValue;
+                      } else {
+                        console.log(`SubmitForm - Using existing value for conversion field ${cf.field_name}:`, metadataWithDefaults[cf.field_name]);
+                      }
+                    }
+                  });
+                }
+                
                 currentAssetMetadata = metadataWithDefaults;
-                console.log('SubmitForm - assetMetadata after adding conversion defaults:', currentAssetMetadata);
+                console.log('SubmitForm - assetMetadata after adding conversion fields:', currentAssetMetadata);
               } else {
                 console.log('SubmitForm - No conversion_fields found for asset_type_id:', actualAssetTypeId);
               }
@@ -298,6 +314,13 @@ export default function SubmitForm() {
           
           console.log('SubmitForm - Final assetMetadata for FormRenderer:', currentAssetMetadata);
           console.log('SubmitForm - Final formData for FormRenderer:', finalMergedData);
+          
+          // Debug: Show what will be passed as mappedFields
+          console.log('SubmitForm - Mapped fields for calculations:', currentAssetMetadata);
+          console.log('SubmitForm - Available conversion fields in mappedFields:');
+          Object.entries(currentAssetMetadata).forEach(([key, value]) => {
+            console.log(`  - ${key}: ${value} (type: ${typeof value})`);
+          });
           
           let debugFormFields: any[] = [];
           if (fetchedForm?.form_data) {
@@ -617,9 +640,22 @@ export default function SubmitForm() {
         <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">{form.name}</h1>
-          <p className="text-muted-foreground">{form.description || 'Complete and submit this form'}</p>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-bold">{form.name}</h1>
+            {assetName && (
+              <Badge variant="secondary" className="px-3 py-1">
+                <Package className="h-3 w-3 mr-1" />
+                {assetName}
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            {assetName 
+              ? `${form.description || 'Complete this form'} for ${assetName}`
+              : form.description || 'Complete and submit this form'
+            }
+          </p>
         </div>
       </div>
       
