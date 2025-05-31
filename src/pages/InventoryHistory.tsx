@@ -22,7 +22,8 @@ import {
   Edit,
   Clock,
   Target,
-  Zap
+  Zap,
+  RefreshCw
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getAllInventoryHistory, getInventoryItem } from "@/services/inventoryService";
@@ -35,6 +36,9 @@ import {
   InventoryEvent as AnomalyInventoryEvent
 } from "@/utils/anomalyDetection";
 import { QuickFixCard } from "@/components/inventory/QuickFixCard";
+import { supabase } from "@/integrations/supabase/client";
+import { clearAssetCacheForOrg } from "@/components/inventory/AssetList";
+import { useToast } from "@/components/ui/use-toast";
 
 interface InventoryEvent {
   id: string;
@@ -74,6 +78,7 @@ interface EventWithAnomalies extends InventoryEvent {
 export default function InventoryHistory() {
   const { inventoryItemId } = useParams<{ inventoryItemId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [inventoryItem, setInventoryItem] = useState<any>(null);
   const [allEvents, setAllEvents] = useState<InventoryEvent[]>([]);
@@ -88,6 +93,9 @@ export default function InventoryHistory() {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlyAnomalies, setShowOnlyAnomalies] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [verificationFilter, setVerificationFilter] = useState<string>("all");
+  const [quantityFilter, setQuantityFilter] = useState<string>("all");
 
   // Performance optimization: Pre-calculate event index map
   const eventIndexMap = useMemo(() => {
@@ -104,8 +112,9 @@ export default function InventoryHistory() {
     
     // Filter out obvious anomalies for accurate trend calculation
     const cleanEvents = allEvents.filter(event => {
-      // Remove events with quantities > 100 (likely anomalies for this paint asset)
-      return event.quantity <= 100;
+      // Remove the massive intake event (15514) and other obvious anomalies
+      // Keep only normal measurement events (under 1000 units for paint)
+      return event.quantity <= 1000 && event.event_type !== 'intake';
     });
     
     if (cleanEvents.length < 2) return null;
@@ -130,27 +139,80 @@ export default function InventoryHistory() {
   }, [inventoryItemId]);
 
   const loadInventoryData = async () => {
+    if (!inventoryItemId) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
+      // Clear any cached data to force fresh fetch
+      if (inventoryItem?.asset?.organization_id) {
+        clearAssetCacheForOrg(inventoryItem.asset.organization_id);
+      }
       
-      // Load inventory item details
-      const item = await getInventoryItem(inventoryItemId!);
-      setInventoryItem(item);
+      // Force refresh inventory item details from database
+      const { data: freshInventoryItem, error: itemError } = await supabase
+        .from('inventory_items')
+        .select(`
+          *,
+          asset:assets(
+            id,
+            name,
+            organization_id,
+            asset_type:asset_types(id, name)
+          )
+        `)
+        .eq('id', inventoryItemId)
+        .single();
+        
+      if (itemError) {
+        throw new Error(`Failed to load inventory item: ${itemError.message}`);
+      }
       
-      // Load all history events
-      const events = await getAllInventoryHistory(inventoryItemId!);
-      const sortedEvents = events.sort((a: any, b: any) => 
-        new Date(b.check_date).getTime() - new Date(a.check_date).getTime()
-      );
-      setAllEvents(sortedEvents);
+      setInventoryItem(freshInventoryItem);
+      
+      // Clear cache for this organization too
+      if (freshInventoryItem?.asset?.organization_id) {
+        clearAssetCacheForOrg(freshInventoryItem.asset.organization_id);
+      }
+      
+      // Load all inventory history
+      const history = await getAllInventoryHistory(inventoryItemId);
+      setAllEvents(history);
+      
+      // Check for verified events in the database
+      const verifiedEventIds = new Set<string>();
+      history.forEach(event => {
+        try {
+          const responseData = event.response_data;
+          if (responseData && typeof responseData === 'object') {
+            const data = responseData as Record<string, any>;
+            // Mark as verified if explicitly verified OR if a fix has been applied
+            if (data.verified?.status === 'verified' || data.fix_applied) {
+              verifiedEventIds.add(event.id);
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      });
+      setVerifiedEvents(verifiedEventIds);
       
     } catch (err) {
-      console.error("Error loading inventory data:", err);
-      setError("Failed to load inventory history");
+      console.error('Failed to load inventory data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load inventory data');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handler for manual refresh button
+  const handleRefresh = async () => {
+    await loadInventoryData();
+    toast({
+      title: "Data Refreshed",
+      description: "Inventory data has been updated successfully",
+    });
   };
 
   // Enhanced anomaly detection with asset type
@@ -263,6 +325,43 @@ export default function InventoryHistory() {
       );
     }
 
+    // Filter by verification status
+    if (verificationFilter !== "all") {
+      filtered = filtered.filter(event => {
+        const isVerified = verifiedEvents.has(event.id);
+        const hasAnomalies = event.anomalies.length > 0 && !dismissedAnomalies.has(event.id);
+        
+        switch (verificationFilter) {
+          case 'verified':
+            return isVerified;
+          case 'has_issues':
+            return hasAnomalies;
+          case 'normal':
+            return !isVerified && !hasAnomalies;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Filter by quantity range
+    if (quantityFilter !== "all") {
+      filtered = filtered.filter(event => {
+        switch (quantityFilter) {
+          case 'low':
+            return event.quantity < 100;
+          case 'medium':
+            return event.quantity >= 100 && event.quantity < 1000;
+          case 'high':
+            return event.quantity >= 1000;
+          case 'exact_measurements':
+            return event.response_data?.exact_quantity !== undefined;
+          default:
+            return true;
+        }
+      });
+    }
+
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(event => 
@@ -279,8 +378,15 @@ export default function InventoryHistory() {
       );
     }
 
+    // Apply sort order
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.check_date).getTime();
+      const dateB = new Date(b.check_date).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
     setFilteredEvents(filtered);
-  }, [processedEvents, eventTypeFilter, yearFilter, searchTerm, showOnlyAnomalies, dismissedAnomalies]);
+  }, [processedEvents, eventTypeFilter, yearFilter, verificationFilter, quantityFilter, searchTerm, showOnlyAnomalies, sortOrder, dismissedAnomalies, verifiedEvents]);
 
   // Calculate enhanced statistics
   const stats: InventoryStats = useMemo(() => {
@@ -410,6 +516,28 @@ export default function InventoryHistory() {
     setDismissedAnomalies(prev => new Set(prev).add(eventId));
   };
 
+  // Helper to safely get exact quantity from response_data
+  const getExactQuantity = (event: InventoryEvent): string => {
+    try {
+      if (event.response_data && typeof event.response_data === 'object') {
+        const data = event.response_data as Record<string, any>;
+        if (data.exact_quantity && typeof data.exact_quantity === 'number') {
+          // Check if this is a liquid asset (paint, chemical, etc.)
+          const isLiquidAsset = inventoryItem?.asset?.asset_type?.name?.toLowerCase().includes('paint') ||
+                               inventoryItem?.asset?.asset_type?.name?.toLowerCase().includes('chemical') ||
+                               inventoryItem?.asset?.asset_type?.name?.toLowerCase().includes('coating');
+          
+          if (isLiquidAsset) {
+            return `${data.exact_quantity} gallons`;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors and fall back to default
+    }
+    return `${event.quantity} units`;
+  };
+
   if (loading) {
     return (
       <div className="container py-6">
@@ -442,8 +570,15 @@ export default function InventoryHistory() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Inventory History</h1>
-          <p className="text-muted-foreground">{inventoryItem.name}</p>
+          <p className="text-muted-foreground">
+            {inventoryItem?.name} - Current: {inventoryItem?.quantity ? `${inventoryItem.quantity} units` : 'Loading...'}
+          </p>
         </div>
+        
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
         
         {/* Anomaly Summary */}
         {totalAnomalies > 0 && (
@@ -474,24 +609,64 @@ export default function InventoryHistory() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            {/* Sort Order */}
+            <Select value={sortOrder} onValueChange={(value: 'newest' | 'oldest') => setSortOrder(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">🕒 Newest First</SelectItem>
+                <SelectItem value="oldest">⏰ Oldest First</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Event Type */}
             <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Event Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Events</SelectItem>
-                <SelectItem value="intake">Intake</SelectItem>
-                <SelectItem value="check">Check</SelectItem>
-                <SelectItem value="audit">Audit</SelectItem>
-                <SelectItem value="addition">Addition</SelectItem>
-                <SelectItem value="removal">Removal</SelectItem>
-                <SelectItem value="transfer">Transfer</SelectItem>
-                <SelectItem value="disposal">Disposal</SelectItem>
-                <SelectItem value="adjustment">Adjustment</SelectItem>
+                <SelectItem value="intake">📦 Intake</SelectItem>
+                <SelectItem value="check">✅ Check</SelectItem>
+                <SelectItem value="audit">🔍 Audit</SelectItem>
+                <SelectItem value="addition">➕ Addition</SelectItem>
+                <SelectItem value="removal">➖ Removal</SelectItem>
+                <SelectItem value="transfer">🔄 Transfer</SelectItem>
+                <SelectItem value="disposal">🗑️ Disposal</SelectItem>
+                <SelectItem value="adjustment">⚖️ Adjustment</SelectItem>
               </SelectContent>
             </Select>
 
+            {/* Verification Status */}
+            <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="verified">✅ Verified</SelectItem>
+                <SelectItem value="has_issues">⚠️ Has Issues</SelectItem>
+                <SelectItem value="normal">📋 Normal</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Quantity Range */}
+            <Select value={quantityFilter} onValueChange={setQuantityFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Quantity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Quantities</SelectItem>
+                <SelectItem value="low">🔻 Low (&lt;100)</SelectItem>
+                <SelectItem value="medium">📊 Medium (100-1000)</SelectItem>
+                <SelectItem value="high">📈 High (&gt;1000)</SelectItem>
+                <SelectItem value="exact_measurements">🎯 Exact Measurements</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Year Filter */}
             <Select value={yearFilter} onValueChange={setYearFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Year" />
@@ -504,17 +679,89 @@ export default function InventoryHistory() {
               </SelectContent>
             </Select>
 
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search notes, location, or event type..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search notes, location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
             </div>
+          </div>
+          
+          {/* Filter Summary */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Showing {filteredEvents.length} of {allEvents.length} events</span>
+              {sortOrder === 'newest' && <span>• Newest first</span>}
+              {sortOrder === 'oldest' && <span>• Oldest first</span>}
+            </div>
+            
+            {/* Clear Filters Button */}
+            {(eventTypeFilter !== 'all' || yearFilter !== 'all' || verificationFilter !== 'all' || 
+              quantityFilter !== 'all' || searchTerm || showOnlyAnomalies) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setEventTypeFilter('all');
+                  setYearFilter('all');
+                  setVerificationFilter('all');
+                  setQuantityFilter('all');
+                  setSearchTerm('');
+                  setShowOnlyAnomalies(false);
+                }}
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          
+          {/* Quick Filter Buttons */}
+          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+            <span className="text-sm font-medium text-muted-foreground mr-2">Quick Filters:</span>
+            
+            <Button
+              variant={quantityFilter === 'exact_measurements' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setQuantityFilter(quantityFilter === 'exact_measurements' ? 'all' : 'exact_measurements')}
+            >
+              🎯 Exact Measurements
+            </Button>
+            
+            <Button
+              variant={verificationFilter === 'verified' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setVerificationFilter(verificationFilter === 'verified' ? 'all' : 'verified')}
+            >
+              ✅ Verified Only
+            </Button>
+            
+            <Button
+              variant={eventTypeFilter === 'audit' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setEventTypeFilter(eventTypeFilter === 'audit' ? 'all' : 'audit')}
+            >
+              🔍 Audits Only
+            </Button>
+            
+            <Button
+              variant={quantityFilter === 'high' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setQuantityFilter(quantityFilter === 'high' ? 'all' : 'high')}
+            >
+              📈 High Quantities
+            </Button>
+            
+            <Button
+              variant={sortOrder === 'oldest' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSortOrder(sortOrder === 'oldest' ? 'newest' : 'oldest')}
+            >
+              {sortOrder === 'oldest' ? '⏰ Oldest First' : '🕒 Newest First'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -527,9 +774,11 @@ export default function InventoryHistory() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Current Stock</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {stats.currentStock}
+                  {inventoryItem?.quantity ? `${inventoryItem.quantity} units` : 'Loading...'}
                 </p>
-                <p className="text-xs text-muted-foreground">units</p>
+                <p className="text-xs text-muted-foreground">
+                  from database
+                </p>
               </div>
               <Package className="h-8 w-8 text-blue-500" />
             </div>
@@ -592,11 +841,26 @@ export default function InventoryHistory() {
         </Alert>
       )}
 
+      {/* High Stock Alert */}
+      {inventoryItem?.quantity > 1000 && (
+        <Alert className="mb-4 border-green-300 bg-green-50">
+          <Package className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            📦 <strong>High Stock Level:</strong> Current inventory ({inventoryItem.quantity} units) is well above normal levels due to recent intake. No reordering needed.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Event Cards Grid */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Event History</span>
+            <div className="flex items-center gap-2">
+              <span>Event History</span>
+              <Badge variant="outline" className="text-xs">
+                {sortOrder === 'newest' ? '🕒 Newest First' : '⏰ Oldest First'}
+              </Badge>
+            </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{filteredEvents.length} events</Badge>
               {totalAnomalies > 0 && (
@@ -689,7 +953,7 @@ export default function InventoryHistory() {
                           )}
                           
                           <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold">{event.quantity} units</span>
+                            <span className="text-lg font-bold">{getExactQuantity(event)}</span>
                             {event.change && (
                               <div className={`flex items-center gap-1 ${
                                 hasUnDismissedAnomalies

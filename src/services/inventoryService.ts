@@ -883,7 +883,6 @@ export const upsertMonthlyInventoryHistory = async ({
         status,
         created_by: user_id,
         check_date: check_date.toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
       .select();
@@ -1429,8 +1428,6 @@ export const updateHistoricalInventoryCheck = async (
         check_date: checkDate.toISOString(),
         month_year: month_year,
         response_data: updatedFormData.response_data || originalHistory.response_data,
-        updated_at: new Date().toISOString(),
-        // updated_by: userId, // Add if you have an updated_by column
       })
       .eq('id', historyId)
       .select()
@@ -1475,7 +1472,4 @@ export const updateHistoricalInventoryCheck = async (
     console.error('Error in updateHistoricalInventoryCheck:', error);
     throw error;
   }
-};
-
-// 4. Remove/disable any logic that creates a new inventory_items for periodic checks
-// ... existing code ... 
+}; 

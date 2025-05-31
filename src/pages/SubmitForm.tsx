@@ -478,7 +478,8 @@ export default function SubmitForm() {
               data,
               currentOrganization.id,
               submissionAssetTypeId,
-              assetId
+              assetId,
+              formType
             );
           }
         }
@@ -494,7 +495,8 @@ export default function SubmitForm() {
         data,
         currentOrganization.id,
         submissionAssetTypeId,
-        assetId // Pass the asset ID if this is from a QR code scan
+        assetId, // Pass the asset ID if this is from a QR code scan
+        formType // Pass the form type to determine correct event_type
       );
       
       // For inventory forms, ensure inventory is updated

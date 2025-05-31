@@ -90,7 +90,8 @@ export async function submitForm(
   formData: FormSubmissionData,
   organizationId: string,
   assetTypeId?: string,
-  assetId?: string
+  assetId?: string,
+  formType?: string
 ) {
   try {
     // First process any file uploads and convert them to URLs
@@ -279,14 +280,58 @@ export async function submitForm(
         const changesSummary = inventoryChanges.map(change => change.description).join('; ');
         const notesWithChanges = `Form: ${form.name}. Changes: ${changesSummary}`;
         
+        // Determine the correct event_type based on formType parameter or form purpose
+        let eventType = 'form_submission';
+        let checkType = 'form_submission';
+        
+        if (formType) {
+          // Use the formType parameter if provided (from URL or navigation state)
+          switch (formType) {
+            case 'intake':
+              eventType = 'intake';
+              checkType = 'intake';
+              break;
+            case 'inventory':
+              eventType = 'check';
+              checkType = 'periodic';
+              break;
+            case 'audit':
+              eventType = 'audit';
+              checkType = 'audit';
+              break;
+            default:
+              eventType = 'form_submission';
+              checkType = formType;
+          }
+        } else if (form.purpose && form.purpose !== 'generic') {
+          // Fallback to form purpose if no formType provided
+          switch (form.purpose) {
+            case 'intake':
+              eventType = 'intake';
+              checkType = 'intake';
+              break;
+            case 'inventory':
+              eventType = 'check';
+              checkType = 'periodic';
+              break;
+            case 'audit':
+              eventType = 'audit';
+              checkType = 'audit';
+              break;
+            default:
+              eventType = 'form_submission';
+              checkType = form.purpose;
+          }
+        }
+        
         await supabase
           .from('inventory_history')
           .insert({
             inventory_item_id: inventoryItem.id,
             organization_id: organizationId,
             quantity: finalQuantity,
-            event_type: 'form_submission',
-            check_type: form.purpose || 'form_submission',
+            event_type: eventType,
+            check_type: checkType,
             notes: notesWithChanges,
             response_data: {
               ...processedData,
@@ -302,6 +347,7 @@ export async function submitForm(
           
         console.log(`✅ Inventory updated: ${inventoryItem.quantity} → ${finalQuantity} for asset ${asset.name}`);
         console.log(`📝 Changes tracked: ${changesSummary}`);
+        console.log(`🏷️ Event type: ${eventType}, Check type: ${checkType}`);
       }
     }
 

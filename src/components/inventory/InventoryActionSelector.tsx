@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/components/ui/use-toast";
 import { useOrganization } from "@/hooks/useOrganization";
 import { getAssetById, Asset } from "@/services/assetService";
-import { getAssetTypeById, AssetType } from "@/services/assetTypeService";
+import { getAssetTypeById, AssetType, getAssetTypeForms } from "@/services/assetTypeService";
 import { getFormById, Form } from "@/services/formService";
 
 export function InventoryActionSelector() {
@@ -41,23 +41,26 @@ export function InventoryActionSelector() {
         const typeData = await getAssetTypeById(assetData.asset_type_id);
         setAssetType(typeData);
         
-        // Load the linked forms
-        if (typeData?.intake_form_id) {
-          try {
-            const intakeFormData = await getFormById(typeData.intake_form_id);
+        // Load the linked forms using the new asset_type_forms table
+        try {
+          const linkedForms = await getAssetTypeForms(assetData.asset_type_id, currentOrganization.id);
+          
+          // Find intake and inventory forms from the linked forms
+          const intakeFormLink = linkedForms?.find((link: any) => link.purpose === 'intake');
+          const inventoryFormLink = linkedForms?.find((link: any) => link.purpose === 'inventory');
+          
+          // Load the actual form objects if they exist
+          if (intakeFormLink?.form_id) {
+            const intakeFormData = await getFormById(intakeFormLink.form_id);
             setIntakeForm(intakeFormData);
-          } catch (error) {
-            console.error("Error loading intake form:", error);
           }
-        }
-        
-        if (typeData?.inventory_form_id) {
-          try {
-            const inventoryFormData = await getFormById(typeData.inventory_form_id);
+          
+          if (inventoryFormLink?.form_id) {
+            const inventoryFormData = await getFormById(inventoryFormLink.form_id);
             setInventoryForm(inventoryFormData);
-          } catch (error) {
-            console.error("Error loading inventory form:", error);
           }
+        } catch (error) {
+          console.error("Error loading linked forms:", error);
         }
       }
     } catch (error) {
@@ -74,8 +77,8 @@ export function InventoryActionSelector() {
 
   const handleIntakeAction = () => {
     // Navigate to intake form (for adding new items)
-    if (assetType?.intake_form_id) {
-      navigate(`/forms/submit/${assetType.intake_form_id}?asset_id=${assetId}&type=intake`, {
+    if (intakeForm?.id) {
+      navigate(`/forms/submit/${intakeForm.id}?asset_id=${assetId}&type=intake`, {
         state: {
           assetId: assetId,
           assetName: asset?.name,
@@ -94,8 +97,8 @@ export function InventoryActionSelector() {
 
   const handleInventoryCheck = () => {
     // Navigate to inventory check form (for counting existing items)
-    if (assetType?.inventory_form_id) {
-      navigate(`/forms/submit/${assetType.inventory_form_id}?asset_id=${assetId}&type=inventory`, {
+    if (inventoryForm?.id) {
+      navigate(`/forms/submit/${inventoryForm.id}?asset_id=${assetId}&type=inventory`, {
         state: {
           assetId: assetId,
           assetName: asset?.name,

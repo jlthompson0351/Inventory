@@ -67,7 +67,6 @@ export const applyInventoryFix = async (
         quantity: newQuantity,
         notes: updatedNotes,
         response_data: updatedResponseData,
-        updated_at: new Date().toISOString()
       })
       .eq('id', eventId)
       .select()
@@ -151,7 +150,6 @@ export const markEventAsVerified = async (eventId: string): Promise<InventoryFix
       .update({
         notes: updatedNotes,
         response_data: updatedResponseData,
-        updated_at: new Date().toISOString()
       })
       .eq('id', eventId)
       .select()
@@ -195,7 +193,6 @@ export const rollbackInventoryFix = async (
         quantity: rollbackData.originalQuantity,
         notes: rollbackData.originalNotes,
         response_data: rollbackData.originalResponseData,
-        updated_at: new Date().toISOString()
       })
       .eq('id', eventId)
       .select()
