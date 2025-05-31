@@ -199,41 +199,43 @@ const MobileAssetWorkflow = () => {
       return;
     }
 
-    // Handle different workflow types
-    if (option.type === 'continue_inventory') {
-      // Navigate to the existing inventory add page for this asset
-      navigate(`/inventory/add-for-asset/${assetData?.asset_id}`, {
-        state: {
-          fromMobileQR: true,
-          authSession: authSession,
-          continueExisting: true,
-          prefillData: {
-            asset_id: assetData?.asset_id,
-            asset_name: assetData?.asset_name,
-            asset_type: assetData?.asset_type_name,
-            barcode: assetData?.barcode
-          }
-        }
-      });
-      return;
-    }
-
-    // Navigate to form with QR context for intake and inventory
+    // Navigate to form with QR context
     if (option.form_id) {
-      navigate(`/forms/submit/${option.form_id}`, {
-        state: {
-          assetId: assetData?.asset_id,
-          assetName: assetData?.asset_name,
-          formType: option.type,
-          fromMobileQR: true,
-          authSession: authSession,
-          prefillData: {
-            asset_id: assetData?.asset_id,
-            asset_name: assetData?.asset_name,
-            asset_type: assetData?.asset_type_name,
-            barcode: assetData?.barcode
-          }
+      // Determine the form behavior based on type
+      let navigationState: any = {
+        assetId: assetData?.asset_id,
+        assetName: assetData?.asset_name,
+        formType: option.type,
+        fromMobileQR: true,
+        authSession: authSession,
+        prefillData: {
+          asset_id: assetData?.asset_id,
+          asset_name: assetData?.asset_name,
+          asset_type: assetData?.asset_type_name,
+          barcode: assetData?.barcode
         }
+      };
+
+      // For inventory types, determine if this should be a new entry or continue existing
+      if (option.type === 'inventory') {
+        // This is "New Inventory" - always fresh, even if same month
+        navigationState.forceNewEntry = true;
+        navigationState.action = 'new'; // This will prevent loading existing month data
+      } else if (option.type === 'continue_inventory') {
+        // This is "Continue Current Inventory" - auto-populate current month data
+        navigationState.continueExisting = true;
+        navigationState.action = 'continue'; // This will load existing month data if available
+      }
+
+      // Navigate to the correct form with mobile QR context
+      const queryParams = new URLSearchParams({
+        fromMobileQR: 'true',
+        type: option.type,
+        action: navigationState.action || 'continue'
+      });
+
+      navigate(`/forms/submit/${option.form_id}?${queryParams.toString()}`, {
+        state: navigationState
       });
     }
   };

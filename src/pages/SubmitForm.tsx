@@ -54,12 +54,15 @@ export default function SubmitForm() {
   const searchParams = new URLSearchParams(location.search);
   const urlAssetId = searchParams.get('asset_id');
   const urlFormType = searchParams.get('type');
+  const actionParam = searchParams.get('action'); // 'new' or default to continue
+  const fromMobileQR = searchParams.get('fromMobileQR') === 'true' || location.state?.fromMobileQR;
   
   // Retrieve QR code scan context if available (from navigation state or URL params)
   const assetId = location.state?.assetId || urlAssetId;
   const assetName = location.state?.assetName || assetDetails?.name;
   const assetTypeId = location.state?.assetTypeId || assetDetails?.asset_type_id;
   const formType = location.state?.formType || urlFormType || 'generic';
+  const forceNewEntry = location.state?.forceNewEntry || actionParam === 'new';
   
   // Stabilize these objects to prevent infinite re-renders
   const prefillData = useMemo(() => location.state?.prefillData || {}, [location.state?.prefillData]);
@@ -176,7 +179,8 @@ export default function SubmitForm() {
                   setExistingSubmissionDate(new Date(latestSubmission.created_at));
                   
                   // Check if user wants to edit existing (default behavior)
-                  const editExisting = searchParams.get('action') !== 'new';
+                  // BUT respect forceNewEntry flag for "New Inventory" button
+                  const editExisting = !forceNewEntry && actionParam !== 'new';
                   localIsEditingExisting = editExisting; // Set local variable
                   setIsEditingExisting(editExisting);
                   
