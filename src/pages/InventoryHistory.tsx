@@ -19,10 +19,22 @@ import {
   Calendar,
   Package,
   AlertTriangle,
-  Edit
+  Edit,
+  Clock,
+  Target,
+  Zap
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getAllInventoryHistory, getInventoryItem } from "@/services/inventoryService";
+import { applyInventoryFix, markEventAsVerified } from "@/services/inventoryFixService";
+import { 
+  detectInventoryAnomalies, 
+  calculateTrendPredictions, 
+  getAnomalySeverityColors,
+  AnomalyDetection,
+  InventoryEvent as AnomalyInventoryEvent
+} from "@/utils/anomalyDetection";
+import { QuickFixCard } from "@/components/inventory/QuickFixCard";
 
 interface InventoryEvent {
   id: string;
@@ -49,20 +61,66 @@ interface InventoryStats {
   totalUsage: number;
 }
 
+interface EventWithAnomalies extends InventoryEvent {
+  anomalies: AnomalyDetection[];
+  change?: {
+    value: number;
+    isPositive: boolean;
+    previous: number;
+    current: number;
+  };
+}
+
 export default function InventoryHistory() {
   const { inventoryItemId } = useParams<{ inventoryItemId: string }>();
   const navigate = useNavigate();
   
   const [inventoryItem, setInventoryItem] = useState<any>(null);
   const [allEvents, setAllEvents] = useState<InventoryEvent[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<InventoryEvent[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<EventWithAnomalies[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dismissedAnomalies, setDismissedAnomalies] = useState<Set<string>>(new Set());
+  const [verifiedEvents, setVerifiedEvents] = useState<Set<string>>(new Set());
   
   // Filters
   const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showOnlyAnomalies, setShowOnlyAnomalies] = useState(false);
+
+  // Performance optimization: Pre-calculate event index map
+  const eventIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    allEvents.forEach((event, index) => {
+      map.set(event.id, index);
+    });
+    return map;
+  }, [allEvents]);
+
+  // Calculate trend predictions using CLEAN data only
+  const trendPrediction = useMemo(() => {
+    if (allEvents.length === 0) return null;
+    
+    // Filter out obvious anomalies for accurate trend calculation
+    const cleanEvents = allEvents.filter(event => {
+      // Remove events with quantities > 100 (likely anomalies for this paint asset)
+      return event.quantity <= 100;
+    });
+    
+    if (cleanEvents.length < 2) return null;
+    
+    const anomalyEvents: AnomalyInventoryEvent[] = cleanEvents.map(event => ({
+      id: event.id,
+      quantity: event.quantity,
+      event_type: event.event_type,
+      check_date: event.check_date,
+      notes: event.notes,
+      response_data: event.response_data
+    }));
+    
+    return calculateTrendPredictions(anomalyEvents);
+  }, [allEvents]);
 
   // Load data
   useEffect(() => {
@@ -86,7 +144,6 @@ export default function InventoryHistory() {
         new Date(b.check_date).getTime() - new Date(a.check_date).getTime()
       );
       setAllEvents(sortedEvents);
-      setFilteredEvents(sortedEvents);
       
     } catch (err) {
       console.error("Error loading inventory data:", err);
@@ -94,6 +151,67 @@ export default function InventoryHistory() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Enhanced anomaly detection with asset type
+  const getQuantityChangeWithAnomalies = (event: InventoryEvent, eventIndex: number): {
+    change?: { value: number; isPositive: boolean; previous: number; current: number };
+    anomalies: AnomalyDetection[];
+  } => {
+    if (eventIndex === allEvents.length - 1) {
+      return { anomalies: [] }; // First event (intake)
+    }
+    
+    const previousEvent = allEvents[eventIndex + 1];
+    const change = event.quantity - previousEvent.quantity;
+    
+    // Convert to anomaly detection format
+    const currentAnomalyEvent: AnomalyInventoryEvent = {
+      id: event.id,
+      quantity: event.quantity,
+      event_type: event.event_type,
+      check_date: event.check_date,
+      notes: event.notes,
+      response_data: event.response_data
+    };
+    
+    const previousAnomalyEvent: AnomalyInventoryEvent = {
+      id: previousEvent.id,
+      quantity: previousEvent.quantity,
+      event_type: previousEvent.event_type,
+      check_date: previousEvent.check_date,
+      notes: previousEvent.notes,
+      response_data: previousEvent.response_data
+    };
+    
+    // Get recent events for systematic error detection
+    const recentEvents = allEvents.slice(Math.max(0, eventIndex - 5), eventIndex + 1)
+      .map(e => ({
+        id: e.id,
+        quantity: e.quantity,
+        event_type: e.event_type,
+        check_date: e.check_date,
+        notes: e.notes,
+        response_data: e.response_data
+      }));
+    
+    // Detect anomalies using smart thresholds
+    const anomalies = detectInventoryAnomalies(
+      currentAnomalyEvent,
+      previousAnomalyEvent,
+      inventoryItem?.asset?.asset_type?.name || 'unknown',
+      recentEvents
+    );
+    
+    return {
+      change: {
+        value: Math.abs(change),
+        isPositive: change >= 0,
+        previous: previousEvent.quantity,
+        current: event.quantity
+      },
+      anomalies
+    };
   };
 
   // Event type mapping
@@ -115,9 +233,23 @@ export default function InventoryHistory() {
     };
   };
 
+  // Process events with anomalies
+  const processedEvents = useMemo(() => {
+    return allEvents.map((event, index) => {
+      const eventIndex = eventIndexMap.get(event.id) ?? index;
+      const { change, anomalies } = getQuantityChangeWithAnomalies(event, eventIndex);
+      
+      return {
+        ...event,
+        change,
+        anomalies: verifiedEvents.has(event.id) ? [] : anomalies // Clear anomalies for verified events
+      } as EventWithAnomalies;
+    });
+  }, [allEvents, eventIndexMap, verifiedEvents, inventoryItem]);
+
   // Filter events based on selected filters
   useEffect(() => {
-    let filtered = allEvents;
+    let filtered = processedEvents;
 
     // Filter by event type
     if (eventTypeFilter !== "all") {
@@ -140,10 +272,17 @@ export default function InventoryHistory() {
       );
     }
 
-    setFilteredEvents(filtered);
-  }, [allEvents, eventTypeFilter, yearFilter, searchTerm]);
+    // Filter to show only anomalies
+    if (showOnlyAnomalies) {
+      filtered = filtered.filter(event => 
+        event.anomalies.length > 0 && !dismissedAnomalies.has(event.id)
+      );
+    }
 
-  // Calculate statistics
+    setFilteredEvents(filtered);
+  }, [processedEvents, eventTypeFilter, yearFilter, searchTerm, showOnlyAnomalies, dismissedAnomalies]);
+
+  // Calculate enhanced statistics
   const stats: InventoryStats = useMemo(() => {
     if (allEvents.length === 0) {
       return {
@@ -158,10 +297,16 @@ export default function InventoryHistory() {
       };
     }
 
+    // Filter out anomalous data for accurate statistics
+    const cleanEvents = allEvents.filter((event, index) => {
+      const eventWithAnomalies = processedEvents[index];
+      return !eventWithAnomalies.anomalies.some(a => a.severity === 'critical');
+    });
+
     const usageData = [];
-    for (let i = 1; i < allEvents.length; i++) {
-      const current = allEvents[i];
-      const previous = allEvents[i - 1];
+    for (let i = 1; i < cleanEvents.length; i++) {
+      const current = cleanEvents[i];
+      const previous = cleanEvents[i - 1];
       const usage = previous.quantity - current.quantity;
       if (usage > 0) {
         usageData.push({ month: current.month_year, usage });
@@ -176,7 +321,7 @@ export default function InventoryHistory() {
       ? usageData.reduce((max, item) => item.usage > max.usage ? item : max)
       : { month: '', usage: 0 };
 
-    const sortedByQuantity = [...allEvents].sort((a, b) => a.quantity - b.quantity);
+    const sortedByQuantity = [...cleanEvents].sort((a, b) => a.quantity - b.quantity);
     const lowPoint = sortedByQuantity[0] || { month_year: '', quantity: 0 };
 
     const lastEvent = allEvents[0];
@@ -194,7 +339,7 @@ export default function InventoryHistory() {
       daysSinceCheck: daysSince,
       totalUsage: usageData.reduce((sum, item) => sum + item.usage, 0)
     };
-  }, [allEvents, inventoryItem]);
+  }, [allEvents, processedEvents, inventoryItem]);
 
   // Get available years for filter
   const availableYears = useMemo(() => {
@@ -204,59 +349,65 @@ export default function InventoryHistory() {
     return Array.from(years).sort().reverse();
   }, [allEvents]);
 
-  // Get quantity change for an event with anomaly detection
-  const getQuantityChange = (event: InventoryEvent, index: number) => {
-    if (index === allEvents.length - 1) return null; // First event (intake)
-    
-    const previousEvent = allEvents[index + 1];
-    const change = event.quantity - previousEvent.quantity;
-    
-    // Anomaly detection
-    const anomalies = [];
-    
-    // Check for massive unexpected increases
-    if (change > 50) {
-      anomalies.push({
-        type: 'massive_increase',
-        message: `Huge increase (+${change} units) - possible typo?`,
-        severity: 'high'
+  // Count total anomalies
+  const totalAnomalies = useMemo(() => {
+    return processedEvents.reduce((count, event) => 
+      count + (event.anomalies.length > 0 && !dismissedAnomalies.has(event.id) ? 1 : 0), 0
+    );
+  }, [processedEvents, dismissedAnomalies]);
+
+  // Handle quick fix application
+  const handleFixApplied = async (eventId: string, newQuantity: number, reason: string) => {
+    try {
+      // Apply the fix using the real API
+      const result = await applyInventoryFix(inventoryItemId!, {
+        eventId,
+        newQuantity,
+        reason,
+        fixType: reason.includes('Auto-fix') ? 'auto' : 'manual',
+        confidence: reason.includes('confidence') ? 
+          parseInt(reason.match(/(\d+)% confidence/)?.[1] || '0') : undefined
       });
+      
+      if (result.success) {
+        // Mark as verified since fix was applied
+        setVerifiedEvents(prev => new Set(prev).add(eventId));
+        
+        // Reload data to show updated quantities
+        await loadInventoryData();
+        
+        console.log('Fix applied successfully:', result.message);
+      } else {
+        console.error('Fix failed:', result.message);
+        alert(`Failed to apply fix: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Failed to apply fix:', error);
+      alert('An unexpected error occurred while applying the fix');
     }
-    
-    // Check for exact multiples of 100 (common typing errors)
-    if (Math.abs(change) === 100) {
-      anomalies.push({
-        type: 'exact_hundred',
-        message: 'Exact 100 unit change - possible extra digit?',
-        severity: 'medium'
-      });
+  };
+
+  // Handle mark as verified
+  const handleMarkVerified = async (eventId: string) => {
+    try {
+      const result = await markEventAsVerified(eventId);
+      
+      if (result.success) {
+        setVerifiedEvents(prev => new Set(prev).add(eventId));
+        console.log('Event verified successfully:', result.message);
+      } else {
+        console.error('Verification failed:', result.message);
+        alert(`Failed to verify event: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Failed to verify event:', error);
+      alert('An unexpected error occurred while verifying the event');
     }
-    
-    // Check for impossible increases without intake
-    if (change > 20 && event.event_type !== 'intake' && event.event_type !== 'addition') {
-      anomalies.push({
-        type: 'unexpected_increase',
-        message: 'Inventory increased without recorded intake',
-        severity: 'medium'
-      });
-    }
-    
-    // Check for percentage jumps > 150%
-    if (previousEvent.quantity > 0 && (event.quantity / previousEvent.quantity) > 2.5) {
-      anomalies.push({
-        type: 'percentage_jump',
-        message: `${Math.round((event.quantity / previousEvent.quantity) * 100)}% increase - verify accuracy`,
-        severity: 'high'
-      });
-    }
-    
-    return {
-      value: Math.abs(change),
-      isPositive: change >= 0,
-      previous: previousEvent.quantity,
-      current: event.quantity,
-      anomalies: anomalies
-    };
+  };
+
+  // Handle dismiss anomaly
+  const handleDismissAnomaly = (eventId: string) => {
+    setDismissedAnomalies(prev => new Set(prev).add(eventId));
   };
 
   if (loading) {
@@ -289,16 +440,38 @@ export default function InventoryHistory() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Inventory History</h1>
           <p className="text-muted-foreground">{inventoryItem.name}</p>
         </div>
+        
+        {/* Anomaly Summary */}
+        {totalAnomalies > 0 && (
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <Badge variant="destructive">
+              {totalAnomalies} {totalAnomalies === 1 ? 'Issue' : 'Issues'} Detected
+            </Badge>
+          </div>
+        )}
       </div>
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Filters</CardTitle>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>Filters</span>
+            {totalAnomalies > 0 && (
+              <Button
+                variant={showOnlyAnomalies ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowOnlyAnomalies(!showOnlyAnomalies)}
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Issues Only
+              </Button>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -347,74 +520,91 @@ export default function InventoryHistory() {
       </Card>
 
       {/* Metadata Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Current Stock</p>
-                <p className="text-2xl font-bold">{stats.currentStock}</p>
+                <p className="text-sm font-medium text-muted-foreground">Current Stock</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats.currentStock}
+                </p>
+                <p className="text-xs text-muted-foreground">units</p>
               </div>
               <Package className="h-8 w-8 text-blue-500" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Units in inventory
-            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Usage</p>
-                <p className="text-2xl font-bold">{stats.avgMonthlyUsage}</p>
+                <p className="text-sm font-medium text-muted-foreground">Daily Usage</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {trendPrediction?.dailyUsage?.toFixed(1) || '0'}
+                </p>
+                <p className="text-xs text-muted-foreground">units/day</p>
               </div>
-              <BarChart3 className="h-8 w-8 text-green-500" />
+              <TrendingDown className="h-8 w-8 text-green-500" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Units per month
-            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-amber-500">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Peak Usage</p>
-                <p className="text-2xl font-bold">{stats.peakUsage.amount}</p>
+                <p className="text-sm font-medium text-muted-foreground">Days Remaining</p>
+                <p className="text-2xl font-bold text-amber-600">
+                  {trendPrediction?.daysUntilEmpty || '∞'}
+                </p>
+                <p className="text-xs text-muted-foreground">at current usage</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-amber-500" />
+              <Clock className="h-8 w-8 text-amber-500" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {stats.peakUsage.month ? format(parseISO(`${stats.peakUsage.month}-01`), 'MMM yyyy') : 'No data'}
-            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-red-500">
+        <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Days Since Check</p>
-                <p className="text-2xl font-bold">{stats.daysSinceCheck}</p>
+                <p className="text-sm font-medium text-muted-foreground">Last Check</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {stats.daysSinceCheck}
+                </p>
+                <p className="text-xs text-muted-foreground">days ago</p>
               </div>
               <Calendar className="h-8 w-8 text-red-500" />
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Last: {stats.lastCheckDate ? format(new Date(stats.lastCheckDate), 'MMM d') : 'Never'}
-            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Reorder Alert */}
+      {trendPrediction?.shouldReorder && (
+        <Alert className="mb-4 border-amber-300 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            📦 <strong>Reorder Recommended:</strong> Stock is getting low. Consider reordering when you reach {trendPrediction.reorderPoint} units.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Event Cards Grid */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Event History</span>
-            <Badge variant="secondary">{filteredEvents.length} events</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{filteredEvents.length} events</Badge>
+              {totalAnomalies > 0 && (
+                <Badge variant="destructive">
+                  {totalAnomalies} issues
+                </Badge>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -424,120 +614,126 @@ export default function InventoryHistory() {
               <p>No events found matching your filters</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredEvents.map((event, index) => {
-                const eventInfo = getEventTypeInfo(event.event_type);
-                // Find the correct index in allEvents array for this event
-                const allEventsIndex = allEvents.findIndex(e => e.id === event.id);
-                const change = getQuantityChange(event, allEventsIndex);
-                
-                return (
-                  <Card key={event.id} className={`overflow-hidden hover:shadow-md transition-shadow ${
-                    change?.anomalies && change.anomalies.length > 0 
-                      ? change.anomalies.some(a => a.severity === 'high') 
-                        ? 'border-red-300 bg-red-50' 
-                        : 'border-orange-300 bg-orange-50'
-                      : ''
-                  }`}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge className={eventInfo.color}>
-                            {eventInfo.icon} {eventInfo.label}
-                          </Badge>
-                          {change?.anomalies && change.anomalies.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              {change.anomalies.some(a => a.severity === 'high') ? (
-                                <AlertTriangle className="h-4 w-4 text-red-600" />
-                              ) : (
-                                <AlertTriangle className="h-4 w-4 text-orange-600" />
-                              )}
-                            </div>
+            <div className="space-y-4">
+              {/* Quick Fix Cards for events with anomalies */}
+              {filteredEvents
+                .filter(event => event.anomalies.length > 0 && !dismissedAnomalies.has(event.id))
+                .map(event => (
+                  <QuickFixCard
+                    key={`anomaly-${event.id}`}
+                    anomalies={event.anomalies}
+                    currentQuantity={event.quantity}
+                    previousQuantity={event.change?.previous || 0}
+                    eventId={event.id}
+                    onFixApplied={(newQuantity, reason) => handleFixApplied(event.id, newQuantity, reason)}
+                    onMarkVerified={handleMarkVerified}
+                    onDismiss={() => handleDismissAnomaly(event.id)}
+                  />
+                ))}
+              
+              {/* Regular Event Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredEvents.map((event) => {
+                  const eventInfo = getEventTypeInfo(event.event_type);
+                  const hasUnDismissedAnomalies = event.anomalies.length > 0 && !dismissedAnomalies.has(event.id);
+                  const highestSeverity = hasUnDismissedAnomalies ? 
+                    event.anomalies.reduce((highest, current) => {
+                      const severityOrder = { low: 1, medium: 2, high: 3, critical: 4 };
+                      return severityOrder[current.severity] > severityOrder[highest.severity] ? current : highest;
+                    }).severity : 'low';
+                  
+                  const colors = hasUnDismissedAnomalies ? getAnomalySeverityColors(highestSeverity) : null;
+                  
+                  return (
+                    <Card key={event.id} className={`overflow-hidden hover:shadow-md transition-shadow ${
+                      hasUnDismissedAnomalies ? `${colors?.background} ${colors?.border}` : ''
+                    }`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={eventInfo.color}>
+                              {eventInfo.icon} {eventInfo.label}
+                            </Badge>
+                            {hasUnDismissedAnomalies && (
+                              <div className="flex items-center gap-1">
+                                <AlertTriangle className={`h-4 w-4 ${colors?.icon}`} />
+                                <Badge variant="secondary" className="text-xs">
+                                  {event.anomalies.length}
+                                </Badge>
+                              </div>
+                            )}
+                            {verifiedEvents.has(event.id) && (
+                              <Badge variant="outline" className="text-xs text-green-600">
+                                ✓ Verified
+                              </Badge>
+                            )}
+                          </div>
+                          {event.event_type !== 'intake' && (
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                              <Edit className="h-3 w-3" />
+                            </Button>
                           )}
                         </div>
-                        {event.event_type !== 'intake' && (
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                      <p className="text-sm font-medium">
-                        {format(new Date(event.check_date), 'MMM d, yyyy')}
-                      </p>
-                    </CardHeader>
-                    
-                    <CardContent className="pt-0 space-y-3">
-                      {/* Anomaly Warnings */}
-                      {change?.anomalies && change.anomalies.length > 0 && (
-                        <div className="space-y-1">
-                          {change.anomalies.map((anomaly, i) => (
-                            <div key={i} className={`text-xs p-2 rounded flex items-center gap-1 ${
-                              anomaly.severity === 'high' 
-                                ? 'bg-red-100 text-red-800 border border-red-200' 
-                                : 'bg-orange-100 text-orange-800 border border-orange-200'
-                            }`}>
-                              <AlertTriangle className="h-3 w-3" />
-                              {anomaly.message}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Quantity Change */}
-                      <div className="space-y-2">
-                        {change && (
-                          <div className="text-xs text-muted-foreground">
-                            Start: {change.previous} → End: {change.current}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold">{event.quantity} units</span>
-                          {change && (
-                            <div className={`flex items-center gap-1 ${
-                              change.anomalies && change.anomalies.length > 0
-                                ? change.anomalies.some(a => a.severity === 'high') 
-                                  ? 'text-red-600' 
-                                  : 'text-orange-600'
-                                : change.isPositive ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {change.isPositive ? (
-                                <ArrowUp className="h-3 w-3" />
-                              ) : (
-                                <ArrowDown className="h-3 w-3" />
-                              )}
-                              <span className="text-xs font-medium">
-                                {change.isPositive ? '+' : '-'}{change.value}
-                              </span>
+                        <p className="text-sm font-medium">
+                          {format(new Date(event.check_date), 'MMM d, yyyy')}
+                        </p>
+                      </CardHeader>
+                      
+                      <CardContent className="pt-0 space-y-3">
+                        {/* Quantity Change */}
+                        <div className="space-y-2">
+                          {event.change && (
+                            <div className="text-xs text-muted-foreground">
+                              Start: {event.change.previous} → End: {event.change.current}
                             </div>
                           )}
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg font-bold">{event.quantity} units</span>
+                            {event.change && (
+                              <div className={`flex items-center gap-1 ${
+                                hasUnDismissedAnomalies
+                                  ? colors?.icon
+                                  : event.change.isPositive ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {event.change.isPositive ? (
+                                  <ArrowUp className="h-3 w-3" />
+                                ) : (
+                                  <ArrowDown className="h-3 w-3" />
+                                )}
+                                <span className="text-xs font-medium">
+                                  {event.change.isPositive ? '+' : '-'}{event.change.value}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      <Separator />
+                        <Separator />
 
-                      {/* Event Details */}
-                      <div className="space-y-1 text-xs">
-                        {event.location && (
-                          <div className="text-muted-foreground">
-                            📍 {event.location}
-                          </div>
-                        )}
-                        {event.notes && (
-                          <div className="text-muted-foreground line-clamp-2">
-                            💬 {event.notes}
-                          </div>
-                        )}
-                        {event.status && (
-                          <Badge variant="outline" className="text-xs">
-                            {event.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        {/* Event Details */}
+                        <div className="space-y-1 text-xs">
+                          {event.location && (
+                            <div className="text-muted-foreground">
+                              📍 {event.location}
+                            </div>
+                          )}
+                          {event.notes && (
+                            <div className="text-muted-foreground line-clamp-2">
+                              💬 {event.notes}
+                            </div>
+                          )}
+                          {event.status && (
+                            <Badge variant="outline" className="text-xs">
+                              {event.status}
+                            </Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           )}
         </CardContent>
