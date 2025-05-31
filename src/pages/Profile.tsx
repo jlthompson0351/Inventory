@@ -1,7 +1,7 @@
-
 import { Card } from "@/components/ui/card";
 import ProfileForm from "@/components/profile/ProfileForm";
 import AvatarUpload from "@/components/profile/AvatarUpload";
+import PinManagement from "@/components/profile/PinManagement";
 import { useProfileData } from "@/hooks/useProfileData";
 
 const Profile = () => {
@@ -24,6 +24,11 @@ const Profile = () => {
           setLoading={setLoading}
           onAvatarUpdated={updateAvatar}
         />
+      </div>
+      
+      {/* Mobile QR Authentication PIN Management */}
+      <div className="mt-6">
+        <PinManagement />
       </div>
     </div>
   );

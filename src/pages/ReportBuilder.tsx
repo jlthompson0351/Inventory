@@ -626,8 +626,8 @@ const ReportBuilder = () => {
         subject,
         dataSources: selectedDataSources,
         columns: selectedColumns,
-        filters: filterRules.map(({ id, ...rest }) => rest),
-        sorts: sortRules.map(({ id, ...rest }) => rest),
+        filters: filterRules.map(({ id: _, ...rest }) => rest), // Remove UI-only id
+        sorts: sortRules.map(({ id: __, ...rest }) => rest), // Remove UI-only id
         assetTypes: selectedAssetTypes
       },
       organization_id: currentOrganization.id,
@@ -636,57 +636,36 @@ const ReportBuilder = () => {
     };
     
     try {
-      const response = await executeReport(tempReport);
+      const response = await executeReport(tempReport); // Fetch all data for export
       const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
         return;
       }
 
-      // Create workbook with enhanced formatting
       const workbook = XLSX.utils.book_new();
-      
-      // Prepare headers
       const headers = selectedColumns.map(colId => formFields.find(f => f.id === colId)?.field_label || colId);
       
-      // Prepare data rows
       const data = results.map(item => selectedColumns.map(colId => {
-        let value = item[colId]; // First try direct access with the exact field ID
+        // Simplified data access: relies on backend providing correct keys
+        let value = item[colId];
         
-        // If not found directly and field contains dots, try nested access
-        if ((value === undefined || value === null) && colId.includes('.')) {
-          const parts = colId.split('.');
-          value = item[parts[0]]?.[parts[1]];
-        }
-        
-        // Check if property exists directly on item
-        if ((value === undefined || value === null) && item.hasOwnProperty(colId)) {
-          value = item[colId];
-        }
-        
-        // For form submission data
-        if ((value === undefined || value === null) && item.submission_data && item.submission_data[colId]) {
-          value = item.submission_data[colId];
-        }
-        
-        // Format dates for Excel
         const field = formFields.find(f => f.id === colId);
         if (field?.field_type === 'date' && value) {
-          return new Date(value);
+          // Ensure value is a valid date string or number before creating Date
+          const dateValue = new Date(value);
+          return dateValue instanceof Date && !isNaN(dateValue.valueOf()) ? dateValue : '';
         }
         
         return value !== null && value !== undefined ? value : '';
       }));
 
-      // Create worksheet with headers and data
       const worksheetData = [headers, ...data];
       const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
       
-      // Set column widths
-      const columnWidths = headers.map(header => ({ width: Math.max(header.length + 2, 12) }));
+      const columnWidths = headers.map(header => ({ width: Math.max(String(header).length + 2, 12) }));
       worksheet['!cols'] = columnWidths;
       
-      // Add metadata sheet
       const metadataSheet = XLSX.utils.aoa_to_sheet([
         ['Report Information'],
         ['Report Name', reportName],
@@ -701,10 +680,7 @@ const ReportBuilder = () => {
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Report Data');
       XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadata');
       
-      // Generate filename
       const filename = `${reportName.replace(/\s+/g, "_")}_${new Date().toISOString().split('T')[0]}.xlsx`;
-      
-      // Write and download
       XLSX.writeFile(workbook, filename);
       
       toast({ 
@@ -727,15 +703,15 @@ const ReportBuilder = () => {
     toast({ title: "Preparing Export", description: "Please wait..." });
     setIsLoading(true);
      const tempReport: Report = {
-      id: id || 'export',
+      id: id || 'export-csv', // differentiate from excel export id if necessary
       name: reportName,
       description,
       report_config: {
         subject,
         dataSources: selectedDataSources,
         columns: selectedColumns,
-        filters: filterRules.map(({ id, ...rest }) => rest),
-        sorts: sortRules.map(({ id, ...rest }) => rest),
+        filters: filterRules.map(({ id: _, ...rest }) => rest),
+        sorts: sortRules.map(({ id: __, ...rest }) => rest),
         assetTypes: selectedAssetTypes
       },
       organization_id: currentOrganization.id,
@@ -743,34 +719,28 @@ const ReportBuilder = () => {
       updated_at: new Date().toISOString()
     };
     try {
-      const response = await executeReport(tempReport); // Full export, no limit
+      const response = await executeReport(tempReport); // Fetch all data
       const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
         return;
       }
       const headers = selectedColumns.map(colId => formFields.find(f => f.id === colId)?.field_label || colId);
+      
       const data = results.map(item => selectedColumns.map(colId => {
-        let value = item[colId]; // First try direct access with the exact field ID
+        // Simplified data access: relies on backend providing correct keys
+        let value = item[colId];
         
-        // If not found directly and field contains dots, try nested access
-        if ((value === undefined || value === null) && colId.includes('.')) {
-          const parts = colId.split('.');
-          value = item[parts[0]]?.[parts[1]];
-        }
-        
-        // Check if property exists directly on item
-        if ((value === undefined || value === null) && item.hasOwnProperty(colId)) {
-          value = item[colId];
-        }
-        
-        // For form submission data
-        if ((value === undefined || value === null) && item.submission_data && item.submission_data[colId]) {
-          value = item.submission_data[colId];
+        // For CSV, all values should be strings. Dates can be formatted.
+        const field = formFields.find(f => f.id === colId);
+        if (field?.field_type === 'date' && value) {
+          const dateValue = new Date(value);
+          return dateValue instanceof Date && !isNaN(dateValue.valueOf()) ? dateValue.toLocaleDateString() : '';
         }
         
         return value !== null && value !== undefined ? String(value) : '';
       }));
+
       const csvContent = [headers.join(","), ...data.map(row => row.join(","))].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");

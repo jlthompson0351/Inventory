@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   Edit, 
-  QrCode, 
   Eye, 
   Package, 
   Calendar, 
   Hash, 
   MoreVertical,
   Trash2,
-  Download
+  Download,
+  MapPin,
+  History,
+  Settings
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -22,6 +24,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { getInventoryItems } from "@/services/inventoryService";
+import { useOrganization } from "@/hooks/useOrganization";
 
 interface Asset {
   id: string;
@@ -49,9 +53,29 @@ interface AssetCardProps {
 
 export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: AssetCardProps) {
   const navigate = useNavigate();
+  const { currentOrganization } = useOrganization();
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [inventoryItemId, setInventoryItemId] = useState<string | null>(null);
 
-  const handleViewDetails = () => {
+  // Load inventory item ID for this asset
+  useEffect(() => {
+    const loadInventoryItemId = async () => {
+      if (asset.has_inventory && currentOrganization?.id) {
+        try {
+          const inventoryItems = await getInventoryItems(currentOrganization.id, asset.id);
+          if (inventoryItems && inventoryItems.length > 0) {
+            setInventoryItemId(inventoryItems[0].id);
+          }
+        } catch (error) {
+          console.error("Error loading inventory item ID:", error);
+        }
+      }
+    };
+
+    loadInventoryItemId();
+  }, [asset.id, asset.has_inventory, currentOrganization?.id]);
+
+  const handleManageAsset = () => {
     navigate(`/assets/${asset.id}`);
   };
 
@@ -63,15 +87,11 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
     }
   };
 
-  const handleManageInventory = () => {
-    navigate(`/assets/${asset.id}/inventory`);
-  };
-
-  const handleQRCode = () => {
-    if (onGenerateQR) {
-      onGenerateQR(asset);
+  const handleInventoryHistory = () => {
+    if (inventoryItemId) {
+      navigate(`/inventory/${inventoryItemId}/history`);
     } else {
-      setIsQRModalOpen(true);
+      console.error("No inventory item found for this asset");
     }
   };
 
@@ -83,52 +103,41 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       case 'maintenance':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'retired':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
     }
   };
 
   return (
-    <Card className="group hover:shadow-lg transition-shadow duration-200">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg font-semibold truncate">
-              {asset.name}
-            </CardTitle>
-            {asset.description && (
-              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                {asset.description}
-              </p>
-            )}
-          </div>
+    <Card className="overflow-hidden hover:shadow-md transition-shadow h-full min-h-[280px]" style={{ transform: 'scale(1.1)' }}>
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-start mb-2">
+          <CardTitle className="text-base line-clamp-1" title={asset.name}>
+            {asset.name}
+          </CardTitle>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 flex-shrink-0">
+                <MoreVertical className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleViewDetails}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
+              <DropdownMenuItem onClick={handleManageAsset}>
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Asset
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleEditAsset}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Asset
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleQRCode}>
-                <QrCode className="mr-2 h-4 w-4" />
-                Generate QR Code
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownloadQR}>
                 <Download className="mr-2 h-4 w-4" />
                 Download QR
@@ -145,25 +154,33 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
           </DropdownMenu>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          {asset.status && (
-            <Badge className={getStatusColor(asset.status)}>
-              {asset.status}
-            </Badge>
-          )}
+        {/* Status Badge - Prominent like inventory quantity */}
+        {asset.status && (
+          <Badge 
+            variant="outline"
+            className={`${getStatusColor(asset.status)} mb-2 w-fit font-semibold`}
+          >
+            {asset.status}
+          </Badge>
+        )}
+
+        {/* Asset Type and Inventory */}
+        <div className="flex flex-wrap gap-1 mb-2">
           {asset.asset_type && (
             <Badge 
-              variant="outline" 
+              variant="secondary" 
+              className="text-xs"
               style={{ 
-                borderColor: asset.asset_type.color,
-                color: asset.asset_type.color 
+                backgroundColor: `${asset.asset_type.color}20`,
+                color: asset.asset_type.color,
+                borderColor: asset.asset_type.color
               }}
             >
               {asset.asset_type.name}
             </Badge>
           )}
           {asset.has_inventory && (
-            <Badge variant="secondary">
+            <Badge variant="outline" className="text-xs">
               <Package className="mr-1 h-3 w-3" />
               Inventory: {asset.inventory_quantity || 0}
             </Badge>
@@ -171,65 +188,64 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
-        {/* Asset Details */}
-        <div className="grid grid-cols-1 gap-2 text-sm">
+      <CardContent className="pt-0 space-y-3">
+        {/* Key Metadata - Compact like inventory cards */}
+        <div className="space-y-1 text-xs text-muted-foreground">
           {asset.serial_number && (
-            <div className="flex items-center text-muted-foreground">
-              <Hash className="mr-2 h-4 w-4" />
-              <span className="font-medium">Serial:</span>
-              <span className="ml-1">{asset.serial_number}</span>
+            <div className="flex items-center gap-1">
+              <Hash className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">Serial: {asset.serial_number}</span>
             </div>
           )}
+          
           {asset.acquisition_date && (
-            <div className="flex items-center text-muted-foreground">
-              <Calendar className="mr-2 h-4 w-4" />
-              <span className="font-medium">Acquired:</span>
-              <span className="ml-1">
-                {format(new Date(asset.acquisition_date), 'MMM dd, yyyy')}
-              </span>
+            <div className="flex items-center gap-1">
+              <Calendar className="h-3 w-3 flex-shrink-0" />
+              <span>Acquired {format(new Date(asset.acquisition_date), 'MMM d, yyyy')}</span>
             </div>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleViewDetails}
-            className="flex-1"
+        {/* Description - Compact */}
+        {asset.description && (
+          <p className="text-xs text-muted-foreground line-clamp-2" title={asset.description}>
+            {asset.description}
+          </p>
+        )}
+
+        {/* Action buttons - Cleaner layout */}
+        <div className="space-y-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManageAsset}
+            className="text-xs h-7 w-full"
           >
-            <Eye className="mr-2 h-4 w-4" />
-            View
+            <Settings className="h-3 w-3 mr-1" />
+            Manage Asset
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleEditAsset}
-            className="flex-1"
-          >
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleQRCode}
-            className="flex-1"
-          >
-            <QrCode className="mr-2 h-4 w-4" />
-            QR Code
-          </Button>
-          {asset.has_inventory && (
+          
+          <div className="grid grid-cols-1 gap-1">
             <Button 
               variant="outline" 
-              size="sm" 
-              onClick={handleManageInventory}
-              className="flex-1"
+              size="sm"
+              onClick={handleEditAsset}
+              className="h-8 text-xs"
             >
-              <Package className="mr-2 h-4 w-4" />
-              Inventory
+              <Edit className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+          </div>
+
+          {asset.has_inventory && inventoryItemId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleInventoryHistory}
+              className="text-xs h-7 w-full"
+            >
+              <History className="h-3 w-3 mr-1" />
+              Inventory History
             </Button>
           )}
         </div>

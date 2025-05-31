@@ -15,6 +15,7 @@ import AssetTypes from "./pages/AssetTypes";
 import Assets from "./pages/Assets";
 import NewAsset from "./pages/NewAsset";
 import AssetDetail from "./pages/AssetDetail";
+import AssetQRManager from "./pages/AssetQRManager";
 import Reports from "./pages/Reports";
 import ReportBuilder from "./pages/ReportBuilder";
 import Login from "./pages/Login";
@@ -156,6 +157,7 @@ const AppRoutes = () => {
         <Route path="/assets/:id/edit" element={user ? <PageLayout><NewAsset /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/assets/:assetId/inventory-check" element={user ? <PageLayout><InventoryCheck /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/assets/scan/:qrCode" element={user ? <PageLayout><ScanAsset /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/assets/qr-manager" element={user ? <PageLayout><AssetQRManager /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Reporting Routes */}
         <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />

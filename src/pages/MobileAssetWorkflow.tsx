@@ -8,7 +8,8 @@ import {
   Lock,
   Loader2,
   ArrowRight,
-  QrCode
+  QrCode,
+  RotateCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,40 @@ const MobileAssetWorkflow = () => {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // PIN authentication function
+  const authenticateWithPin = async (pin: string, assetId: string): Promise<AuthSession> => {
+    // Find user by PIN
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('quick_access_pin', pin)
+      .eq('is_deleted', false);
+
+    if (profileError) {
+      console.error('Database error:', profileError);
+      throw new Error('Authentication failed');
+    }
+    
+    const profileData = profiles && profiles.length > 0 ? profiles[0] : null;
+    
+    if (!profileData) {
+      throw new Error('Invalid PIN code');
+    }
+    
+    // Create a session object with the verified user data
+    const session: AuthSession = {
+      user_id: profileData.id,
+      session_token: 'mobile_session',
+      expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      full_name: profileData.full_name || 'Mobile User',
+      organization_id: 'current',
+      role: 'user'
+    };
+    
+    return session;
+  };
 
   // Load asset data on mount
   useEffect(() => {
@@ -110,6 +145,12 @@ const MobileAssetWorkflow = () => {
             label: 'Inventory Check', 
             form_id: assetTypeData?.inventory_form_id || null,
             available: !!assetTypeData?.inventory_form_id
+          },
+          {
+            type: 'continue_inventory',
+            label: 'Continue Current Inventory',
+            form_id: assetTypeData?.inventory_form_id || null,
+            available: !!assetTypeData?.inventory_form_id
           }
         ]
       };
@@ -130,66 +171,19 @@ const MobileAssetWorkflow = () => {
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (pin.length !== 4) {
-      toast({
-        variant: "destructive",
-        title: "Invalid PIN",
-        description: "Please enter a 4-digit PIN.",
-      });
-      return;
-    }
+    if (pin.length !== 4) return;
+
+    setIsAuthenticating(true);
+    setAuthError(null);
 
     try {
-      setIsAuthenticating(true);
-      
-      // Use a more basic approach to avoid TypeScript issues
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('quick_access_pin', pin);
-
-      if (profileError) {
-        console.error('Database error:', profileError);
-        throw profileError;
-      }
-      
-      const profileData = profiles && profiles.length > 0 ? profiles[0] : null;
-      
-      if (!profileData) {
-        toast({
-          variant: "destructive",
-          title: "Authentication Failed",
-          description: "Invalid PIN code. Please try again.",
-        });
-        setPin("");
-        return;
-      }
-      
-      // Create a session object with the verified user data
-      const session: AuthSession = {
-        user_id: profileData.id,
-        session_token: 'mobile_session',
-        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        full_name: profileData.full_name || 'Mobile User',
-        organization_id: 'current',
-        role: 'user'
-      };
-      
+      const session = await authenticateWithPin(pin, assetId!);
       setAuthSession(session);
       setStep('options');
-      
-      toast({
-        title: "Authentication Successful",
-        description: `Welcome, ${session.full_name}!`,
-      });
     } catch (error) {
-      console.error('Error authenticating PIN:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Authentication failed. Please try again.",
-      });
+      console.error('PIN authentication failed:', error);
+      setAuthError(error instanceof Error ? error.message : 'Invalid PIN. Please try again.');
+      setPin('');
     } finally {
       setIsAuthenticating(false);
     }
@@ -205,15 +199,26 @@ const MobileAssetWorkflow = () => {
       return;
     }
 
-    if (option.type === 'complete_monthly') {
-      toast({
-        title: "Feature Coming Soon",
-        description: "Month completion feature will be available soon.",
+    // Handle different workflow types
+    if (option.type === 'continue_inventory') {
+      // Navigate to the existing inventory add page for this asset
+      navigate(`/inventory/add-for-asset/${assetData?.asset_id}`, {
+        state: {
+          fromMobileQR: true,
+          authSession: authSession,
+          continueExisting: true,
+          prefillData: {
+            asset_id: assetData?.asset_id,
+            asset_name: assetData?.asset_name,
+            asset_type: assetData?.asset_type_name,
+            barcode: assetData?.barcode
+          }
+        }
       });
       return;
     }
 
-    // Navigate to form with QR context
+    // Navigate to form with QR context for intake and inventory
     if (option.form_id) {
       navigate(`/forms/submit/${option.form_id}`, {
         state: {
@@ -237,7 +242,7 @@ const MobileAssetWorkflow = () => {
     switch (type) {
       case 'intake': return Package;
       case 'inventory': return ClipboardList;
-      case 'complete_monthly': return CheckCircle;
+      case 'continue_inventory': return RotateCcw;
       default: return Package;
     }
   };
@@ -246,86 +251,334 @@ const MobileAssetWorkflow = () => {
     switch (type) {
       case 'intake': return 'bg-blue-500 hover:bg-blue-600';
       case 'inventory': return 'bg-green-500 hover:bg-green-600';
-      case 'complete_monthly': return 'bg-purple-500 hover:bg-purple-600';
+      case 'continue_inventory': return 'bg-orange-500 hover:bg-orange-600';
       default: return 'bg-gray-500 hover:bg-gray-600';
+    }
+  };
+
+  const getOptionDescription = (type: string) => {
+    switch (type) {
+      case 'intake': return 'Record new items coming into inventory';
+      case 'inventory': return 'Perform a fresh inventory count';
+      case 'continue_inventory': return 'Update existing inventory for this month';
+      default: return '';
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              <p className="text-center text-gray-600">Loading asset information...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-8">
+        <div className="mx-auto max-w-sm space-y-6 pt-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-blue-500 p-3 rounded-2xl shadow-lg">
+                <QrCode className="h-8 w-8 text-white" />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Asset Workflow</h1>
+            <p className="text-sm text-gray-600">Mobile QR Code Access</p>
+          </div>
+
+          {/* Asset Card */}
+          {assetData && (
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+                    <Package className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h2 className="font-bold text-lg text-gray-900 mb-1">{assetData.asset_name}</h2>
+                  <p className="text-sm text-gray-600 mb-2">{assetData.asset_type_name}</p>
+                  <div className="inline-block bg-gray-100 px-3 py-1 rounded-full">
+                    <p className="text-xs text-gray-500">QR: {assetData.barcode}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Loading Step */}
+          {step === 'loading' && (
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardContent className="flex flex-col items-center py-12">
+                <div className="bg-blue-100 p-4 rounded-full mb-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Asset Data</h3>
+                <p className="text-sm text-gray-600 text-center">
+                  Please wait while we retrieve your asset information...
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* PIN Entry Step */}
+          {step === 'pin' && (
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="text-center pb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
+                  <Lock className="h-8 w-8 text-green-600" />
+                </div>
+                <CardTitle className="text-xl text-gray-900">Enter Your PIN</CardTitle>
+                <p className="text-sm text-gray-600 mt-2">
+                  Use your 4-digit PIN for quick access
+                </p>
+              </CardHeader>
+              <CardContent className="px-6 pb-6">
+                <form onSubmit={handlePinSubmit} className="space-y-6">
+                  <div className="space-y-4">
+                    <Label htmlFor="pin" className="text-sm font-medium text-gray-700">
+                      4-Digit PIN Code
+                    </Label>
+                    <Input
+                      id="pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]{4}"
+                      maxLength={4}
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter PIN"
+                      className="text-center text-2xl tracking-[0.3em] h-14 font-mono bg-gray-50 border-2 focus:border-blue-500 focus:bg-white transition-all duration-200"
+                      autoFocus
+                    />
+                    {authError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-sm text-red-600 text-center font-medium">{authError}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg" 
+                    disabled={pin.length !== 4 || isAuthenticating}
+                  >
+                    {isAuthenticating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Authenticating...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Authenticate
+                      </>
+                    )}
+                  </Button>
+                  
+                  <div className="text-center pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-3">Need help?</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => navigate('/login')}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Use full login instead
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Workflow Options Step */}
+          {step === 'options' && authSession && assetData && (
+            <>
+              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="text-center pb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                  <CardTitle className="text-xl text-gray-900">
+                    Welcome, {authSession.full_name}
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Choose an action for this asset
+                  </p>
+                </CardHeader>
+              </Card>
+
+              <div className="space-y-4">
+                {assetData.workflow_options.map((option, index) => {
+                  const Icon = getOptionIcon(option.type);
+                  const colorClass = getOptionColor(option.type);
+                  const description = getOptionDescription(option.type);
+                  
+                  return (
+                    <Button
+                      key={index}
+                      onClick={() => handleWorkflowOption(option)}
+                      disabled={!option.available}
+                      className={`w-full h-auto p-6 ${
+                        option.available 
+                          ? `${colorClass} shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200` 
+                          : 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed'
+                      } text-white rounded-xl`}
+                      variant="default"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center">
+                          <div className="bg-white/20 p-2 rounded-lg mr-4">
+                            <Icon className="h-6 w-6" />
+                          </div>
+                          <div className="text-left">
+                            <div className="font-semibold text-base">{option.label}</div>
+                            <div className="text-sm opacity-90 mt-1">
+                              {option.available ? description : 'Not configured'}
+                            </div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-5 w-5 opacity-70" />
+                      </div>
+                    </Button>
+                  );
+                })}
+              </div>
+
+              {/* Help Section */}
+              <Card className="shadow-lg border-0 bg-white/60 backdrop-blur-sm mt-8">
+                <CardContent className="p-4 text-center">
+                  <p className="text-xs text-gray-600 mb-2">Need assistance?</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/assets/${assetData.asset_id}`)}
+                    className="text-blue-600 hover:text-blue-700 text-sm"
+                  >
+                    View full asset details
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Footer */}
+          <div className="text-center pt-8 pb-4">
+            <p className="text-xs text-gray-500">
+              StockFlow Inventory Management
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="mx-auto max-w-md space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-8">
+      <div className="mx-auto max-w-sm space-y-6 pt-8">
         {/* Header */}
-        <div className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <QrCode className="h-8 w-8 text-blue-500 mr-2" />
-            <h1 className="text-2xl font-bold text-gray-900">Asset Workflow</h1>
-          </div>
-          
-          {assetData && (
-            <div className="bg-white rounded-lg p-4 border">
-              <h2 className="font-semibold text-lg text-gray-900">{assetData.asset_name}</h2>
-              <p className="text-sm text-gray-600">{assetData.asset_type_name}</p>
-              <p className="text-xs text-gray-500 mt-1">QR: {assetData.barcode}</p>
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-blue-500 p-3 rounded-2xl shadow-lg">
+              <QrCode className="h-8 w-8 text-white" />
             </div>
-          )}
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Asset Workflow</h1>
+          <p className="text-sm text-gray-600">Mobile QR Code Access</p>
         </div>
+
+        {/* Asset Card */}
+        {assetData && (
+          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
+                  <Package className="h-6 w-6 text-blue-600" />
+                </div>
+                <h2 className="font-bold text-lg text-gray-900 mb-1">{assetData.asset_name}</h2>
+                <p className="text-sm text-gray-600 mb-2">{assetData.asset_type_name}</p>
+                <div className="inline-block bg-gray-100 px-3 py-1 rounded-full">
+                  <p className="text-xs text-gray-500">QR: {assetData.barcode}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Loading Step */}
+        {step === 'loading' && (
+          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+            <CardContent className="flex flex-col items-center py-12">
+              <div className="bg-blue-100 p-4 rounded-full mb-4">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Asset Data</h3>
+              <p className="text-sm text-gray-600 text-center">
+                Please wait while we retrieve your asset information...
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* PIN Entry Step */}
         {step === 'pin' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Lock className="h-5 w-5 mr-2" />
-                Enter Your PIN
-              </CardTitle>
+          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+            <CardHeader className="text-center pb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
+                <Lock className="h-8 w-8 text-green-600" />
+              </div>
+              <CardTitle className="text-xl text-gray-900">Enter Your PIN</CardTitle>
+              <p className="text-sm text-gray-600 mt-2">
+                Use your 4-digit PIN for quick access
+              </p>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handlePinSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="pin">4-Digit PIN Code</Label>
+            <CardContent className="px-6 pb-6">
+              <form onSubmit={handlePinSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <Label htmlFor="pin" className="text-sm font-medium text-gray-700">
+                    4-Digit PIN Code
+                  </Label>
                   <Input
                     id="pin"
                     type="password"
                     inputMode="numeric"
-                    pattern="[0-9]*"
+                    pattern="[0-9]{4}"
                     maxLength={4}
                     value={pin}
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                     placeholder="Enter PIN"
-                    className="text-center text-2xl tracking-widest"
+                    className="text-center text-2xl tracking-[0.3em] h-14 font-mono bg-gray-50 border-2 focus:border-blue-500 focus:bg-white transition-all duration-200"
                     autoFocus
                   />
+                  {authError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm text-red-600 text-center font-medium">{authError}</p>
+                    </div>
+                  )}
                 </div>
                 
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg" 
                   disabled={pin.length !== 4 || isAuthenticating}
                 >
                   {isAuthenticating ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Authenticating...
                     </>
                   ) : (
-                    'Authenticate'
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Authenticate
+                    </>
                   )}
                 </Button>
+                
+                <div className="text-center pt-4 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 mb-3">Need help?</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => navigate('/login')}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Use full login instead
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -334,57 +587,80 @@ const MobileAssetWorkflow = () => {
         {/* Workflow Options Step */}
         {step === 'options' && authSession && assetData && (
           <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Smartphone className="h-5 w-5 mr-2" />
+            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <CardHeader className="text-center pb-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <CardTitle className="text-xl text-gray-900">
                   Welcome, {authSession.full_name}
                 </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-4">
-                  Choose an action for this asset:
+                <p className="text-sm text-gray-600 mt-2">
+                  Choose an action for this asset
                 </p>
-              </CardContent>
+              </CardHeader>
             </Card>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {assetData.workflow_options.map((option, index) => {
                 const Icon = getOptionIcon(option.type);
                 const colorClass = getOptionColor(option.type);
+                const description = getOptionDescription(option.type);
                 
                 return (
                   <Button
                     key={index}
                     onClick={() => handleWorkflowOption(option)}
                     disabled={!option.available}
-                    className={`w-full h-auto p-6 ${option.available ? colorClass : 'bg-gray-300 hover:bg-gray-300'} text-white`}
+                    className={`w-full h-auto p-6 ${
+                      option.available 
+                        ? `${colorClass} shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200` 
+                        : 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed'
+                    } text-white rounded-xl`}
                     variant="default"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center">
-                        <Icon className="h-6 w-6 mr-3" />
+                        <div className="bg-white/20 p-2 rounded-lg mr-4">
+                          <Icon className="h-6 w-6" />
+                        </div>
                         <div className="text-left">
-                          <div className="font-semibold">{option.label}</div>
-                          {!option.available && (
-                            <div className="text-xs opacity-75">Not configured</div>
-                          )}
+                          <div className="font-semibold text-base">{option.label}</div>
+                          <div className="text-sm opacity-90 mt-1">
+                            {option.available ? description : 'Not configured'}
+                          </div>
                         </div>
                       </div>
-                      <ArrowRight className="h-5 w-5" />
+                      <ArrowRight className="h-5 w-5 opacity-70" />
                     </div>
                   </Button>
                 );
               })}
             </div>
 
-            <div className="text-center pt-4">
-              <p className="text-xs text-gray-500">
-                Session expires at {new Date(authSession.expires_at).toLocaleTimeString()}
-              </p>
-            </div>
+            {/* Help Section */}
+            <Card className="shadow-lg border-0 bg-white/60 backdrop-blur-sm mt-8">
+              <CardContent className="p-4 text-center">
+                <p className="text-xs text-gray-600 mb-2">Need assistance?</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/assets/${assetData.asset_id}`)}
+                  className="text-blue-600 hover:text-blue-700 text-sm"
+                >
+                  View full asset details
+                </Button>
+              </CardContent>
+            </Card>
           </>
         )}
+
+        {/* Footer */}
+        <div className="text-center pt-8 pb-4">
+          <p className="text-xs text-gray-500">
+            StockFlow Inventory Management
+          </p>
+        </div>
       </div>
     </div>
   );

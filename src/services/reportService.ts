@@ -904,24 +904,50 @@ class ParallelDataProcessor {
       `)
       .eq('organization_id', organizationId);
 
+    // Apply filters specific to form submissions
+    if (config.filters) {
+      config.filters.forEach(filter => {
+        if (filter.field.startsWith('form_submissions.')) {
+          const fieldName = filter.field.replace('form_submissions.', '');
+          query = this.applyFilterToQuery(query, fieldName, filter);
+        }
+      });
+    }
+
+    // Apply sorting
+    if (config.sorts) {
+      config.sorts.forEach(sort => {
+        if (sort.field.startsWith('form_submissions.')) {
+          const fieldName = sort.field.replace('form_submissions.', '');
+          query = query.order(fieldName, { ascending: sort.direction === 'asc' });
+        }
+      });
+    }
+
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data || []).map(item => ({
-      record_source: 'Form Submissions',
-      'form_submissions.id': item.id,
-      'form_submissions.form_id': item.form_id,
-      'form_submissions.created_at': item.created_at,
-      'form_submissions.updated_at': item.updated_at,
-      'forms.name': item.forms?.name,
-      'forms.description': item.forms?.description,
-      submission_data: item.submission_data,
-      // Flatten submission data fields
-      ...Object.entries(item.submission_data || {}).reduce((acc, [key, value]) => ({
-        ...acc,
-        [`submission.${key}`]: value
-      }), {})
-    }));
+    return (data || []).map(item => {
+      const submissionFields: Record<string, any> = {};
+      
+      // Create form_field keys that match ReportBuilder expectations
+      if (item.submission_data && typeof item.submission_data === 'object') {
+        Object.entries(item.submission_data).forEach(([key, value]) => {
+          submissionFields[`form_field.${item.form_id}.${key}`] = value;
+        });
+      }
+
+      return {
+        record_source: 'Form Submissions',
+        'form_submissions.id': item.id,
+        'form_submissions.form_id': item.form_id,
+        'form_submissions.created_at': item.created_at,
+        'form_submissions.updated_at': item.updated_at,
+        'forms.name': item.forms?.name,
+        'forms.description': item.forms?.description,
+        ...submissionFields
+      };
+    });
   }
 
   private static async processFormResponsesDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
@@ -1101,15 +1127,15 @@ class ParallelDataProcessor {
       return result;
     }
 
-    // Process conversion fields and show asset type name when field has data
     conversionFields.forEach(field => {
-      const fieldId = `conversion.${item.asset_types?.id || item.asset_type_id}.${field.field_name}`;
-      const hasData = item.metadata?.[field.field_name] !== undefined && 
-                     item.metadata?.[field.field_name] !== null && 
-                     item.metadata?.[field.field_name] !== '';
-      
-      // Show asset type name if this field has data, empty string otherwise
-      result[fieldId] = hasData ? (item.asset_types?.name || 'Unknown') : '';
+      // Ensure field_name and asset_type_id are present
+      const assetTypeId = item.asset_types?.id || item.asset_type_id;
+      if (field.field_name && assetTypeId) {
+        const fieldId = `conversion.${assetTypeId}.${field.field_name}`;
+        // Get the actual value from metadata instead of asset type name
+        const value = item.metadata?.[field.field_name];
+        result[fieldId] = value !== undefined && value !== null ? value : '';
+      }
     });
 
     return result;

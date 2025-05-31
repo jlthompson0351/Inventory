@@ -14,9 +14,11 @@ export type Database = {
           aggregatable: boolean | null
           asset_type_id: string
           created_at: string | null
+          deleted_at: string | null
           description: string | null
           field_type: string | null
           id: string
+          is_deleted: boolean | null
           organization_id: string
           source_field: string
           target_field: string
@@ -26,9 +28,11 @@ export type Database = {
           aggregatable?: boolean | null
           asset_type_id: string
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           field_type?: string | null
           id?: string
+          is_deleted?: boolean | null
           organization_id: string
           source_field: string
           target_field: string
@@ -38,9 +42,11 @@ export type Database = {
           aggregatable?: boolean | null
           asset_type_id?: string
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           field_type?: string | null
           id?: string
+          is_deleted?: boolean | null
           organization_id?: string
           source_field?: string
           target_field?: string
@@ -59,6 +65,20 @@ export type Database = {
             columns: ["asset_type_id"]
             isOneToOne: false
             referencedRelation: "inventory_aggregation_report"
+            referencedColumns: ["asset_type_id"]
+          },
+          {
+            foreignKeyName: "asset_formula_mappings_asset_type_id_fkey"
+            columns: ["asset_type_id"]
+            isOneToOne: false
+            referencedRelation: "mv_asset_type_summary"
+            referencedColumns: ["asset_type_id"]
+          },
+          {
+            foreignKeyName: "asset_formula_mappings_asset_type_id_fkey"
+            columns: ["asset_type_id"]
+            isOneToOne: false
+            referencedRelation: "qr_asset_details"
             referencedColumns: ["asset_type_id"]
           },
           {
@@ -1327,22 +1347,31 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
           full_name: string | null
           id: string
+          is_deleted: boolean | null
+          quick_access_pin: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           full_name?: string | null
           id: string
+          is_deleted?: boolean | null
+          quick_access_pin?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           full_name?: string | null
           id?: string
+          is_deleted?: boolean | null
+          quick_access_pin?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2140,9 +2169,29 @@ export type Database = {
         Args: { p_barcode: string }
         Returns: boolean
       }
+      verify_quick_access_pin: {
+        Args: { pin_code: string }
+        Returns: {
+          user_id: string
+          full_name: string
+          organization_id: string
+          role: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      inventory_movement_type:
+        | "intake"
+        | "consumption"
+        | "adjustment_up"
+        | "adjustment_down"
+        | "damage"
+        | "theft"
+        | "return"
+        | "transfer_in"
+        | "transfer_out"
+        | "expired"
+        | "audit"
     }
     CompositeTypes: {
       organization_hierarchy: {
@@ -2264,6 +2313,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      inventory_movement_type: [
+        "intake",
+        "consumption",
+        "adjustment_up",
+        "adjustment_down",
+        "damage",
+        "theft",
+        "return",
+        "transfer_in",
+        "transfer_out",
+        "expired",
+        "audit",
+      ],
+    },
   },
 } as const
