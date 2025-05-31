@@ -395,6 +395,12 @@ export default function NewAsset() {
         metadata.current_inventory = values.current_inventory;
       }
       
+      // Add all conversion field values from the dynamic form to metadata
+      // This ensures conversion values are saved when editing an asset
+      if (Object.keys(formValues).length > 0) {
+        Object.assign(metadata, formValues);
+      }
+      
       // Prepare asset data
       const assetData: any = {
         name: values.name,
@@ -636,6 +642,9 @@ export default function NewAsset() {
         delete dynamicFormValues.cost;
         delete dynamicFormValues.unit_type;
         delete dynamicFormValues.current_inventory;
+        
+        // The conversion field values are already included in metadataObject
+        // so they'll be in dynamicFormValues by default
         
         setFormValues(dynamicFormValues);
       } else {
