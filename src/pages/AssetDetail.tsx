@@ -262,13 +262,37 @@ export default function AssetDetail() {
           created_at,
           updated_at,
           created_by,
-          last_checked_at,
-          profiles!created_by(full_name, email)
+          last_checked_at
         `)
         .eq('asset_id', assetId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch user profiles separately if needed
+      if (inventoryData && inventoryData.length > 0) {
+        const userIds = [...new Set(inventoryData.map(item => item.created_by).filter(Boolean))];
+        
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', userIds);
+          
+          // Map profiles to inventory items
+          const profileMap = profiles?.reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, any>) || {};
+          
+          // Add profile data to inventory items
+          inventoryData.forEach(item => {
+            if (item.created_by && profileMap[item.created_by]) {
+              (item as any).profiles = profileMap[item.created_by];
+            }
+          });
+        }
+      }
 
       setInventoryItems(inventoryData || []);
       setHasInventoryItem(inventoryData && inventoryData.length > 0);

@@ -346,7 +346,7 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {usageSummary.slice(0, 6).map((item, index) => (
                   <div 
-                    key={item.month} 
+                    key={`usage-${item.month}-${index}`} 
                     className={`p-3 rounded-md border ${
                       item.usage > 0 ? 'bg-red-50 border-red-200' : 
                       item.usage < 0 ? 'bg-green-50 border-green-200' : 
@@ -438,31 +438,32 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
         <div className="overflow-x-auto">
           <div className="flex space-x-2 py-2 min-w-max">
             {filteredHistory.map((historyItem, index) => (
-              <Button
-                key={historyItem.month_year}
-                variant={historyItem.month_year === currentMonth ? "default" : "outline"}
-                size="sm"
-                className="px-3 py-1 h-auto"
-                onClick={() => setCurrentMonth(historyItem.month_year)}
-              >
-                <Badge 
-                  variant="outline" 
-                  className={`mr-2 ${
-                    historyItem.event_type === 'intake' ? 'bg-blue-50 border-blue-200' : 
-                    historyItem.event_type === 'check' ? 'bg-green-50 border-green-200' : 
-                    'bg-gray-50 border-gray-200'
-                  }`}
+              <div key={`${historyItem.month_year}-${historyItem.id || index}`} className="flex items-center space-x-1">
+                <Button
+                  variant={historyItem.month_year === currentMonth ? "default" : "outline"}
+                  size="sm"
+                  className="px-3 py-1 h-auto"
+                  onClick={() => setCurrentMonth(historyItem.month_year)}
                 >
-                  {historyItem.event_type === 'intake' ? 'I' : 
-                   historyItem.event_type === 'check' ? 'C' : 'O'}
-                </Badge>
-                {format(parseISO(`${historyItem.month_year}-01`), 'MMM yyyy')}
+                  <Badge 
+                    variant="outline" 
+                    className={`mr-2 ${
+                      historyItem.event_type === 'intake' ? 'bg-blue-50 border-blue-200' : 
+                      historyItem.event_type === 'check' ? 'bg-green-50 border-green-200' : 
+                      'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    {historyItem.event_type === 'intake' ? 'I' : 
+                     historyItem.event_type === 'check' ? 'C' : 'O'}
+                  </Badge>
+                  {format(parseISO(`${historyItem.month_year}-01`), 'MMM yyyy')}
+                </Button>
                 {/* Edit button for each record */}
                 {historyItem.event_type !== 'intake' && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="ml-2 text-xs"
+                    className="text-xs px-2"
                     onClick={e => {
                       e.stopPropagation();
                       setEditRecord(historyItem);
@@ -472,7 +473,7 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
                     Edit
                   </Button>
                 )}
-              </Button>
+              </div>
             ))}
             {filteredHistory.length === 0 && !loading && (
               <div className="text-sm text-muted-foreground">No history records found</div>
