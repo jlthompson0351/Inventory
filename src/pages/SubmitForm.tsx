@@ -10,7 +10,9 @@ import {
   Calendar,
   Plus,
   Edit,
-  Package
+  Package,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +27,8 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { applyFormulaMappings } from '@/services/formulaMappingService';
 import { clearAssetCacheForOrg } from "@/components/inventory/AssetList";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export default function SubmitForm() {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +71,8 @@ export default function SubmitForm() {
   // Stabilize these objects to prevent infinite re-renders
   const prefillData = useMemo(() => location.state?.prefillData || {}, [location.state?.prefillData]);
   const calculationFormulas = useMemo(() => location.state?.calculationFormulas || {}, [location.state?.calculationFormulas]);
+  
+  const [showCalculatedFields, setShowCalculatedFields] = useState(false);
   
   useEffect(() => {
     const loadForm = async () => {
@@ -241,7 +247,8 @@ export default function SubmitForm() {
                     if (cf.field_name) {
                       // Check if the field exists in asset metadata, otherwise use default
                       if (!(cf.field_name in metadataWithDefaults)) {
-                        const defaultValue = cf.default_value !== undefined ? cf.default_value : 0;
+                        // Use 1.0 as default for conversion fields instead of 0 so math works
+                        const defaultValue = cf.field_name.startsWith('convert_') ? 1.0 : (cf.default_value !== undefined ? cf.default_value : 0);
                         console.warn(`SubmitForm - Adding default (${defaultValue}) for missing conversion field: ${cf.field_name}`);
                         metadataWithDefaults[cf.field_name] = defaultValue;
                       } else {
@@ -326,6 +333,15 @@ export default function SubmitForm() {
             console.log(`  - ${key}: ${value} (type: ${typeof value})`);
           });
           
+          // Additional debugging to ensure conversion fields are numbers
+          console.log('SubmitForm - Conversion fields as numbers:');
+          Object.entries(currentAssetMetadata).forEach(([key, value]) => {
+            if (key.startsWith('convert_')) {
+              const numValue = Number(value);
+              console.log(`  - ${key}: original="${value}" numeric=${numValue} isNaN=${isNaN(numValue)}`);
+            }
+          });
+          
           let debugFormFields: any[] = [];
           if (fetchedForm?.form_data) {
             const parsedData = typeof fetchedForm.form_data === 'string' 
@@ -334,6 +350,19 @@ export default function SubmitForm() {
             debugFormFields = parsedData?.fields || [];
           }
           console.log('SubmitForm - DEBUG: Form fields with mapped.convert formulas:', debugFormFields.filter((f: any) => f.formula?.includes('mapped.convert')));
+          
+          // Log specific examples of formula fields
+          debugFormFields.forEach((field: any) => {
+            if (field.formula?.includes('mapped.convert')) {
+              console.log(`SubmitForm - Field "${field.label}" (${field.id}) formula: ${field.formula}`);
+              // Extract the conversion field name from the formula
+              const match = field.formula.match(/\{mapped\.(convert_[^}]+)\}/);
+              if (match) {
+                const conversionField = match[1];
+                console.log(`  - Requires: ${conversionField} = ${currentAssetMetadata[conversionField]}`);
+              }
+            }
+          });
 
         } else {
           toast({
@@ -451,7 +480,7 @@ export default function SubmitForm() {
                         inventory_item_id: inventoryItem.id,
                         organization_id: currentOrganization.id,
                         quantity: roundedQuantity, // Database expects integer
-                        event_type: 'check',
+                        event_type: 'audit',
                         check_type: 'periodic',
                         notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
                         response_data: {
@@ -562,7 +591,7 @@ export default function SubmitForm() {
                     inventory_item_id: inventoryItem.id,
                     organization_id: currentOrganization.id,
                     quantity: roundedQuantity, // Database expects integer
-                    event_type: 'check',
+                    event_type: 'audit',
                     check_type: 'periodic',
                     notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
                     response_data: {
@@ -603,7 +632,7 @@ export default function SubmitForm() {
       } else if (formType === 'inventory') {
         navigate('/inventory');
       } else if (assetId) {
-        navigate(`/inventory/${assetId}`);
+        navigate(`/assets/${assetId}`);
       } else {
         navigate('/forms');
       }
@@ -737,6 +766,31 @@ export default function SubmitForm() {
       
       <Card>
         <CardContent className="p-6">
+          {/* Toggle for showing calculated fields and formulas */}
+          {form && form.form_data && (form.form_data as any).fields && 
+           (form.form_data as any).fields.some((field: any) => field.type === 'calculated') && (
+            <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-primary" />
+                <Label htmlFor="show-formulas" className="text-sm font-medium">
+                  Show Conversion & Formula Fields
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-formulas"
+                  checked={showCalculatedFields}
+                  onCheckedChange={setShowCalculatedFields}
+                />
+                {showCalculatedFields ? (
+                  <Eye className="h-4 w-4 text-primary" />
+                ) : (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </div>
+          )}
+          
           <FormRenderer
             form={form}
             validationRules={validationRules}
@@ -749,6 +803,7 @@ export default function SubmitForm() {
             submitButtonIconProps={submitting ? { className: 'animate-spin' } : undefined}
             mappedFields={assetMetadata}
             assetName={assetName}
+            showCalculatedFields={showCalculatedFields}
           />
         </CardContent>
       </Card>

@@ -189,7 +189,7 @@ export const hasPeriodicInventoryForMonth = async (assetId: string, monthYear: s
 // Helper to map old check_type to new event_type
 function mapCheckTypeToEventType(checkType: string): string {
   if (checkType === 'initial') return 'intake';
-  if (checkType === 'periodic') return 'check';
+  if (checkType === 'periodic') return 'audit';
   return checkType; // fallback for custom/other types
 }
 
@@ -1001,7 +1001,7 @@ export const createMonthlyInventoryCheck = async (
         location: checkData.location || '',
         quantity: checkData.quantity,
         check_type: 'periodic',
-        event_type: 'check',
+        event_type: 'audit',
         notes: checkData.notes || 'Monthly inventory check',
         status: checkData.status || 'active',
         check_date: checkDate.toISOString(),
@@ -1324,7 +1324,7 @@ export const recordNewInventoryCheck = async (
         location: checkData.location || inventoryItem.location || '', // Now safe
         quantity: finalQuantity, 
         check_type: 'periodic', 
-        event_type: 'check',    
+        event_type: 'audit',    
         notes: checkData.notes || 'Periodic inventory check',
         status: checkData.status || inventoryItem.status || 'active', // Now safe
         check_date: checkDate.toISOString(),

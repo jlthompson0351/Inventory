@@ -257,12 +257,10 @@ export default function AssetDetail() {
         .select(`
           id,
           quantity,
-          unit_type,
-          notes,
+          description,
           created_at,
           updated_at,
-          created_by,
-          last_checked_at
+          created_by
         `)
         .eq('asset_id', assetId)
         .order('created_at', { ascending: false });
@@ -276,7 +274,7 @@ export default function AssetDetail() {
         if (userIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, full_name, email')
+            .select('id, full_name')
             .in('id', userIds);
           
           // Map profiles to inventory items
@@ -640,13 +638,13 @@ export default function AssetDetail() {
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <div className="font-semibold text-lg">
-                              {item.quantity} {item.unit_type || 'units'}
+                              {item.quantity} units
                             </div>
                             <div className="text-sm text-muted-foreground">
                               Added: {new Date(item.created_at).toLocaleDateString()}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              By: {item.profiles?.full_name || item.profiles?.email || 'Unknown'}
+                              By: {item.profiles?.full_name || 'Unknown'}
                             </div>
                           </div>
                           <Button 
@@ -657,9 +655,9 @@ export default function AssetDetail() {
                             View Details
                           </Button>
                         </div>
-                        {item.notes && (
+                        {item.description && (
                           <div className="text-sm text-muted-foreground mt-2">
-                            Notes: {item.notes}
+                            Notes: {item.description}
                           </div>
                         )}
                       </div>

@@ -438,7 +438,7 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
         <div className="overflow-x-auto">
           <div className="flex space-x-2 py-2 min-w-max">
             {filteredHistory.map((historyItem, index) => (
-              <div key={`${historyItem.month_year}-${historyItem.id || index}`} className="flex items-center space-x-1">
+              <div key={`timeline-${historyItem.id}-${index}`} className="flex items-center space-x-1">
                 <Button
                   variant={historyItem.month_year === currentMonth ? "default" : "outline"}
                   size="sm"
@@ -458,21 +458,6 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
                   </Badge>
                   {format(parseISO(`${historyItem.month_year}-01`), 'MMM yyyy')}
                 </Button>
-                {/* Edit button for each record */}
-                {historyItem.event_type !== 'intake' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs px-2"
-                    onClick={e => {
-                      e.stopPropagation();
-                      setEditRecord(historyItem);
-                      setEditFormValues(historyItem.response_data || {});
-                    }}
-                  >
-                    Edit
-                  </Button>
-                )}
               </div>
             ))}
             {filteredHistory.length === 0 && !loading && (

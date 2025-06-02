@@ -159,7 +159,12 @@ export default function InventoryHistory() {
             id,
             name,
             organization_id,
-            asset_type:asset_types(id, name)
+            asset_type:asset_types(
+              id, 
+              name,
+              intake_form_id,
+              inventory_form_id
+            )
           )
         `)
         .eq('id', inventoryItemId)
@@ -933,7 +938,35 @@ export default function InventoryHistory() {
                             )}
                           </div>
                           {event.event_type !== 'intake' && (
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                // Determine the correct form ID based on event type
+                                let formId = event.response_data?.form_id;
+                                
+                                if (!formId && inventoryItem?.asset?.asset_type) {
+                                  // Use inventory form for audit/check events, intake form for others
+                                  if (['audit', 'check'].includes(event.event_type)) {
+                                    formId = inventoryItem.asset.asset_type.inventory_form_id;
+                                  } else {
+                                    formId = inventoryItem.asset.asset_type.intake_form_id;
+                                  }
+                                }
+                                
+                                if (formId) {
+                                  navigate(`/forms/submit/${formId}?asset_id=${inventoryItem?.asset_id}&action=edit-history&history_id=${event.id}`);
+                                } else {
+                                  toast({
+                                    title: "Form Not Found",
+                                    description: "Could not find the form for this event type",
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              title="Edit this entry"
+                            >
                               <Edit className="h-3 w-3" />
                             </Button>
                           )}

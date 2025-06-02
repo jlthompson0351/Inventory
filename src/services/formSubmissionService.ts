@@ -281,7 +281,7 @@ export async function submitForm(
         const notesWithChanges = `Form: ${form.name}. Changes: ${changesSummary}`;
         
         // Determine the correct event_type based on formType parameter or form purpose
-        let eventType = 'form_submission';
+        let eventType = 'audit';
         let checkType = 'form_submission';
         
         if (formType) {
@@ -292,7 +292,7 @@ export async function submitForm(
               checkType = 'intake';
               break;
             case 'inventory':
-              eventType = 'check';
+              eventType = 'audit';
               checkType = 'periodic';
               break;
             case 'audit':
@@ -300,7 +300,7 @@ export async function submitForm(
               checkType = 'audit';
               break;
             default:
-              eventType = 'form_submission';
+              eventType = 'audit';
               checkType = formType;
           }
         } else if (form.purpose && form.purpose !== 'generic') {
@@ -311,7 +311,7 @@ export async function submitForm(
               checkType = 'intake';
               break;
             case 'inventory':
-              eventType = 'check';
+              eventType = 'audit';
               checkType = 'periodic';
               break;
             case 'audit':
@@ -319,7 +319,7 @@ export async function submitForm(
               checkType = 'audit';
               break;
             default:
-              eventType = 'form_submission';
+              eventType = 'audit';
               checkType = form.purpose;
           }
         }
@@ -336,13 +336,16 @@ export async function submitForm(
             response_data: {
               ...processedData,
               _inventory_changes: inventoryChanges,
-              _previous_quantity: inventoryItem.quantity
+              _previous_quantity: inventoryItem.quantity,
+              // Add exact_quantity for SET actions to preserve decimal precision
+              ...(inventoryChanges.some(c => c.action === 'set') ? { exact_quantity: newQuantity } : {}),
+              // Store the form ID for later reference
+              form_id: formId
             },
             created_by: userId,
-            created_at: new Date().toISOString(),
             check_date: new Date().toISOString(),
             month_year: new Date().toISOString().slice(0, 7),
-            location: processedData.location || inventoryItem.location || ''
+            status: 'active'
           });
           
         console.log(`✅ Inventory updated: ${inventoryItem.quantity} → ${finalQuantity} for asset ${asset.name}`);

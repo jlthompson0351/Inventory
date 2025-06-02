@@ -40,6 +40,7 @@ interface FormRendererProps {
   submitButtonIconProps?: any;
   mappedFields?: Record<string, any>;
   assetName?: string;
+  showCalculatedFields?: boolean;
 }
 
 export function FormRenderer({
@@ -54,7 +55,8 @@ export function FormRenderer({
   submitButtonDisabled,
   submitButtonIconProps,
   mappedFields = {},
-  assetName
+  assetName,
+  showCalculatedFields = false
 }: FormRendererProps) {
   const [formData, setFormData] = useState<any>(() => {
     // Initialize with initialData on first render
@@ -63,7 +65,6 @@ export function FormRenderer({
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCalculatedFields, setShowCalculatedFields] = useState(false);
   const [inventoryWarning, setInventoryWarning] = useState<string | null>(null);
   
   // Extract fields from form.form_data
@@ -265,6 +266,21 @@ export function FormRenderer({
         context.mappedFields[`mapped.${key}`] = Number(value) || 0;
       });
       
+      // CRITICAL: Override with historical conversion rates if editing historical data
+      if (formData._historical_conversion_rates) {
+        console.log('FormRenderer - Using historical conversion rates for calculations:', formData._historical_conversion_rates);
+        Object.entries(formData._historical_conversion_rates).forEach(([key, value]) => {
+          context.mappedFields[`mapped.${key}`] = Number(value) || 0;
+        });
+      }
+      
+      // Debug logging for mapped fields
+      if (field.formula.includes('mapped.convert')) {
+        console.log(`FormRenderer - Calculating ${field.id} with formula: ${field.formula}`);
+        console.log(`FormRenderer - Available mapped fields:`, context.mappedFields);
+        console.log(`FormRenderer - Current field values:`, context.fields);
+      }
+      
       // Use secure formula evaluator
       const result = evaluateFormula(field.formula, context);
       if (result.success) {
@@ -329,26 +345,19 @@ export function FormRenderer({
   const handleChange = (fieldId: string, value: any) => {
     console.log(`FormRenderer - handleChange for ${fieldId}, new value: ${value}`);
     
-    // For numeric fields, ensure we keep valid values even if temporarily empty
+    // Update the form data immediately
+    const updatedData = { ...formData, [fieldId]: value };
+    
+    // For numeric fields that are empty, we still want to update and recalculate
     const field = fields.find(f => f.id === fieldId);
-    if (field?.type === 'number') {
-      // Allow empty string (user is typing) but don't convert to 0
-      if (value === '') {
-        const updatedData = { ...formData, [fieldId]: value };
-        setFormData(updatedData);
-        
-        // Clear error for this field
-        if (errors[fieldId]) {
-          const updatedErrors = { ...errors };
-          delete updatedErrors[fieldId];
-          setErrors(updatedErrors);
-        }
-        
-        return;
+    if (field?.type === 'number' && value === '') {
+      // Clear error for this field if it exists
+      if (errors[fieldId]) {
+        const updatedErrors = { ...errors };
+        delete updatedErrors[fieldId];
+        setErrors(updatedErrors);
       }
     }
-    
-    const updatedData = { ...formData, [fieldId]: value };
     
     // Calculate ALL formula fields with cascading support
     // This ensures all calculated fields update properly, even with complex dependencies
@@ -384,6 +393,21 @@ export function FormRenderer({
               // The formulas expect {mapped.field_name} so we need to set the key as 'mapped.field_name'
               context.mappedFields[`mapped.${key}`] = Number(value) || 0;
             });
+            
+            // CRITICAL: Override with historical conversion rates if editing historical data
+            if (updatedData._historical_conversion_rates) {
+              console.log('FormRenderer - Using historical conversion rates for calculations:', updatedData._historical_conversion_rates);
+              Object.entries(updatedData._historical_conversion_rates).forEach(([key, value]) => {
+                context.mappedFields[`mapped.${key}`] = Number(value) || 0;
+              });
+            }
+            
+            // Debug logging for mapped fields
+            if (field.formula.includes('mapped.convert')) {
+              console.log(`FormRenderer - Calculating ${field.id} with formula: ${field.formula}`);
+              console.log(`FormRenderer - Available mapped fields:`, context.mappedFields);
+              console.log(`FormRenderer - Current field values:`, context.fields);
+            }
             
             // Use secure formula evaluator
             const result = evaluateFormula(field.formula, context);
@@ -503,7 +527,99 @@ export function FormRenderer({
     
     if (validateForm()) {
       try {
-        await onSubmit(formData);
+        // Ensure all calculated fields are properly calculated before submission
+        const finalFormData = { ...formData };
+        let calculationAttempts = 0;
+        const MAX_CALC_ATTEMPTS = 3;
+        
+        console.log('FormRenderer - Ensuring all calculated fields are up to date before submission');
+        
+        // Run calculations one more time to ensure everything is current
+        while (calculationAttempts < MAX_CALC_ATTEMPTS) {
+          let hasCalculationChanges = false;
+          calculationAttempts++;
+          
+          fields.forEach(field => {
+            if (field.type === 'calculated' && field.formula) {
+              try {
+                // Create context object for evaluation with ALL current values
+                const context: FormulaContext = {
+                  fields: {},
+                  mappedFields: {}
+                };
+                
+                // Add all field values to context
+                fields.forEach(f => {
+                  const currentValue = finalFormData[f.id];
+                  // Convert to number, default to 0 for empty/invalid values
+                  context.fields[f.id] = (currentValue === '' || currentValue === null || currentValue === undefined) ? 0 : Number(currentValue) || 0;
+                });
+                
+                // Add mapped fields from props
+                Object.entries(mappedFields).forEach(([key, value]) => {
+                  context.mappedFields[`mapped.${key}`] = Number(value) || 0;
+                });
+                
+                // CRITICAL: Override with historical conversion rates if editing historical data
+                if (finalFormData._historical_conversion_rates) {
+                  Object.entries(finalFormData._historical_conversion_rates).forEach(([key, value]) => {
+                    context.mappedFields[`mapped.${key}`] = Number(value) || 0;
+                  });
+                }
+                
+                // Use secure formula evaluator
+                const result = evaluateFormula(field.formula, context);
+                if (result.success) {
+                  const newValue = Number(result.result).toFixed(2);
+                  
+                  // Check if value changed
+                  if (finalFormData[field.id] !== newValue) {
+                    console.log(`FormRenderer - Final calculation: ${field.id} = ${newValue} (was ${finalFormData[field.id]})`);
+                    finalFormData[field.id] = newValue;
+                    hasCalculationChanges = true;
+                  }
+                } else {
+                  console.error(`FormRenderer - Formula evaluation error for ${field.id}:`, (result as { success: false; error: string }).error);
+                  console.log(`FormRenderer - Setting ${field.id} to 0.00 due to calculation error`);
+                  finalFormData[field.id] = '0.00';
+                  hasCalculationChanges = true;
+                }
+              } catch (e) {
+                console.error(`FormRenderer - Exception calculating ${field.id}:`, e);
+                console.log(`FormRenderer - Setting ${field.id} to 0.00 due to exception`);
+                finalFormData[field.id] = '0.00';
+                hasCalculationChanges = true;
+              }
+            }
+          });
+          
+          // If no changes in this iteration, we're done
+          if (!hasCalculationChanges) {
+            break;
+          }
+        }
+        
+        // Final safety check: ensure ALL calculated fields have values
+        fields.forEach(field => {
+          if (field.type === 'calculated') {
+            if (finalFormData[field.id] === undefined || finalFormData[field.id] === null || finalFormData[field.id] === '') {
+              console.warn(`FormRenderer - Calculated field ${field.id} has no value, setting to 0.00`);
+              finalFormData[field.id] = '0.00';
+            }
+          }
+        });
+        
+        console.log('FormRenderer - Final form data being submitted:', finalFormData);
+        console.log('FormRenderer - Calculated fields in submission:', 
+          fields.filter(f => f.type === 'calculated').map(f => ({
+            id: f.id,
+            label: f.label,
+            value: finalFormData[f.id],
+            formula: f.formula
+          }))
+        );
+        
+        await onSubmit(finalFormData);
       } catch (error) {
         console.error('Form submission error:', error);
         // Could set a general form error here
@@ -611,13 +727,20 @@ export function FormRenderer({
         )}
         
         {field.type === 'calculated' && (
-          <Input
-            id={field.id}
-            value={formData[field.id] || '0.00'}
-            readOnly
-            disabled
-            className="bg-muted"
-          />
+          <div className={`${showCalculatedFields ? 'bg-muted/50 p-3 rounded border-dashed border-2' : ''}`}>
+            <Input
+              id={field.id}
+              value={formData[field.id] || '0.00'}
+              readOnly
+              disabled
+              className={`${showCalculatedFields ? 'bg-white font-mono font-bold text-lg' : 'bg-muted'}`}
+            />
+            {showCalculatedFields && field.formula && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                <strong>Formula:</strong> <code className="bg-white px-1 rounded">{field.formula}</code>
+              </div>
+            )}
+          </div>
         )}
         
         {field.type === 'barcode' && (
@@ -671,35 +794,12 @@ export function FormRenderer({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Asset info and calculated fields toggle */}
+      {/* Asset info */}
       {assetName && (
         <Alert className="mb-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <div className="flex justify-between items-center">
-              <span>
-                <strong>Asset:</strong> {assetName}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCalculatedFields(!showCalculatedFields)}
-                className="ml-4"
-              >
-                {showCalculatedFields ? (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-2" />
-                    Hide Conversions
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Show Conversions
-                  </>
-                )}
-              </Button>
-            </div>
+            <strong>Asset:</strong> {assetName}
           </AlertDescription>
         </Alert>
       )}

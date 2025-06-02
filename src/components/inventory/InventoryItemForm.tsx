@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Select, 
@@ -41,6 +41,8 @@ import {
   getFormWithRelatedData
 } from "@/services/formService";
 import { useOrganization } from "@/hooks/useOrganization";
+import { Calculator, Eye, EyeOff } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 // Form schema with validation
 const formSchema = z.object({
@@ -90,6 +92,7 @@ export function InventoryItemForm({
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [currentMonthHistory, setCurrentMonthHistory] = useState<any[]>([]);
   const [eventType, setEventType] = useState<'intake' | 'addition' | 'audit' | 'adjustment' | 'removal' | 'transfer' | 'disposal' | 'deleted' | 'check'>('intake');
+  const [showCalculatedFields, setShowCalculatedFields] = useState(false);
   
   // Initialize form with default values or data from an existing item
   const form = useForm<FormValues>({
@@ -538,6 +541,31 @@ export function InventoryItemForm({
                 )}
               </CardHeader>
               <CardContent>
+                {/* Toggle for showing calculated fields and formulas */}
+                {formTemplate?.form_data && (formTemplate.form_data as any).fields && 
+                 (formTemplate.form_data as any).fields.some((field: any) => field.type === 'calculated') && (
+                  <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg border">
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-primary" />
+                      <Label htmlFor="show-formulas-inventory" className="text-sm font-medium">
+                        Show Conversion & Formula Fields
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="show-formulas-inventory"
+                        checked={showCalculatedFields}
+                        onCheckedChange={setShowCalculatedFields}
+                      />
+                      {showCalculatedFields ? (
+                        <Eye className="h-4 w-4 text-primary" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 {formTemplate?.fields && Array.isArray(formTemplate.fields) && formTemplate.fields.length > 0 ? (
                   <FormRenderer
                     form={formTemplate}
@@ -545,6 +573,7 @@ export function InventoryItemForm({
                     fieldDependencies={fieldDependencies}
                     onSubmit={setDynamicFormData}
                     initialData={dynamicFormData}
+                    showCalculatedFields={showCalculatedFields}
                   />
                 ) : (
                   <div className="text-center p-4 border border-dashed rounded-md text-muted-foreground">
