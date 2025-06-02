@@ -57,22 +57,6 @@ import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 const queryClient = new QueryClient();
 
 /**
- * RouteDebugger Component
- * 
- * This component logs route changes to the console for debugging purposes.
- * Only active in development mode to help with troubleshooting navigation.
- */
-const RouteDebugger = () => {
-  const location = useLocation();
-  
-  useEffect(() => {
-    console.log("Current Route:", location.pathname);
-  }, [location.pathname]);
-  
-  return null;
-};
-
-/**
  * AppRoutes Component
  * 
  * Main route configuration component that handles authentication state
@@ -96,7 +80,6 @@ const AppRoutes = () => {
 
   return (
     <>
-      <RouteDebugger />
       <Routes>
         {/* Public routes - accessible without login */}
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -143,7 +126,7 @@ const AppRoutes = () => {
         <Route path="/forms/edit/:id" element={user ? <PageLayout><FormBuilder /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/forms/:id" element={user ? <PageLayout><FormDetail /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/forms/preview/:id" element={user ? <PageLayout><FormPreview /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/submit/:id" element={user ? <PageLayout><SubmitForm /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/forms/submit/:id" element={<FormSubmissionWrapper />} />
         
         {/* Asset Type Management Routes */}
         <Route path="/asset-types" element={user ? <PageLayout><AssetTypes /></PageLayout> : <Navigate to="/login" />} />
@@ -235,6 +218,28 @@ class AppErrorBoundary extends Component<{children: ReactNode}, {hasError: boole
     return this.props.children;
   }
 }
+
+/**
+ * FormSubmissionWrapper Component
+ * 
+ * Handles authentication for form submissions from both:
+ * 1. Traditional login users
+ * 2. Mobile QR PIN authentication users
+ */
+const FormSubmissionWrapper = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  
+  // Check if user came from mobile QR workflow with valid PIN session
+  const hasMobilePinAuth = location.state?.fromMobileQR && location.state?.authSession;
+  
+  // Allow access if either traditional auth OR mobile PIN auth
+  if (user || hasMobilePinAuth) {
+    return <PageLayout><SubmitForm /></PageLayout>;
+  }
+  
+  return <Navigate to="/login" />;
+};
 
 /**
  * Main App Component

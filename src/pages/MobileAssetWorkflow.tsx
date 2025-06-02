@@ -46,19 +46,12 @@ const MobileAssetWorkflow = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // DEBUG: Log component initialization
-  console.log('=== MobileAssetWorkflow Component Initialized ===');
-  console.log('Raw assetId from useParams:', assetId);
-  console.log('Type of assetId:', typeof assetId);
-  console.log('URL pathname:', window.location.pathname);
-  console.log('URL search:', window.location.search);
-  
   const [step, setStep] = useState<'loading' | 'pin' | 'options'>('loading');
   const [pin, setPin] = useState("");
   const [assetData, setAssetData] = useState<AssetData | null>(null);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   // PIN authentication function
@@ -96,32 +89,16 @@ const MobileAssetWorkflow = () => {
 
   // Load asset data on mount
   useEffect(() => {
-    console.log('=== useEffect triggered ===');
-    console.log('assetId in useEffect:', assetId);
-    console.log('Boolean check of assetId:', !!assetId);
-    
     if (assetId) {
-      console.log('About to call loadAssetData...');
       loadAssetData();
-    } else {
-      console.log('assetId is falsy, not calling loadAssetData');
     }
   }, [assetId]);
 
   const loadAssetData = async () => {
-    console.log('🚀 loadAssetData function called!');
-    
     try {
       setIsLoading(true);
       
-      // DEBUG: Log environment and parameters
-      console.log('=== DEBUG: loadAssetData ===');
-      console.log('Asset ID from params:', assetId);
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-      
       // First get the asset data - use maybeSingle() to handle missing assets gracefully
-      console.log('Making Supabase query...');
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id, name, barcode, asset_type_id, organization_id')
@@ -129,11 +106,14 @@ const MobileAssetWorkflow = () => {
         .eq('is_deleted', false)
         .single();
 
-      console.log('Supabase response:', { data: assetData, error: assetError });
-
       if (assetError) {
         console.error('Error fetching asset:', assetError);
-        throw new Error('Failed to fetch asset data');
+        toast({
+          variant: "destructive",
+          title: "Asset Not Found",
+          description: "The asset you're looking for could not be found.",
+        });
+        return;
       }
       
       if (!assetData) {
@@ -146,18 +126,21 @@ const MobileAssetWorkflow = () => {
         return;
       }
 
-      console.log('Asset data found:', assetData);
-
       // Then get the asset type info - use maybeSingle() here too
       const { data: assetTypeData, error: assetTypeError } = await supabase
         .from('asset_types')
-        .select('id, name')
+        .select('*')
         .eq('id', assetData.asset_type_id)
-        .single();
+        .maybeSingle();
 
       if (assetTypeError) {
         console.error('Error fetching asset type:', assetTypeError);
-        throw new Error('Failed to fetch asset type data');
+        toast({
+          variant: "destructive", 
+          title: "Asset Type Error",
+          description: "Could not load asset type information.",
+        });
+        return;
       }
 
       // Get linked forms for this asset type from asset_type_forms table
