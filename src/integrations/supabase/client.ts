@@ -2,8 +2,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database.types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+// Temporarily hardcode the values to bypass environment variable issues
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://kxcubbibhofdvporfarj.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4Y3ViYmliaG9mZHZwb3JmYXJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ0MDA4OTcsImV4cCI6MjA1OTk3Njg5N30.tgIV238CB9EeMOWdqM-u8oDhhbCz2f7SzT7ma9jfeEo';
 
 // Debug logging to help troubleshoot environment variable issues
 console.log('Environment variables check:', {
@@ -11,6 +12,11 @@ console.log('Environment variables check:', {
   hasKey: !!SUPABASE_PUBLISHABLE_KEY,
   urlValue: SUPABASE_URL ? 'present' : 'missing',
   keyValue: SUPABASE_PUBLISHABLE_KEY ? 'present' : 'missing'
+});
+
+console.log('Hardcoded fallback values:', {
+  url: 'https://kxcubbibhofdvporfarj.supabase.co',
+  keyPresent: true
 });
 
 if (!SUPABASE_URL) {
