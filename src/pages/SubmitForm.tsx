@@ -456,20 +456,34 @@ export default function SubmitForm() {
                   } else {
                     console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
                     
-                    // Also update the asset metadata with the exact decimal value
-                    const { error: assetUpdateError } = await supabase
+                    // Get current asset to preserve existing metadata (especially conversion rates)
+                    const { data: currentAsset, error: assetFetchError } = await supabase
                       .from('assets')
-                      .update({
-                        metadata: {
-                          ...assetMetadata,
-                          exact_quantity_gallons: newQuantity,
-                          last_inventory_update: new Date().toISOString()
-                        }
-                      })
-                      .eq('id', assetId);
+                      .select('metadata')
+                      .eq('id', assetId)
+                      .single();
+                    
+                    if (!assetFetchError && currentAsset) {
+                      // Preserve existing metadata and only update inventory-related fields
+                      const preservedMetadata = (currentAsset.metadata as Record<string, any>) || {};
+                      const updatedMetadata = {
+                        ...preservedMetadata,
+                        exact_quantity_gallons: newQuantity,
+                        last_inventory_update: new Date().toISOString()
+                      };
                       
-                    if (assetUpdateError) {
-                      console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
+                      const { error: assetUpdateError } = await supabase
+                        .from('assets')
+                        .update({
+                          metadata: updatedMetadata
+                        })
+                        .eq('id', assetId);
+                        
+                      if (assetUpdateError) {
+                        console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
+                      } else {
+                        console.log('Asset metadata updated while preserving conversion rates');
+                      }
                     }
                     
                     // Create inventory history record
@@ -523,96 +537,111 @@ export default function SubmitForm() {
         });
       } else {
         // Create new submission
-      const result = await submitForm(
-        id,
-        data,
-        currentOrganization.id,
-        submissionAssetTypeId,
-        assetId, // Pass the asset ID if this is from a QR code scan
-        formType // Pass the form type to determine correct event_type
-      );
-      
-      // For inventory forms, ensure inventory is updated
-      if (formType === 'inventory' && form?.form_data && assetId) {
-        const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
+        const result = await submitForm(
+          id,
+          data,
+          currentOrganization.id,
+          submissionAssetTypeId,
+          assetId, // Pass the asset ID if this is from a QR code scan
+          formType // Pass the form type to determine correct event_type
+        );
         
-        // Find field with inventory_action = 'set'
-        const setField = formSchema.fields?.find((field: any) => field.inventory_action === 'set');
-        if (setField && data[setField.id]) {
-          const newQuantity = Number(data[setField.id]);
+        // For inventory forms, ensure inventory is updated
+        if (formType === 'inventory' && form?.form_data && assetId) {
+          const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;
           
-          if (!isNaN(newQuantity)) {
-            // Get inventory item for this asset
-            const { data: inventoryItem, error: fetchError } = await supabase
-              .from('inventory_items')
-              .select('id')
-              .eq('asset_id', assetId)
-              .single();
-              
-            if (fetchError) {
-              console.error('Error fetching inventory item:', fetchError);
-            } else if (inventoryItem) {
-              // Update inventory quantity (round for integer column)
-              const roundedQuantity = Math.round(newQuantity);
-              const { error: updateError } = await supabase
+          // Find field with inventory_action = 'set'
+          const setField = formSchema.fields?.find((field: any) => field.inventory_action === 'set');
+          if (setField && data[setField.id]) {
+            const newQuantity = Number(data[setField.id]);
+            
+            if (!isNaN(newQuantity)) {
+              // Get inventory item for this asset
+              const { data: inventoryItem, error: fetchError } = await supabase
                 .from('inventory_items')
-                .update({
-                  quantity: roundedQuantity, // Database expects integer
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', inventoryItem.id);
+                .select('id')
+                .eq('asset_id', assetId)
+                .single();
                 
-              if (updateError) {
-                console.error('Error updating inventory:', updateError);
-              } else {
-                console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
-                
-                // Also update the asset metadata with the exact decimal value
-                const { error: assetUpdateError } = await supabase
-                  .from('assets')
+              if (fetchError) {
+                console.error('Error fetching inventory item:', fetchError);
+              } else if (inventoryItem) {
+                // Update inventory quantity (round for integer column)
+                const roundedQuantity = Math.round(newQuantity);
+                const { error: updateError } = await supabase
+                  .from('inventory_items')
                   .update({
-                    metadata: {
-                      ...assetMetadata,
+                    quantity: roundedQuantity, // Database expects integer
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', inventoryItem.id);
+                  
+                if (updateError) {
+                  console.error('Error updating inventory:', updateError);
+                } else {
+                  console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
+                  
+                  // Get current asset to preserve existing metadata (especially conversion rates)
+                  const { data: currentAsset, error: assetFetchError } = await supabase
+                    .from('assets')
+                    .select('metadata')
+                    .eq('id', assetId)
+                    .single();
+                  
+                  if (!assetFetchError && currentAsset) {
+                    // Preserve existing metadata and only update inventory-related fields
+                    const preservedMetadata = (currentAsset.metadata as Record<string, any>) || {};
+                    const updatedMetadata = {
+                      ...preservedMetadata,
                       exact_quantity_gallons: newQuantity,
                       last_inventory_update: new Date().toISOString()
+                    };
+                    
+                    const { error: assetUpdateError } = await supabase
+                      .from('assets')
+                      .update({
+                        metadata: updatedMetadata
+                      })
+                      .eq('id', assetId);
+                      
+                    if (assetUpdateError) {
+                      console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
+                    } else {
+                      console.log('Asset metadata updated while preserving conversion rates');
                     }
-                  })
-                  .eq('id', assetId);
+                  }
                   
-                if (assetUpdateError) {
-                  console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
-                }
-                
-                // Create inventory history record
-                const userId = (await supabase.auth.getUser()).data.user?.id;
-                const { error: historyError } = await supabase
-                  .from('inventory_history')
-                  .insert({
-                    inventory_item_id: inventoryItem.id,
-                    organization_id: currentOrganization.id,
-                    quantity: roundedQuantity, // Database expects integer
-                    event_type: 'audit',
-                    check_type: 'periodic',
-                    notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
-                    response_data: {
-                      ...data,
-                      exact_quantity: newQuantity
-                    },
-                    created_by: userId || null,
-                    created_at: new Date().toISOString(),
-                    check_date: new Date().toISOString(),
-                    month_year: new Date().toISOString().slice(0, 7),
-                    location: data.location || '',
-                    status: 'active'
-                  });
-                  
-                if (historyError) {
-                  console.error('Error creating inventory history:', historyError);
+                  // Create inventory history record
+                  const userId = (await supabase.auth.getUser()).data.user?.id;
+                  const { error: historyError } = await supabase
+                    .from('inventory_history')
+                    .insert({
+                      inventory_item_id: inventoryItem.id,
+                      organization_id: currentOrganization.id,
+                      quantity: roundedQuantity, // Database expects integer
+                      event_type: 'audit',
+                      check_type: 'periodic',
+                      notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
+                      response_data: {
+                        ...data,
+                        exact_quantity: newQuantity
+                      },
+                      created_by: userId || null,
+                      created_at: new Date().toISOString(),
+                      check_date: new Date().toISOString(),
+                      month_year: new Date().toISOString().slice(0, 7),
+                      location: data.location || '',
+                      status: 'active'
+                    });
+                    
+                  if (historyError) {
+                    console.error('Error creating inventory history:', historyError);
+                  }
                 }
               }
+            } else {
+              console.error('Invalid quantity value:', data[setField.id]);
             }
-          } else {
-            console.error('Invalid quantity value:', data[setField.id]);
           }
         }
       }
@@ -621,7 +650,6 @@ export default function SubmitForm() {
         title: 'Form Submitted',
         description: 'Data has been recorded successfully',
       });
-      }
       
       // Clear asset cache to refresh inventory quantities
       clearAssetCacheForOrg(currentOrganization.id);
@@ -670,14 +698,14 @@ export default function SubmitForm() {
   }
   
   return (
-    <div className="container py-6">
-      <div className="flex items-center mb-6">
+    <div className={`${fromMobileQR ? 'mobile-form-container' : 'container'} py-6`}>
+      <div className={`flex items-center mb-6 ${fromMobileQR ? 'px-4' : ''}`}>
         <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold">{form.name}</h1>
+            <h1 className={`${fromMobileQR ? 'text-xl' : 'text-2xl'} font-bold`}>{form.name}</h1>
             {assetName && (
               <Badge variant="secondary" className="px-3 py-1">
                 <Package className="h-3 w-3 mr-1" />
@@ -685,7 +713,7 @@ export default function SubmitForm() {
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground">
+          <p className={`text-muted-foreground ${fromMobileQR ? 'text-sm' : ''}`}>
             {assetName 
               ? `${form.description || 'Complete this form'} for ${assetName}`
               : form.description || 'Complete and submit this form'
@@ -695,7 +723,7 @@ export default function SubmitForm() {
       </div>
       
       {assetId && (
-        <Alert className="mb-6">
+        <Alert className={`mb-6 ${fromMobileQR ? 'mx-4' : ''}`}>
           <QrCode className="h-4 w-4" />
           <AlertTitle>Form Pre-filled from QR Code</AlertTitle>
           <AlertDescription>
@@ -711,14 +739,14 @@ export default function SubmitForm() {
       )}
       
       {existingSubmissionId && assetId && (
-        <Alert className="mb-6" variant={isEditingExisting ? "default" : "default"}>
+        <Alert className={`mb-6 ${fromMobileQR ? 'mx-4' : ''}`} variant={isEditingExisting ? "default" : "default"}>
           <Calendar className="h-4 w-4" />
           <AlertTitle className="flex items-center justify-between">
             <span>
               {isEditingExisting ? 'Editing Existing Monthly Inventory' : 'Creating New Inventory Entry'}
             </span>
             {existingSubmissionDate && isEditingExisting && (
-              <span className="text-sm text-muted-foreground">
+              <span className={`text-sm text-muted-foreground ${fromMobileQR ? 'hidden sm:inline' : ''}`}>
                 Last updated: {existingSubmissionDate.toLocaleDateString()} at {existingSubmissionDate.toLocaleTimeString()}
               </span>
             )}
@@ -731,7 +759,7 @@ export default function SubmitForm() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="ml-2"
+                  className={`${fromMobileQR ? 'ml-0 mt-2 w-full sm:ml-2 sm:mt-0 sm:w-auto' : 'ml-2'}`}
                   onClick={() => {
                     const newUrl = new URL(window.location.href);
                     newUrl.searchParams.set('action', 'new');
@@ -748,7 +776,7 @@ export default function SubmitForm() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="ml-2"
+                  className={`${fromMobileQR ? 'ml-0 mt-2 w-full sm:ml-2 sm:mt-0 sm:w-auto' : 'ml-2'}`}
                   onClick={() => {
                     const newUrl = new URL(window.location.href);
                     newUrl.searchParams.delete('action');
@@ -764,12 +792,12 @@ export default function SubmitForm() {
         </Alert>
       )}
       
-      <Card>
-        <CardContent className="p-6">
+      <Card className={fromMobileQR ? 'mx-4' : ''}>
+        <CardContent className={`${fromMobileQR ? 'p-4' : 'p-6'}`}>
           {/* Toggle for showing calculated fields and formulas */}
           {form && form.form_data && (form.form_data as any).fields && 
            (form.form_data as any).fields.some((field: any) => field.type === 'calculated') && (
-            <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg border">
+            <div className={`flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg border ${fromMobileQR ? 'flex-col gap-3 sm:flex-row sm:gap-0' : ''}`}>
               <div className="flex items-center gap-2">
                 <Calculator className="h-4 w-4 text-primary" />
                 <Label htmlFor="show-formulas" className="text-sm font-medium">
@@ -804,6 +832,7 @@ export default function SubmitForm() {
             mappedFields={assetMetadata}
             assetName={assetName}
             showCalculatedFields={showCalculatedFields}
+            isMobile={fromMobileQR}
           />
         </CardContent>
       </Card>

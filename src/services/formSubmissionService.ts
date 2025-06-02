@@ -128,11 +128,35 @@ export async function submitForm(
     // If this is an asset-related form
     if (assetTypeId) {
       if (assetId) {
+        // Get current asset to preserve existing metadata (especially conversion rates)
+        const { data: currentAsset, error: fetchError } = await supabase
+          .from('assets')
+          .select('metadata')
+          .eq('id', assetId)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // Preserve existing metadata and merge with form data
+        const existingMetadata = (currentAsset?.metadata as Record<string, any>) || {};
+        const mergedMetadata = {
+          ...existingMetadata,
+          ...processedData,
+          // Always preserve these critical fields if they exist
+          ...(existingMetadata.convert_tank_amount_gallons && { convert_tank_amount_gallons: existingMetadata.convert_tank_amount_gallons }),
+          ...(existingMetadata.convert_dip_spin_wmv_gallons && { convert_dip_spin_wmv_gallons: existingMetadata.convert_dip_spin_wmv_gallons }),
+          ...(existingMetadata.convert_wmv_rackspin_gallons && { convert_wmv_rackspin_gallons: existingMetadata.convert_wmv_rackspin_gallons }),
+          ...(existingMetadata.convert_coating_amount_gallons && { convert_coating_amount_gallons: existingMetadata.convert_coating_amount_gallons }),
+          ...(existingMetadata.convert_rack_spin_forplan_gallons && { convert_rack_spin_forplan_gallons: existingMetadata.convert_rack_spin_forplan_gallons }),
+          ...(existingMetadata.convert_partial_drums_coating_amount_gallons && { convert_partial_drums_coating_amount_gallons: existingMetadata.convert_partial_drums_coating_amount_gallons }),
+          last_form_submission: new Date().toISOString()
+        };
+        
         // Update existing asset
         const { data, error } = await supabase
           .from('assets')
           .update({
-            metadata: processedData,
+            metadata: mergedMetadata,
             updated_at: new Date().toISOString()
           })
           .eq('id', assetId)

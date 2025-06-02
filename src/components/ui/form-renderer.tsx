@@ -41,6 +41,7 @@ interface FormRendererProps {
   mappedFields?: Record<string, any>;
   assetName?: string;
   showCalculatedFields?: boolean;
+  isMobile?: boolean;
 }
 
 export function FormRenderer({
@@ -56,7 +57,8 @@ export function FormRenderer({
   submitButtonIconProps,
   mappedFields = {},
   assetName,
-  showCalculatedFields = false
+  showCalculatedFields = false,
+  isMobile = false
 }: FormRendererProps) {
   const [formData, setFormData] = useState<any>(() => {
     // Initialize with initialData on first render
@@ -639,14 +641,14 @@ export function FormRenderer({
     const isDisabled = isFieldDisabled(field.id) || field.type === 'calculated';
     
     return (
-      <div className="mb-4" key={field.id}>
-        <Label htmlFor={field.id} className="flex items-center">
+      <div className={`${isMobile ? 'mb-3' : 'mb-4'}`} key={field.id}>
+        <Label htmlFor={field.id} className={`flex items-center ${isMobile ? 'text-sm font-medium' : ''}`}>
           {field.label}
           {isFieldRequired(field) && <span className="text-red-500 ml-1">*</span>}
         </Label>
         
         {field.description && (
-          <p className="text-sm text-muted-foreground mb-2">{field.description}</p>
+          <p className={`text-muted-foreground mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>{field.description}</p>
         )}
         
         {field.type === 'text' && (
@@ -656,7 +658,7 @@ export function FormRenderer({
             onChange={(e) => handleChange(field.id, e.target.value)}
             placeholder={field.placeholder}
             disabled={isDisabled}
-            className={errors[field.id] ? 'border-red-500' : ''}
+            className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'h-11 text-base' : ''}`}
           />
         )}
         
@@ -664,11 +666,12 @@ export function FormRenderer({
           <Input
             id={field.id}
             type="number"
+            inputMode="numeric"
             value={formData[field.id] || ''}
             onChange={(e) => handleChange(field.id, e.target.value)}
             placeholder={field.placeholder}
             disabled={isDisabled}
-            className={errors[field.id] ? 'border-red-500' : ''}
+            className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'h-11 text-base' : ''}`}
           />
         )}
         
@@ -679,7 +682,7 @@ export function FormRenderer({
             onChange={(e) => handleChange(field.id, e.target.value)}
             placeholder={field.placeholder}
             disabled={isDisabled}
-            className={errors[field.id] ? 'border-red-500' : ''}
+            className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'min-h-[88px] text-base' : ''}`}
           />
         )}
         
@@ -689,27 +692,27 @@ export function FormRenderer({
             onValueChange={(value) => handleChange(field.id, value)}
             disabled={isDisabled}
           >
-            <SelectTrigger id={field.id} className={errors[field.id] ? 'border-red-500' : ''}>
+            <SelectTrigger id={field.id} className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'h-11 text-base' : ''}`}>
               <SelectValue placeholder={field.placeholder} />
             </SelectTrigger>
             <SelectContent>
               {field.options?.map((option) => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
+                <SelectItem key={option} value={option} className={isMobile ? 'text-base py-3' : ''}>{option}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
         
         {field.type === 'checkbox' && (
-          <div className="flex items-center space-x-2">
+          <div className={`flex items-center space-x-2 ${isMobile ? 'py-1' : ''}`}>
             <Checkbox
               id={field.id}
               checked={!!formData[field.id]}
               onCheckedChange={(checked) => handleChange(field.id, checked)}
               disabled={isDisabled}
-              className={errors[field.id] ? 'border-red-500' : ''}
+              className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'h-5 w-5' : ''}`}
             />
-            <Label htmlFor={field.id} className="text-sm font-normal">
+            <Label htmlFor={field.id} className={`font-normal ${isMobile ? 'text-base' : 'text-sm'}`}>
               {field.placeholder || 'Yes'}
             </Label>
           </div>
@@ -722,7 +725,7 @@ export function FormRenderer({
             value={formData[field.id] || ''}
             onChange={(e) => handleChange(field.id, e.target.value)}
             disabled={isDisabled}
-            className={errors[field.id] ? 'border-red-500' : ''}
+            className={`${errors[field.id] ? 'border-red-500' : ''} ${isMobile ? 'h-11 text-base' : ''}`}
           />
         )}
         
@@ -733,10 +736,10 @@ export function FormRenderer({
               value={formData[field.id] || '0.00'}
               readOnly
               disabled
-              className={`${showCalculatedFields ? 'bg-white font-mono font-bold text-lg' : 'bg-muted'}`}
+              className={`${showCalculatedFields ? 'bg-white font-mono font-bold text-lg' : 'bg-muted'} ${isMobile ? 'h-11 text-base' : ''}`}
             />
             {showCalculatedFields && field.formula && (
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className={`mt-1 text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
                 <strong>Formula:</strong> <code className="bg-white px-1 rounded">{field.formula}</code>
               </div>
             )}
@@ -744,16 +747,21 @@ export function FormRenderer({
         )}
         
         {field.type === 'barcode' && (
-          <div className="flex space-x-2">
+          <div className={`flex space-x-2 ${isMobile ? 'flex-col space-x-0 space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0' : ''}`}>
             <Input
               id={field.id}
               value={formData[field.id] || ''}
               onChange={(e) => handleChange(field.id, e.target.value)}
               placeholder="Scan barcode"
               disabled={isDisabled}
-              className={`flex-1 ${errors[field.id] ? 'border-red-500' : ''}`}
+              className={`${isMobile ? 'flex-1 h-11 text-base' : 'flex-1'} ${errors[field.id] ? 'border-red-500' : ''}`}
             />
-            <Button type="button" variant="outline" disabled={isDisabled}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              disabled={isDisabled}
+              className={isMobile ? 'w-full h-11 sm:w-auto' : ''}
+            >
               Scan
             </Button>
           </div>
@@ -761,7 +769,7 @@ export function FormRenderer({
         
         {/* Display validation error */}
         {errors[field.id] && (
-          <p className="text-sm text-red-500 mt-1">{errors[field.id]}</p>
+          <p className={`text-red-500 mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>{errors[field.id]}</p>
         )}
       </div>
     );
@@ -793,10 +801,10 @@ export function FormRenderer({
   }, [formData, mappedFields, fields]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className={`space-y-6 ${isMobile ? 'space-y-4' : ''}`}>
       {/* Asset info */}
       {assetName && (
-        <Alert className="mb-4">
+        <Alert className={`mb-4 ${isMobile ? 'mb-3' : ''}`}>
           <Info className="h-4 w-4" />
           <AlertDescription>
             <strong>Asset:</strong> {assetName}
@@ -806,7 +814,7 @@ export function FormRenderer({
       
       {/* Inventory Warning */}
       {inventoryWarning && (
-        <Alert className="mb-4 border-orange-200 bg-orange-50">
+        <Alert className={`mb-4 border-orange-200 bg-orange-50 ${isMobile ? 'mb-3' : ''}`}>
           <AlertTriangle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-800 whitespace-pre-line">
             {inventoryWarning}
@@ -814,7 +822,7 @@ export function FormRenderer({
         </Alert>
       )}
       
-      <div className="grid gap-4">
+      <div className={`grid gap-4 ${isMobile ? 'gap-3' : ''}`}>
         {fields.map(renderField)}
       </div>
       
@@ -822,7 +830,7 @@ export function FormRenderer({
         <div className="flex justify-end">
           <Button 
             type="submit" 
-            className="w-full"
+            className={`w-full ${isMobile ? 'h-12 text-base font-semibold' : ''}`}
             disabled={isSubmitting || submitButtonDisabled}
           >
             {submitButtonIcon && (
