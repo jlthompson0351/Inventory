@@ -1,4 +1,3 @@
-
 import { Package } from "lucide-react";
 import React from "react";
 
@@ -14,7 +13,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
           <div className="flex items-center justify-center">
             <Package className="h-12 w-12 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold mt-4">StockFlow</h1>
+          <h1 className="text-3xl font-bold mt-4">Inventory System</h1>
           <p className="text-muted-foreground">Inventory Management System</p>
         </div>
         

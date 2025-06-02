@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,7 @@ const AppSettings = () => {
         <CardHeader>
           <CardTitle>Personalize Your Experience</CardTitle>
           <CardDescription>
-            Configure how StockFlow looks and behaves to match your preferences.
+            Configure how your inventory management system looks and behaves to match your preferences.
           </CardDescription>
         </CardHeader>
         <CardContent>

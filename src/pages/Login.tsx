@@ -99,45 +99,6 @@ const Login = () => {
     }
   };
 
-  const handleDemoLogin = async () => {
-    const demoEmail = 'demo@example.com';
-    const demoPass = 'demo12345';
-    
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    
-    // Instead of using setTimeout, let's manually trigger login
-    setLoading(true);
-    try {
-      console.log("Attempting demo login with:", demoEmail);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: demoEmail,
-        password: demoPass,
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      console.log("Demo login successful, user:", data?.user?.id);
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!',
-      });
-      
-    } catch (error: any) {
-      console.error('Demo login error:', error);
-      setError(error.message || 'An error occurred during login');
-      toast({
-        variant: 'destructive',
-        title: 'Demo Login Failed',
-        description: `Error: ${error.message}`,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const resetPasswordRequest = async () => {
     if (!email) {
       toast({
@@ -175,7 +136,7 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl">Welcome to BarcodEx</CardTitle>
+          <CardTitle className="text-2xl">Welcome</CardTitle>
           <CardDescription>
             Enter your credentials to sign in to your account
           </CardDescription>
@@ -230,28 +191,6 @@ const Login = () => {
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-muted-foreground/20" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-card px-2 text-muted-foreground">Or</span>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            type="button"
-            className="w-full"
-            onClick={handleDemoLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <div className="flex items-center">
-                <Spinner className="mr-2" size="sm" />
-                Loading demo...
-              </div>
-            ) : 'Use Demo Account'}
-          </Button>
           <p className="text-center text-sm text-muted-foreground pt-2">
             Don't have an account?{' '}
             <Button
@@ -268,33 +207,6 @@ const Login = () => {
           </p>
         </CardFooter>
       </Card>
-      
-      {/* Debug information (collapsed by default) */}
-      <details className="fixed bottom-4 left-4 text-xs bg-muted/80 p-2 rounded border text-muted-foreground">
-        <summary>Debug Info</summary>
-        <div className="mt-2 space-y-1">
-          <p>Login component mounted</p>
-          <p>Auth state: {authStatus}</p>
-          <p>Project ID: kxcubbibhofdvporfarj (omni)</p>
-          <div className="mt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full text-xs h-6" 
-              onClick={async () => {
-                try {
-                  await supabase.auth.signOut();
-                  toast({ title: "Signed out for testing" });
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-            >
-              Test Sign Out
-            </Button>
-          </div>
-        </div>
-      </details>
     </div>
   );
 };

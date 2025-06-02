@@ -131,36 +131,41 @@ export default function SubmitForm() {
                 console.log('SubmitForm - Fetched base assetMetadata:', currentAssetMetadata);
                 
                 // Fetch the inventory item for this asset to get the current quantity
-                const { data: inventoryItem, error: inventoryError } = await supabase
-                  .from('inventory_items')
-                  .select('quantity, id')
-                  .eq('asset_id', assetId)
-                  .single();
-                
-                if (!inventoryError && inventoryItem) {
-                  currentAssetMetadata.current_inventory = inventoryItem.quantity;
-                  console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
-                  
-                  // Fetch the most recent inventory history to get the starting point
-                  const currentMonth = new Date().toISOString().slice(0, 7);
-                  const { data: recentHistory, error: historyError } = await supabase
-                    .from('inventory_history')
-                    .select('quantity, month_year, check_date')
-                    .eq('inventory_item_id', inventoryItem.id)
-                    .lt('month_year', currentMonth) // Get history before current month
-                    .order('check_date', { ascending: false })
-                    .limit(1)
+                // SKIP for intake forms - we want them to start blank
+                if (formType !== 'intake') {
+                  const { data: inventoryItem, error: inventoryError } = await supabase
+                    .from('inventory_items')
+                    .select('quantity, id')
+                    .eq('asset_id', assetId)
                     .single();
                   
-                  if (!historyError && recentHistory) {
-                    // Use the most recent past inventory as the starting point
-                    currentAssetMetadata.starting_inventory = recentHistory.quantity;
-                    console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
-                  } else {
-                    // If no previous history, use current inventory as starting point
-                    currentAssetMetadata.starting_inventory = inventoryItem.quantity;
-                    console.log('SubmitForm - No previous history found, using current inventory as starting point');
+                  if (!inventoryError && inventoryItem) {
+                    currentAssetMetadata.current_inventory = inventoryItem.quantity;
+                    console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
+                    
+                    // Fetch the most recent inventory history to get the starting point
+                    const currentMonth = new Date().toISOString().slice(0, 7);
+                    const { data: recentHistory, error: historyError } = await supabase
+                      .from('inventory_history')
+                      .select('quantity, month_year, check_date')
+                      .eq('inventory_item_id', inventoryItem.id)
+                      .lt('month_year', currentMonth) // Get history before current month
+                      .order('check_date', { ascending: false })
+                      .limit(1)
+                      .single();
+                    
+                    if (!historyError && recentHistory) {
+                      // Use the most recent past inventory as the starting point
+                      currentAssetMetadata.starting_inventory = recentHistory.quantity;
+                      console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
+                    } else {
+                      // If no previous history, use current inventory as starting point
+                      currentAssetMetadata.starting_inventory = inventoryItem.quantity;
+                      console.log('SubmitForm - No previous history found, using current inventory as starting point');
+                    }
                   }
+                } else {
+                  console.log('SubmitForm - Skipping inventory pre-population for intake form');
                 }
                 
                 // Check for existing submissions this month
@@ -186,7 +191,8 @@ export default function SubmitForm() {
                   
                   // Check if user wants to edit existing (default behavior)
                   // BUT respect forceNewEntry flag for "New Inventory" button
-                  const editExisting = !forceNewEntry && actionParam !== 'new';
+                  // ALSO skip editing existing for intake forms - intake should always be new
+                  const editExisting = !forceNewEntry && actionParam !== 'new' && formType !== 'intake';
                   localIsEditingExisting = editExisting; // Set local variable
                   setIsEditingExisting(editExisting);
                   
@@ -277,12 +283,15 @@ export default function SubmitForm() {
             try {
               // DON'T populate form fields from asset metadata if we're editing existing
               // Only do this for new submissions
-              if (!localIsEditingExisting) {
+              // ALSO skip for intake forms - they should start blank for easy data entry
+              if (!localIsEditingExisting && formType !== 'intake') {
                 formFields.forEach((field: any) => {
                   if (currentAssetMetadata[field.id] !== undefined) {
                     finalMergedData[field.id] = currentAssetMetadata[field.id];
                   }
                 });
+              } else if (formType === 'intake') {
+                console.log('SubmitForm - Skipping form field pre-population for intake form');
               }
               
               finalMergedData = await applyFormulaMappings(

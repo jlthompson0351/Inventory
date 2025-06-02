@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
@@ -43,7 +42,7 @@ const LoginForm = () => {
         });
       } else {
         toast.success("Login Successful", {
-          description: "Welcome to StockFlow Inventory Management",
+          description: "Welcome to your inventory management system",
         });
         navigate("/"); // Let App.tsx handle redirects
       }

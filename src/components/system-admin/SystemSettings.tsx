@@ -23,7 +23,7 @@ export default function SystemSettings() {
     allowNewRegistrations: true,
     maxOrganizationsPerUser: 5,
     maxMembersPerOrganization: 50,
-    systemEmailAddress: 'system@stockflow.com'
+    systemEmailAddress: 'system@company.com'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 

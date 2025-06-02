@@ -101,7 +101,7 @@ const MobileAssetWorkflow = () => {
       // First get the asset data
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
-        .select('id, name, barcode, asset_type_id')
+        .select('id, name, barcode, asset_type_id, organization_id')
         .eq('id', assetId)
         .eq('is_deleted', false)
         .single();
@@ -120,37 +120,55 @@ const MobileAssetWorkflow = () => {
       // Then get the asset type info
       const { data: assetTypeData, error: assetTypeError } = await supabase
         .from('asset_types')
-        .select('id, name, intake_form_id, inventory_form_id')
+        .select('id, name')
         .eq('id', assetData.asset_type_id)
         .single();
 
       if (assetTypeError) throw assetTypeError;
+
+      // Get linked forms for this asset type from asset_type_forms table
+      const { data: linkedForms } = await supabase
+        .from('asset_type_forms')
+        .select('form_id, purpose')
+        .eq('asset_type_id', assetData.asset_type_id)
+        .eq('organization_id', assetData.organization_id);
+
+      let intakeFormId = null;
+      let inventoryFormId = null;
+
+      if (linkedForms) {
+        const intakeForm = linkedForms.find(f => f.purpose === 'intake');
+        const inventoryForm = linkedForms.find(f => f.purpose === 'inventory');
+        
+        if (intakeForm) intakeFormId = intakeForm.form_id;
+        if (inventoryForm) inventoryFormId = inventoryForm.form_id;
+      }
       
       // Transform the data to match our expected format
       const transformedAssetData: AssetData = {
         asset_id: assetData.id,
         asset_name: assetData.name,
         asset_type_name: assetTypeData?.name || 'Unknown Type',
-        organization_id: '',
+        organization_id: assetData.organization_id || '',
         barcode: assetData.barcode || '',
         workflow_options: [
           {
             type: 'intake',
             label: 'Asset Intake',
-            form_id: assetTypeData?.intake_form_id || null,
-            available: !!assetTypeData?.intake_form_id
+            form_id: intakeFormId,
+            available: !!intakeFormId
           },
           {
             type: 'inventory',
             label: 'Inventory Check', 
-            form_id: assetTypeData?.inventory_form_id || null,
-            available: !!assetTypeData?.inventory_form_id
+            form_id: inventoryFormId,
+            available: !!inventoryFormId
           },
           {
             type: 'continue_inventory',
             label: 'Continue Current Inventory',
-            form_id: assetTypeData?.inventory_form_id || null,
-            available: !!assetTypeData?.inventory_form_id
+            form_id: inventoryFormId,
+            available: !!inventoryFormId
           }
         ]
       };
@@ -216,8 +234,12 @@ const MobileAssetWorkflow = () => {
         }
       };
 
-      // For inventory types, determine if this should be a new entry or continue existing
-      if (option.type === 'inventory') {
+      // For different workflow types, determine navigation behavior
+      if (option.type === 'intake') {
+        // This is "Asset Intake" - create new inventory items
+        navigationState.forceNewEntry = true;
+        navigationState.action = 'new';
+      } else if (option.type === 'inventory') {
         // This is "New Inventory" - always fresh, even if same month
         navigationState.forceNewEntry = true;
         navigationState.action = 'new'; // This will prevent loading existing month data
@@ -460,7 +482,7 @@ const MobileAssetWorkflow = () => {
           {/* Footer */}
           <div className="text-center pt-8 pb-4">
             <p className="text-xs text-gray-500">
-              StockFlow Inventory Management
+              Inventory Management System
             </p>
           </div>
         </div>
@@ -660,7 +682,7 @@ const MobileAssetWorkflow = () => {
         {/* Footer */}
         <div className="text-center pt-8 pb-4">
           <p className="text-xs text-gray-500">
-            StockFlow Inventory Management
+            Inventory Management System
           </p>
         </div>
       </div>

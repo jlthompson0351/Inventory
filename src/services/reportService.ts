@@ -1845,3 +1845,294 @@ export const DATA_SOURCE_COLUMNS: Record<string, ColumnDefinition[]> = {
 
 // Export cache manager for external access
 export { reportCache }; 
+
+// 🚀 PAINT INVENTORY REPORT TYPES
+export interface PaintInventoryReportConfig extends ReportConfig {
+  paintInventoryOptions?: {
+    includeIntake?: boolean;
+    monthFilter?: string;
+  };
+}
+
+export interface PaintInventoryReportData {
+  asset_id: string;
+  coating_name: string;
+  barcode: string;
+  full_drums: number;
+  coating_amount_inches: number;
+  partial_drums_inches: number;
+  tank_amount: number;
+  dip_spin_wmv: number;
+  wmv_rackspin: number;
+  coating_gallons: number;
+  tank_gallons: number;
+  dip_spin_gallons: number;
+  wmv_rackspin_gallons: number;
+  total_gallons: number;
+  last_audit_date: string;
+  intake_date?: string;
+  has_recent_data: boolean;
+  form_data: any;
+}
+
+// 🚀 PAINT INVENTORY REPORT FUNCTION
+export async function getPaintInventoryReport(
+  organizationId: string,
+  assetTypeId: string,
+  options: {
+    includeIntake?: boolean;
+    monthFilter?: string;
+  } = {}
+): Promise<PaintInventoryReportData[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_paint_inventory_report', {
+      p_organization_id: organizationId,
+      p_asset_type_id: assetTypeId,
+      p_include_intake: options.includeIntake || false,
+      p_month_filter: options.monthFilter || null
+    });
+
+    if (error) {
+      console.error('Paint inventory report error:', error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error executing paint inventory report:', error);
+    throw error;
+  }
+}
+
+// 🚀 ENHANCED EXECUTE REPORT FUNCTION
+export async function executePaintInventoryReport(
+  report: Report | PaintInventoryReportConfig,
+  organizationId: string,
+  limit?: number,
+  useCache: boolean = true
+): Promise<{
+  data: PaintInventoryReportData[];
+  stats: ExecutionStats;
+}> {
+  const startTime = performance.now();
+  let cacheHit = false;
+
+  try {
+    // Generate cache key
+    const cacheKey = reportCache.generateCacheKey(report.report_config || report, organizationId);
+    
+    // Check cache if enabled
+    if (useCache && (report.report_config?.caching?.enabled ?? true)) {
+      const cachedData = reportCache.get(cacheKey);
+      if (cachedData) {
+        cacheHit = true;
+        const endTime = performance.now();
+        return {
+          data: limit ? cachedData.slice(0, limit) : cachedData,
+          stats: {
+            executionTime: Math.round(endTime - startTime),
+            rowCount: cachedData.length,
+            cacheHit: true,
+            queryComplexity: 'low',
+            dataSourcesUsed: ['paint_inventory_specialized'],
+            bytesProcessed: JSON.stringify(cachedData).length
+          }
+        };
+      }
+    }
+
+    // Get asset type from config
+    const config = report.report_config || report;
+    const assetTypeId = config.assetTypes?.[0];
+    
+    if (!assetTypeId) {
+      throw new Error('Asset type is required for paint inventory report');
+    }
+
+    // Execute the specialized paint inventory report
+    const paintConfig = config as PaintInventoryReportConfig;
+    const data = await getPaintInventoryReport(
+      organizationId,
+      assetTypeId,
+      paintConfig.paintInventoryOptions || {}
+    );
+
+    // Apply limit if specified
+    const results = limit ? data.slice(0, limit) : data;
+
+    // Cache results
+    if (useCache && (config.caching?.enabled ?? true)) {
+      const cacheTTL = config.caching?.ttl || 300;
+      reportCache.set(cacheKey, results, cacheTTL);
+    }
+
+    const endTime = performance.now();
+    const executionTime = Math.round(endTime - startTime);
+
+    const stats: ExecutionStats = {
+      executionTime,
+      rowCount: results.length,
+      cacheHit,
+      queryComplexity: 'medium',
+      dataSourcesUsed: ['paint_inventory_specialized', 'assets', 'inventory_history'],
+      bytesProcessed: JSON.stringify(results).length
+    };
+
+    // Log execution
+    await logReportExecution(report as Report, stats);
+
+    return { data: results, stats };
+
+  } catch (error) {
+    console.error('Error executing paint inventory report:', error);
+    throw error;
+  }
+}
+
+// 🚀 ASSET INVENTORY REPORT TYPES (Generic for any asset type)
+export interface AssetInventoryReportConfig extends ReportConfig {
+  assetInventoryOptions?: {
+    includeIntake?: boolean;
+    monthFilter?: string;
+  };
+}
+
+export interface AssetInventoryReportData {
+  asset_id: string;
+  asset_name: string;
+  asset_barcode: string;
+  asset_type_name: string;
+  field_1: number;
+  field_2: number;
+  field_3: number;
+  field_4: number;
+  field_5: number;
+  field_6: number;
+  field_7: number;
+  field_8: number;
+  field_10: number;
+  field_12: number;
+  field_13: number;
+  converted_field_1: number;
+  converted_field_2: number;
+  converted_field_3: number;
+  converted_field_4: number;
+  converted_field_5: number;
+  converted_field_6: number;
+  total_converted: number;
+  last_audit_date: string;
+  intake_date?: string;
+  has_recent_data: boolean;
+  form_data: any;
+  conversion_metadata: any;
+}
+
+// 🚀 ASSET INVENTORY REPORT FUNCTION (Generic)
+export async function getAssetInventoryReport(
+  organizationId: string,
+  assetTypeId: string,
+  options: {
+    includeIntake?: boolean;
+    monthFilter?: string;
+  } = {}
+): Promise<AssetInventoryReportData[]> {
+  try {
+    // Use executeSQL since the function might not be in the generated types yet
+    const { data, error } = await supabase.rpc('get_asset_inventory_report' as any, {
+      p_organization_id: organizationId,
+      p_asset_type_id: assetTypeId,
+      p_include_intake: options.includeIntake || false,
+      p_month_filter: options.monthFilter || null
+    });
+
+    if (error) {
+      console.error('Asset inventory report error:', error);
+      throw error;
+    }
+
+    return (data as AssetInventoryReportData[]) || [];
+  } catch (error) {
+    console.error('Error executing asset inventory report:', error);
+    throw error;
+  }
+}
+
+// 🚀 ENHANCED EXECUTE REPORT FUNCTION
+export async function executeAssetInventoryReport(
+  config: AssetInventoryReportConfig,
+  organizationId: string,
+  limit?: number,
+  useCache: boolean = true
+): Promise<{
+  data: AssetInventoryReportData[];
+  stats: ExecutionStats;
+}> {
+  const startTime = performance.now();
+  let cacheHit = false;
+
+  try {
+    // Generate cache key
+    const cacheKey = reportCache.generateCacheKey(config, organizationId);
+    
+    // Check cache if enabled
+    if (useCache && (config.caching?.enabled ?? true)) {
+      const cachedData = reportCache.get(cacheKey);
+      if (cachedData) {
+        cacheHit = true;
+        const endTime = performance.now();
+        return {
+          data: limit ? cachedData.slice(0, limit) : cachedData,
+          stats: {
+            executionTime: Math.round(endTime - startTime),
+            rowCount: cachedData.length,
+            cacheHit: true,
+            queryComplexity: 'low',
+            dataSourcesUsed: ['asset_inventory_specialized'],
+            bytesProcessed: JSON.stringify(cachedData).length
+          }
+        };
+      }
+    }
+
+    // Get asset type from config
+    const assetTypeId = config.assetTypes?.[0];
+    
+    if (!assetTypeId) {
+      throw new Error('Asset type is required for asset inventory report');
+    }
+
+    // Execute the specialized asset inventory report
+    const data = await getAssetInventoryReport(
+      organizationId,
+      assetTypeId,
+      config.assetInventoryOptions || {}
+    );
+
+    // Apply limit if specified
+    const results = limit ? data.slice(0, limit) : data;
+
+    // Cache results
+    if (useCache && (config.caching?.enabled ?? true)) {
+      const cacheTTL = config.caching?.ttl || 300;
+      reportCache.set(cacheKey, results, cacheTTL);
+    }
+
+    const endTime = performance.now();
+    const executionTime = Math.round(endTime - startTime);
+
+    const stats: ExecutionStats = {
+      executionTime,
+      rowCount: results.length,
+      cacheHit,
+      queryComplexity: 'medium',
+      dataSourcesUsed: ['asset_inventory_specialized', 'assets', 'inventory_history'],
+      bytesProcessed: JSON.stringify(results).length
+    };
+
+    return { data: results, stats };
+
+  } catch (error) {
+    console.error('Error executing asset inventory report:', error);
+    throw error;
+  }
+}

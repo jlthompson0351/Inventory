@@ -157,7 +157,7 @@ const PageLayout = ({ children }: PageLayoutProps) => {
             <div className="flex items-center justify-center">
               <div className="flex items-center space-x-2">
                 <QrCode className="h-6 w-6 text-blue-600" />
-                <span className="font-semibold text-gray-900">StockFlow Mobile</span>
+                <span className="font-semibold text-gray-900">Mobile</span>
               </div>
             </div>
           </div>
