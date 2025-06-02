@@ -98,7 +98,14 @@ const MobileAssetWorkflow = () => {
     try {
       setIsLoading(true);
       
+      // DEBUG: Log environment and parameters
+      console.log('=== DEBUG: loadAssetData ===');
+      console.log('Asset ID from params:', assetId);
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
       // First get the asset data - use maybeSingle() to handle missing assets gracefully
+      console.log('Making Supabase query...');
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id, name, barcode, asset_type_id, organization_id')
@@ -106,12 +113,15 @@ const MobileAssetWorkflow = () => {
         .eq('is_deleted', false)
         .single();
 
+      console.log('Supabase response:', { data: assetData, error: assetError });
+
       if (assetError) {
         console.error('Error fetching asset:', assetError);
         throw new Error('Failed to fetch asset data');
       }
       
       if (!assetData) {
+        console.log('No asset data returned');
         toast({
           variant: "destructive",
           title: "Asset Not Found",
@@ -119,6 +129,8 @@ const MobileAssetWorkflow = () => {
         });
         return;
       }
+
+      console.log('Asset data found:', assetData);
 
       // Then get the asset type info - use maybeSingle() here too
       const { data: assetTypeData, error: assetTypeError } = await supabase
