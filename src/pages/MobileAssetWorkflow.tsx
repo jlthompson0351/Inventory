@@ -46,6 +46,13 @@ const MobileAssetWorkflow = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // DEBUG: Log component initialization
+  console.log('=== MobileAssetWorkflow Component Initialized ===');
+  console.log('Raw assetId from useParams:', assetId);
+  console.log('Type of assetId:', typeof assetId);
+  console.log('URL pathname:', window.location.pathname);
+  console.log('URL search:', window.location.search);
+  
   const [step, setStep] = useState<'loading' | 'pin' | 'options'>('loading');
   const [pin, setPin] = useState("");
   const [assetData, setAssetData] = useState<AssetData | null>(null);
@@ -89,12 +96,21 @@ const MobileAssetWorkflow = () => {
 
   // Load asset data on mount
   useEffect(() => {
+    console.log('=== useEffect triggered ===');
+    console.log('assetId in useEffect:', assetId);
+    console.log('Boolean check of assetId:', !!assetId);
+    
     if (assetId) {
+      console.log('About to call loadAssetData...');
       loadAssetData();
+    } else {
+      console.log('assetId is falsy, not calling loadAssetData');
     }
   }, [assetId]);
 
   const loadAssetData = async () => {
+    console.log('🚀 loadAssetData function called!');
+    
     try {
       setIsLoading(true);
       
