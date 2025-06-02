@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -74,101 +74,128 @@ export default function SubmitForm() {
   
   const [showCalculatedFields, setShowCalculatedFields] = useState(false);
   
-  useEffect(() => {
-    const loadForm = async () => {
-      if (!id || !currentOrganization) return;
+  const loadForm = useCallback(async () => {
+    console.log('🚀 SubmitForm - loadForm function called!');
+    console.log('SubmitForm - Parameters:', { id, currentOrganization: !!currentOrganization, fromMobileQR });
+    
+    if (!id) {
+      console.log('SubmitForm - Missing form ID, exiting early');
+      return;
+    }
+    
+    // For mobile QR workflow, we can proceed without currentOrganization initially
+    // We'll get the organization from the form data
+    if (!currentOrganization && !fromMobileQR) {
+      console.log('SubmitForm - Missing currentOrganization and not from mobile QR, exiting early');
+      return;
+    }
+    
+    try {
+      console.log('SubmitForm - Setting loading to true...');
+      setLoading(true);
       
-      try {
-        setLoading(true);
-        const { form: fetchedForm, validationRules: fetchedValidationRules, fieldDependencies: fetchedFieldDependencies } = await getFormWithRelatedData(id);
+      console.log('SubmitForm - Calling getFormWithRelatedData...');
+      const { form: fetchedForm, validationRules: fetchedValidationRules, fieldDependencies: fetchedFieldDependencies } = await getFormWithRelatedData(id);
+      console.log('SubmitForm - getFormWithRelatedData completed:', { fetchedForm: !!fetchedForm });
+      
+      if (fetchedForm) {
+        console.log('SubmitForm - Form found, processing...');
         
-        if (fetchedForm) {
-          setForm(fetchedForm);
-          setValidationRules(fetchedValidationRules || []);
-          setFieldDependencies(fetchedFieldDependencies || []);
-          
-          const initialData: Record<string, any> = {};
-          let formFields: any[] = [];
-          if (fetchedForm.form_data) {
-            const parsedFormData = typeof fetchedForm.form_data === 'string' 
-              ? JSON.parse(fetchedForm.form_data) 
-              : fetchedForm.form_data;
-            formFields = Array.isArray(parsedFormData?.fields) ? parsedFormData.fields : [];
+        // For mobile QR, use the organization from the form if currentOrganization is not available
+        let workingOrganization = currentOrganization;
+        if (!workingOrganization && fromMobileQR && fetchedForm.organization_id) {
+          console.log('SubmitForm - Using organization from form for mobile QR:', fetchedForm.organization_id);
+          workingOrganization = { id: fetchedForm.organization_id };
+        }
+        
+        setForm(fetchedForm);
+        setValidationRules(fetchedValidationRules || []);
+        setFieldDependencies(fetchedFieldDependencies || []);
+        
+        const initialData: Record<string, any> = {};
+        let formFields: any[] = [];
+        if (fetchedForm.form_data) {
+          const parsedFormData = typeof fetchedForm.form_data === 'string' 
+            ? JSON.parse(fetchedForm.form_data) 
+            : fetchedForm.form_data;
+          formFields = Array.isArray(parsedFormData?.fields) ? parsedFormData.fields : [];
+        }
+        formFields.forEach((field: any) => {
+          if (field.defaultValue !== undefined) {
+            initialData[field.id] = field.defaultValue;
           }
-          formFields.forEach((field: any) => {
-            if (field.defaultValue !== undefined) {
-              initialData[field.id] = field.defaultValue;
-            }
-          });
-          
-          let currentAssetMetadata: Record<string, any> = {};
-          let assetDataForEffect: any = null;
-          let finalMergedData = { ...initialData, ...prefillData }; // Start with initial and prefill
-          let localIsEditingExisting = false; // Local variable to track if we're editing
+        });
+        
+        let currentAssetMetadata: Record<string, any> = {};
+        let assetDataForEffect: any = null;
+        let finalMergedData = { ...initialData, ...prefillData }; // Start with initial and prefill
+        let localIsEditingExisting = false; // Local variable to track if we're editing
 
-          if (assetId) {
-            // 1. Fetch base asset data and metadata
-            try {
-              const { data: fetchedAssetData, error: assetError } = await supabase
-                .from('assets')
-                .select('*, asset_types(*)')
-                .eq('id', assetId)
-                .single();
+        if (assetId) {
+          // 1. Fetch base asset data and metadata
+          try {
+            const { data: fetchedAssetData, error: assetError } = await supabase
+              .from('assets')
+              .select('*, asset_types(*)')
+              .eq('id', assetId)
+              .single();
+              
+            if (!assetError && fetchedAssetData) {
+              assetDataForEffect = fetchedAssetData;
+              setAssetDetails(fetchedAssetData); // Store asset details for header
+              
+              // Store the asset type ID for later use
+              if (fetchedAssetData.asset_type_id) {
+                setFetchedAssetTypeId(fetchedAssetData.asset_type_id);
+              }
+              // Ensure metadata is an object, not a primitive
+              const metadata = fetchedAssetData.metadata;
+              currentAssetMetadata = (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) 
+                ? metadata as Record<string, any>
+                : {};
+              console.log('SubmitForm - Fetched base assetMetadata:', currentAssetMetadata);
+              
+              // Fetch the inventory item for this asset to get the current quantity
+              // SKIP for intake forms - we want them to start blank
+              if (formType !== 'intake') {
+                const { data: inventoryItem, error: inventoryError } = await supabase
+                  .from('inventory_items')
+                  .select('quantity, id')
+                  .eq('asset_id', assetId)
+                  .single();
                 
-              if (!assetError && fetchedAssetData) {
-                assetDataForEffect = fetchedAssetData;
-                setAssetDetails(fetchedAssetData); // Store asset details for header
-                
-                // Store the asset type ID for later use
-                if (fetchedAssetData.asset_type_id) {
-                  setFetchedAssetTypeId(fetchedAssetData.asset_type_id);
-                }
-                // Ensure metadata is an object, not a primitive
-                const metadata = fetchedAssetData.metadata;
-                currentAssetMetadata = (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) 
-                  ? metadata as Record<string, any>
-                  : {};
-                console.log('SubmitForm - Fetched base assetMetadata:', currentAssetMetadata);
-                
-                // Fetch the inventory item for this asset to get the current quantity
-                // SKIP for intake forms - we want them to start blank
-                if (formType !== 'intake') {
-                  const { data: inventoryItem, error: inventoryError } = await supabase
-                    .from('inventory_items')
-                    .select('quantity, id')
-                    .eq('asset_id', assetId)
+                if (!inventoryError && inventoryItem) {
+                  currentAssetMetadata.current_inventory = inventoryItem.quantity;
+                  console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
+                  
+                  // Fetch the most recent inventory history to get the starting point
+                  const currentMonth = new Date().toISOString().slice(0, 7);
+                  const { data: recentHistory, error: historyError } = await supabase
+                    .from('inventory_history')
+                    .select('quantity, month_year, check_date')
+                    .eq('inventory_item_id', inventoryItem.id)
+                    .lt('month_year', currentMonth) // Get history before current month
+                    .order('check_date', { ascending: false })
+                    .limit(1)
                     .single();
                   
-                  if (!inventoryError && inventoryItem) {
-                    currentAssetMetadata.current_inventory = inventoryItem.quantity;
-                    console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
-                    
-                    // Fetch the most recent inventory history to get the starting point
-                    const currentMonth = new Date().toISOString().slice(0, 7);
-                    const { data: recentHistory, error: historyError } = await supabase
-                      .from('inventory_history')
-                      .select('quantity, month_year, check_date')
-                      .eq('inventory_item_id', inventoryItem.id)
-                      .lt('month_year', currentMonth) // Get history before current month
-                      .order('check_date', { ascending: false })
-                      .limit(1)
-                      .single();
-                    
-                    if (!historyError && recentHistory) {
-                      // Use the most recent past inventory as the starting point
-                      currentAssetMetadata.starting_inventory = recentHistory.quantity;
-                      console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
-                    } else {
-                      // If no previous history, use current inventory as starting point
-                      currentAssetMetadata.starting_inventory = inventoryItem.quantity;
-                      console.log('SubmitForm - No previous history found, using current inventory as starting point');
-                    }
+                  if (!historyError && recentHistory) {
+                    // Use the most recent past inventory as the starting point
+                    currentAssetMetadata.starting_inventory = recentHistory.quantity;
+                    console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
+                  } else {
+                    // If no previous history, use current inventory as starting point
+                    currentAssetMetadata.starting_inventory = inventoryItem.quantity;
+                    console.log('SubmitForm - No previous history found, using current inventory as starting point');
                   }
-                } else {
-                  console.log('SubmitForm - Skipping inventory pre-population for intake form');
                 }
-                
-                // Check for existing submissions this month
+              } else {
+                console.log('SubmitForm - Skipping inventory pre-population for intake form');
+              }
+              
+              // Check for existing submissions this month
+              // Only do this if we have a working organization
+              if (workingOrganization) {
                 const now = new Date();
                 const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
                 const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -178,7 +205,7 @@ export default function SubmitForm() {
                   .select('id, submission_data, created_at')
                   .eq('form_id', id)
                   .eq('asset_id', assetId)
-                  .eq('organization_id', currentOrganization.id)
+                  .eq('organization_id', workingOrganization.id)
                   .gte('created_at', firstDayOfMonth.toISOString())
                   .lte('created_at', lastDayOfMonth.toISOString())
                   .order('created_at', { ascending: false })
@@ -219,184 +246,205 @@ export default function SubmitForm() {
                     console.log('SubmitForm - Creating new entry with current inventory:', currentAssetMetadata.current_inventory);
                   }
                 }
-              } else if (assetError) {
-                console.error('SubmitForm - Error fetching asset data:', assetError);
-              }
-            } catch (assetFetchError) {
-              console.error('SubmitForm - Exception during asset data fetching/processing:', assetFetchError);
-            }
-
-            // 2. Augment currentAssetMetadata with conversion_fields from asset_type
-            // Prefer asset_type_id from fetchedAssetData, fallback to location.state.assetTypeId
-            const actualAssetTypeId = assetDataForEffect?.asset_type_id || assetTypeId; 
-
-            if (actualAssetTypeId) {
-              // Fetch asset_type details separately if not fully included or to be sure
-              const { data: assetTypeData, error: assetTypeError } = await supabase
-                .from('asset_types')
-                .select('conversion_fields')
-                .eq('id', actualAssetTypeId)
-                .single();
-
-              if (assetTypeError) {
-                console.error('SubmitForm - Error fetching asset_type for conversion fields:', assetTypeError);
-              }
-              
-              if (assetTypeData?.conversion_fields) {
-                console.log('SubmitForm - Found conversion_fields in asset_type:', assetTypeData.conversion_fields);
-                const conversionFields = assetTypeData.conversion_fields as any[];
-                const metadataWithDefaults = { ...currentAssetMetadata }; // Start with current asset's metadata
-                
-                // Process conversion fields and add them to metadata
-                if (Array.isArray(conversionFields)) {
-                  conversionFields.forEach(cf => {
-                    if (cf.field_name) {
-                      // Check if the field exists in asset metadata, otherwise use default
-                      if (!(cf.field_name in metadataWithDefaults)) {
-                        // Use 1.0 as default for conversion fields instead of 0 so math works
-                        const defaultValue = cf.field_name.startsWith('convert_') ? 1.0 : (cf.default_value !== undefined ? cf.default_value : 0);
-                        console.warn(`SubmitForm - Adding default (${defaultValue}) for missing conversion field: ${cf.field_name}`);
-                        metadataWithDefaults[cf.field_name] = defaultValue;
-                      } else {
-                        console.log(`SubmitForm - Using existing value for conversion field ${cf.field_name}:`, metadataWithDefaults[cf.field_name]);
-                      }
-                    }
-                  });
-                }
-                
-                currentAssetMetadata = metadataWithDefaults;
-                console.log('SubmitForm - assetMetadata after adding conversion fields:', currentAssetMetadata);
               } else {
-                console.log('SubmitForm - No conversion_fields found for asset_type_id:', actualAssetTypeId);
+                console.log('SubmitForm - Skipping existing submission check (no working organization)');
               }
-            } else {
-              console.log('SubmitForm - No asset_type_id available to fetch conversion_fields.');
+            } else if (assetError) {
+              console.error('SubmitForm - Error fetching asset data:', assetError);
             }
+          } catch (assetFetchError) {
+            console.error('SubmitForm - Exception during asset data fetching/processing:', assetFetchError);
           }
-          
-          // Set the potentially augmented assetMetadata to state for FormRenderer
-          setAssetMetadata(currentAssetMetadata);
 
-          // Apply formula mappings (e.g. for pre-filling form fields from asset metadata)
-          // This should use the asset metadata that now includes conversion defaults.
-          if (assetId && assetDataForEffect?.asset_type_id) {
-            try {
-              // DON'T populate form fields from asset metadata if we're editing existing
-              // Only do this for new submissions
-              // ALSO skip for intake forms - they should start blank for easy data entry
-              if (!localIsEditingExisting && formType !== 'intake') {
-                formFields.forEach((field: any) => {
-                  if (currentAssetMetadata[field.id] !== undefined) {
-                    finalMergedData[field.id] = currentAssetMetadata[field.id];
+          // 2. Augment currentAssetMetadata with conversion_fields from asset_type
+          // Prefer asset_type_id from fetchedAssetData, fallback to location.state.assetTypeId
+          const actualAssetTypeId = assetDataForEffect?.asset_type_id || assetTypeId; 
+
+          if (actualAssetTypeId) {
+            // Fetch asset_type details separately if not fully included or to be sure
+            const { data: assetTypeData, error: assetTypeError } = await supabase
+              .from('asset_types')
+              .select('conversion_fields')
+              .eq('id', actualAssetTypeId)
+              .single();
+
+            if (assetTypeError) {
+              console.error('SubmitForm - Error fetching asset_type for conversion fields:', assetTypeError);
+            }
+            
+            if (assetTypeData?.conversion_fields) {
+              console.log('SubmitForm - Found conversion_fields in asset_type:', assetTypeData.conversion_fields);
+              const conversionFields = assetTypeData.conversion_fields as any[];
+              const metadataWithDefaults = { ...currentAssetMetadata }; // Start with current asset's metadata
+              
+              // Process conversion fields and add them to metadata
+              if (Array.isArray(conversionFields)) {
+                conversionFields.forEach(cf => {
+                  if (cf.field_name) {
+                    // Check if the field exists in asset metadata, otherwise use default
+                    if (!(cf.field_name in metadataWithDefaults)) {
+                      // Use 1.0 as default for conversion fields instead of 0 so math works
+                      const defaultValue = cf.field_name.startsWith('convert_') ? 1.0 : (cf.default_value !== undefined ? cf.default_value : 0);
+                      console.warn(`SubmitForm - Adding default (${defaultValue}) for missing conversion field: ${cf.field_name}`);
+                      metadataWithDefaults[cf.field_name] = defaultValue;
+                    } else {
+                      console.log(`SubmitForm - Using existing value for conversion field ${cf.field_name}:`, metadataWithDefaults[cf.field_name]);
+                    }
                   }
                 });
-              } else if (formType === 'intake') {
-                console.log('SubmitForm - Skipping form field pre-population for intake form');
               }
               
-              finalMergedData = await applyFormulaMappings(
-                finalMergedData,
-                assetDataForEffect.asset_type_id,
-                currentAssetMetadata // Use metadata with conversion defaults
-              );
-              console.log('SubmitForm - finalMergedData after applyFormulaMappings:', finalMergedData);
-            } catch (mappingError) {
-              console.error('SubmitForm - Error applying formula mappings:', mappingError);
+              currentAssetMetadata = metadataWithDefaults;
+              console.log('SubmitForm - assetMetadata after adding conversion fields:', currentAssetMetadata);
+            } else {
+              console.log('SubmitForm - No conversion_fields found for asset_type_id:', actualAssetTypeId);
             }
+          } else {
+            console.log('SubmitForm - No asset_type_id available to fetch conversion_fields.');
           }
-          
-          // Apply asset-specific calculation formulas (if any, from location.state)
-          if (Object.keys(calculationFormulas).length > 0) {
-            setHasFormulaFields(true);
-            try {
-              console.log('SubmitForm - Applying asset-specific calculationFormulas using assetMetadata:', currentAssetMetadata);
-              const processedData = await applyAssetCalculationFormulas(
-                supabase,
-                finalMergedData, // Current form data
-                calculationFormulas,
-                currentAssetMetadata // Metadata with conversion defaults
-              );
-              
-              if (processedData) {
-                finalMergedData = processedData;
-                console.log('SubmitForm - finalMergedData after applyAssetCalculationFormulas:', finalMergedData);
-              }
-            } catch (formulaError) {
-              console.error('SubmitForm - Error applying asset-specific calculation formulas:', formulaError);
-            }
-          }
-          
-          setFormData(finalMergedData);
-          // setMergedFormData is likely redundant if formData is the single source of truth for FormRenderer's initialData
-          // If setMergedFormData was for a different purpose, it might need finalMergedData too.
-          // For now, let's assume formData is primary.
-          setMergedFormData(finalMergedData); 
-          
-          console.log('SubmitForm - Final assetMetadata for FormRenderer:', currentAssetMetadata);
-          console.log('SubmitForm - Final formData for FormRenderer:', finalMergedData);
-          
-          // Debug: Show what will be passed as mappedFields
-          console.log('SubmitForm - Mapped fields for calculations:', currentAssetMetadata);
-          console.log('SubmitForm - Available conversion fields in mappedFields:');
-          Object.entries(currentAssetMetadata).forEach(([key, value]) => {
-            console.log(`  - ${key}: ${value} (type: ${typeof value})`);
-          });
-          
-          // Additional debugging to ensure conversion fields are numbers
-          console.log('SubmitForm - Conversion fields as numbers:');
-          Object.entries(currentAssetMetadata).forEach(([key, value]) => {
-            if (key.startsWith('convert_')) {
-              const numValue = Number(value);
-              console.log(`  - ${key}: original="${value}" numeric=${numValue} isNaN=${isNaN(numValue)}`);
-            }
-          });
-          
-          let debugFormFields: any[] = [];
-          if (fetchedForm?.form_data) {
-            const parsedData = typeof fetchedForm.form_data === 'string' 
-              ? JSON.parse(fetchedForm.form_data) 
-              : fetchedForm.form_data;
-            debugFormFields = parsedData?.fields || [];
-          }
-          console.log('SubmitForm - DEBUG: Form fields with mapped.convert formulas:', debugFormFields.filter((f: any) => f.formula?.includes('mapped.convert')));
-          
-          // Log specific examples of formula fields
-          debugFormFields.forEach((field: any) => {
-            if (field.formula?.includes('mapped.convert')) {
-              console.log(`SubmitForm - Field "${field.label}" (${field.id}) formula: ${field.formula}`);
-              // Extract the conversion field name from the formula
-              const match = field.formula.match(/\{mapped\.(convert_[^}]+)\}/);
-              if (match) {
-                const conversionField = match[1];
-                console.log(`  - Requires: ${conversionField} = ${currentAssetMetadata[conversionField]}`);
-              }
-            }
-          });
-
-        } else {
-          toast({
-            title: 'Form Not Found',
-            description: 'The requested form could not be found',
-            variant: 'destructive',
-          });
         }
-      } catch (error) {
-        console.error('Error loading form:', error);
+        
+        // Set the potentially augmented assetMetadata to state for FormRenderer
+        setAssetMetadata(currentAssetMetadata);
+
+        // Apply formula mappings (e.g. for pre-filling form fields from asset metadata)
+        // This should use the asset metadata that now includes conversion defaults.
+        if (assetId && assetDataForEffect?.asset_type_id) {
+          try {
+            // DON'T populate form fields from asset metadata if we're editing existing
+            // Only do this for new submissions
+            // ALSO skip for intake forms - they should start blank for easy data entry
+            if (!localIsEditingExisting && formType !== 'intake') {
+              formFields.forEach((field: any) => {
+                if (currentAssetMetadata[field.id] !== undefined) {
+                  finalMergedData[field.id] = currentAssetMetadata[field.id];
+                }
+              });
+            } else if (formType === 'intake') {
+              console.log('SubmitForm - Skipping form field pre-population for intake form');
+            }
+            
+            finalMergedData = await applyFormulaMappings(
+              finalMergedData,
+              assetDataForEffect.asset_type_id,
+              currentAssetMetadata // Use metadata with conversion defaults
+            );
+            console.log('SubmitForm - finalMergedData after applyFormulaMappings:', finalMergedData);
+          } catch (mappingError) {
+            console.error('SubmitForm - Error applying formula mappings:', mappingError);
+          }
+        }
+        
+        // Apply asset-specific calculation formulas (if any, from location.state)
+        if (Object.keys(calculationFormulas).length > 0) {
+          setHasFormulaFields(true);
+          try {
+            console.log('SubmitForm - Applying asset-specific calculationFormulas using assetMetadata:', currentAssetMetadata);
+            const processedData = await applyAssetCalculationFormulas(
+              supabase,
+              finalMergedData, // Current form data
+              calculationFormulas,
+              currentAssetMetadata // Metadata with conversion defaults
+            );
+            
+            if (processedData) {
+              finalMergedData = processedData;
+              console.log('SubmitForm - finalMergedData after applyAssetCalculationFormulas:', finalMergedData);
+            }
+          } catch (formulaError) {
+            console.error('SubmitForm - Error applying asset-specific calculation formulas:', formulaError);
+          }
+        }
+        
+        setFormData(finalMergedData);
+        // setMergedFormData is likely redundant if formData is the single source of truth for FormRenderer's initialData
+        // If setMergedFormData was for a different purpose, it might need finalMergedData too.
+        // For now, let's assume formData is primary.
+        setMergedFormData(finalMergedData); 
+        
+        console.log('SubmitForm - Final assetMetadata for FormRenderer:', currentAssetMetadata);
+        console.log('SubmitForm - Final formData for FormRenderer:', finalMergedData);
+        
+        // Debug: Show what will be passed as mappedFields
+        console.log('SubmitForm - Mapped fields for calculations:', currentAssetMetadata);
+        console.log('SubmitForm - Available conversion fields in mappedFields:');
+        Object.entries(currentAssetMetadata).forEach(([key, value]) => {
+          console.log(`  - ${key}: ${value} (type: ${typeof value})`);
+        });
+        
+        // Additional debugging to ensure conversion fields are numbers
+        console.log('SubmitForm - Conversion fields as numbers:');
+        Object.entries(currentAssetMetadata).forEach(([key, value]) => {
+          if (key.startsWith('convert_')) {
+            const numValue = Number(value);
+            console.log(`  - ${key}: original="${value}" numeric=${numValue} isNaN=${isNaN(numValue)}`);
+          }
+        });
+        
+        let debugFormFields: any[] = [];
+        if (fetchedForm?.form_data) {
+          const parsedData = typeof fetchedForm.form_data === 'string' 
+            ? JSON.parse(fetchedForm.form_data) 
+            : fetchedForm.form_data;
+          debugFormFields = parsedData?.fields || [];
+        }
+        console.log('SubmitForm - DEBUG: Form fields with mapped.convert formulas:', debugFormFields.filter((f: any) => f.formula?.includes('mapped.convert')));
+        
+        // Log specific examples of formula fields
+        debugFormFields.forEach((field: any) => {
+          if (field.formula?.includes('mapped.convert')) {
+            console.log(`SubmitForm - Field "${field.label}" (${field.id}) formula: ${field.formula}`);
+            // Extract the conversion field name from the formula
+            const match = field.formula.match(/\{mapped\.(convert_[^}]+)\}/);
+            if (match) {
+              const conversionField = match[1];
+              console.log(`  - Requires: ${conversionField} = ${currentAssetMetadata[conversionField]}`);
+            }
+          }
+        });
+
+      } else {
+        console.log('SubmitForm - No form found!');
         toast({
-          title: 'Error',
-          description: 'Failed to load form. Please try again.',
+          title: 'Form Not Found',
+          description: 'The requested form could not be found',
           variant: 'destructive',
         });
-      } finally {
-        setLoading(false);
       }
-    };
-    
+    } catch (error) {
+      console.error('🚨 SubmitForm - Error loading form:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load form. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      console.log('SubmitForm - Setting loading to false...');
+      setLoading(false);
+    }
+  }, [id, currentOrganization?.id, assetId, prefillData, calculationFormulas, formType, forceNewEntry, actionParam, assetTypeId, fromMobileQR]);
+  
+  useEffect(() => {
     loadForm();
-  }, [id, currentOrganization?.id, assetId, toast]);
+  }, [loadForm]);
   
   const handleFormSubmit = async (data: any) => {
-    if (!currentOrganization || !id) return;
+    // For mobile QR workflow, use organization from form if currentOrganization is not available
+    let workingOrganization = currentOrganization;
+    if (!workingOrganization && fromMobileQR && form?.organization_id) {
+      workingOrganization = { id: form.organization_id };
+      console.log('SubmitForm - Using organization from form for submission:', form.organization_id);
+    }
+    
+    if (!workingOrganization || !id) {
+      console.error('SubmitForm - Missing required parameters for submission:', { workingOrganization: !!workingOrganization, id });
+      toast({
+        title: 'Submission Error',
+        description: 'Missing required information for form submission',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
       setSubmitting(true);
@@ -501,7 +549,7 @@ export default function SubmitForm() {
                       .from('inventory_history')
                       .insert({
                         inventory_item_id: inventoryItem.id,
-                        organization_id: currentOrganization.id,
+                        organization_id: workingOrganization.id,
                         quantity: roundedQuantity, // Database expects integer
                         event_type: 'audit',
                         check_type: 'periodic',
@@ -532,7 +580,7 @@ export default function SubmitForm() {
             await submitForm(
               id,
               data,
-              currentOrganization.id,
+              workingOrganization.id,
               submissionAssetTypeId,
               assetId,
               formType
@@ -549,7 +597,7 @@ export default function SubmitForm() {
         const result = await submitForm(
           id,
           data,
-          currentOrganization.id,
+          workingOrganization.id,
           submissionAssetTypeId,
           assetId, // Pass the asset ID if this is from a QR code scan
           formType // Pass the form type to determine correct event_type
@@ -626,7 +674,7 @@ export default function SubmitForm() {
                     .from('inventory_history')
                     .insert({
                       inventory_item_id: inventoryItem.id,
-                      organization_id: currentOrganization.id,
+                      organization_id: workingOrganization.id,
                       quantity: roundedQuantity, // Database expects integer
                       event_type: 'audit',
                       check_type: 'periodic',
@@ -661,7 +709,7 @@ export default function SubmitForm() {
       });
       
       // Clear asset cache to refresh inventory quantities
-      clearAssetCacheForOrg(currentOrganization.id);
+      clearAssetCacheForOrg(workingOrganization.id);
       
       // Navigate based on form type
       if (formType === 'intake') {

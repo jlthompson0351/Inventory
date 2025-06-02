@@ -96,9 +96,11 @@ const MobileAssetWorkflow = () => {
 
   const loadAssetData = async () => {
     try {
+      console.log('🚀 MobileAssetWorkflow - Loading asset data for:', assetId);
       setIsLoading(true);
       
       // First get the asset data - use maybeSingle() to handle missing assets gracefully
+      console.log('MobileAssetWorkflow - Fetching asset data...');
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id, name, barcode, asset_type_id, organization_id')
@@ -107,7 +109,7 @@ const MobileAssetWorkflow = () => {
         .single();
 
       if (assetError) {
-        console.error('Error fetching asset:', assetError);
+        console.error('MobileAssetWorkflow - Error fetching asset:', assetError);
         toast({
           variant: "destructive",
           title: "Asset Not Found",
@@ -117,7 +119,7 @@ const MobileAssetWorkflow = () => {
       }
       
       if (!assetData) {
-        console.log('No asset data returned');
+        console.log('MobileAssetWorkflow - No asset data returned');
         toast({
           variant: "destructive",
           title: "Asset Not Found",
@@ -126,7 +128,10 @@ const MobileAssetWorkflow = () => {
         return;
       }
 
+      console.log('MobileAssetWorkflow - Asset data loaded:', assetData);
+
       // Then get the asset type info - use maybeSingle() here too
+      console.log('MobileAssetWorkflow - Fetching asset type data...');
       const { data: assetTypeData, error: assetTypeError } = await supabase
         .from('asset_types')
         .select('*')
@@ -134,7 +139,7 @@ const MobileAssetWorkflow = () => {
         .maybeSingle();
 
       if (assetTypeError) {
-        console.error('Error fetching asset type:', assetTypeError);
+        console.error('MobileAssetWorkflow - Error fetching asset type:', assetTypeError);
         toast({
           variant: "destructive", 
           title: "Asset Type Error",
@@ -143,12 +148,22 @@ const MobileAssetWorkflow = () => {
         return;
       }
 
+      console.log('MobileAssetWorkflow - Asset type data loaded:', assetTypeData);
+
       // Get linked forms for this asset type from asset_type_forms table
-      const { data: linkedForms } = await supabase
+      console.log('MobileAssetWorkflow - Fetching linked forms...');
+      const { data: linkedForms, error: formsError } = await supabase
         .from('asset_type_forms')
         .select('form_id, purpose')
         .eq('asset_type_id', assetData.asset_type_id)
         .eq('organization_id', assetData.organization_id);
+
+      if (formsError) {
+        console.error('MobileAssetWorkflow - Error fetching linked forms:', formsError);
+        // Don't fail here, continue with no forms
+      }
+
+      console.log('MobileAssetWorkflow - Linked forms loaded:', linkedForms);
 
       let intakeFormId = null;
       let inventoryFormId = null;
@@ -160,6 +175,8 @@ const MobileAssetWorkflow = () => {
         if (intakeForm) intakeFormId = intakeForm.form_id;
         if (inventoryForm) inventoryFormId = inventoryForm.form_id;
       }
+      
+      console.log('MobileAssetWorkflow - Form IDs resolved:', { intakeFormId, inventoryFormId });
       
       // Transform the data to match our expected format
       const transformedAssetData: AssetData = {
@@ -190,16 +207,18 @@ const MobileAssetWorkflow = () => {
         ]
       };
       
+      console.log('MobileAssetWorkflow - Setting asset data and moving to PIN step');
       setAssetData(transformedAssetData);
       setStep('pin');
     } catch (error) {
-      console.error('Error loading asset data:', error);
+      console.error('🚨 MobileAssetWorkflow - Error loading asset data:', error);
       toast({
         variant: "destructive",
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to load asset information.",
       });
     } finally {
+      console.log('MobileAssetWorkflow - Setting loading to false');
       setIsLoading(false);
     }
   };
