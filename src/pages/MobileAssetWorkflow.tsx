@@ -98,7 +98,7 @@ const MobileAssetWorkflow = () => {
     try {
       setIsLoading(true);
       
-      // First get the asset data
+      // First get the asset data - use maybeSingle() to handle missing assets gracefully
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id, name, barcode, asset_type_id, organization_id')
@@ -106,25 +106,31 @@ const MobileAssetWorkflow = () => {
         .eq('is_deleted', false)
         .single();
 
-      if (assetError) throw assetError;
+      if (assetError) {
+        console.error('Error fetching asset:', assetError);
+        throw new Error('Failed to fetch asset data');
+      }
       
       if (!assetData) {
         toast({
           variant: "destructive",
           title: "Asset Not Found",
-          description: "This QR code doesn't link to a valid asset.",
+          description: "This QR code doesn't link to a valid asset or you don't have access to it.",
         });
         return;
       }
 
-      // Then get the asset type info
+      // Then get the asset type info - use maybeSingle() here too
       const { data: assetTypeData, error: assetTypeError } = await supabase
         .from('asset_types')
         .select('id, name')
         .eq('id', assetData.asset_type_id)
         .single();
 
-      if (assetTypeError) throw assetTypeError;
+      if (assetTypeError) {
+        console.error('Error fetching asset type:', assetTypeError);
+        throw new Error('Failed to fetch asset type data');
+      }
 
       // Get linked forms for this asset type from asset_type_forms table
       const { data: linkedForms } = await supabase
@@ -180,7 +186,7 @@ const MobileAssetWorkflow = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load asset information.",
+        description: error instanceof Error ? error.message : "Failed to load asset information.",
       });
     } finally {
       setIsLoading(false);

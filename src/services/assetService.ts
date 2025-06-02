@@ -2,18 +2,23 @@ import { Database } from '@/types/database.types';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Asset {
-  id: string;
-  name: string;
-  description: string | null;
-  asset_id: string | null;
-  organization_id: string;
-  asset_type_id: string;
-  location: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string | null;
+  acquisition_date: string | null;
+  asset_type_id: string | null;
+  barcode: string | null;
+  barcode_type: string | null;
+  created_at: string | null;
+  created_by: string | null;
   deleted_at: string | null;
-  metadata: Record<string, any> | null;
+  description: string | null;
+  id: string;
+  is_deleted: boolean | null;
+  metadata: any | null;
+  name: string;
+  organization_id: string | null;
+  parent_asset_id: string | null;
+  serial_number: string | null;
+  status: string | null;
+  updated_at: string | null;
   has_inventory_item?: boolean;
 }
 
@@ -32,20 +37,15 @@ export const getAssetById = async (id: string): Promise<Asset | null> => {
       .select('*')
       .eq('id', id)
       .is('deleted_at', null)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      // Handle the specific case of no rows found
-      if (error.code === 'PGRST116' || error.message?.includes('no rows')) {
-        console.warn(`Asset with ID ${id} not found in database`);
-        return null;
-      }
       console.error('Supabase error fetching asset by id:', error);
       throw error;
     }
 
     if (!data) {
-      console.warn(`No data returned for asset with ID ${id}`);
+      console.warn(`Asset with ID ${id} not found in database`);
       return null;
     }
 
@@ -100,7 +100,7 @@ export const getAssetByQrCode = async (qrCode: string): Promise<Asset | null> =>
       .select('*')
       .eq('asset_id', qrCode)
       .is('deleted_at', null)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Supabase error fetching asset by QR code:', error);

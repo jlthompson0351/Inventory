@@ -63,7 +63,10 @@ export async function generateMobileAssetQR(
       .eq('is_deleted', false)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching asset for QR generation:', error);
+      throw error;
+    }
     if (!data) return null;
 
     // Generate mobile URL
@@ -113,7 +116,10 @@ export async function generateMobileAssetQRCanvas(
       .eq('is_deleted', false)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching asset for QR canvas generation:', error);
+      throw error;
+    }
     if (!data) throw new Error('Asset not found');
 
     const baseUrl = window.location.origin;
@@ -151,7 +157,10 @@ export async function generateMobileAssetQRSVG(
       .eq('is_deleted', false)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching asset for QR SVG generation:', error);
+      throw error;
+    }
     if (!data) throw new Error('Asset not found');
 
     const baseUrl = window.location.origin;

@@ -74,11 +74,16 @@ const QRScanHandler: React.FC = () => {
           assetData = await getAssetById(qrData.assetId);
         } else if (qrData.barcode) {
           // Look up asset by barcode
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('assets')
             .select('*')
             .eq('barcode', qrData.barcode)
-            .single();
+            .maybeSingle();
+          
+          if (error) {
+            console.error('Error fetching asset by barcode:', error);
+            throw error;
+          }
           assetData = data;
         }
 
@@ -142,11 +147,17 @@ const QRScanHandler: React.FC = () => {
 
     try {
       // Verify PIN against user's profile
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('id, quick_access_pin')
         .eq('quick_access_pin', pin)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error verifying PIN:', error);
+        setAuthError('Authentication failed. Please try again.');
+        return;
+      }
 
       if (profile) {
         setIsAuthenticated(true);
