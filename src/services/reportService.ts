@@ -2136,3 +2136,282 @@ export async function executeAssetInventoryReport(
     throw error;
   }
 }
+
+
+// 🚀 NEW: Monthly Inventory Report Builder
+export async function buildMonthlyInventoryReport(config: any, dateRange: { start: Date; end: Date }) {
+  try {
+    // Get all inventory items with their asset types
+    const { data: inventoryItems, error: itemsError } = await supabase
+      .from('inventory_items')
+      .select(`
+        id,
+        name,
+        sku,
+        quantity,
+        current_price,
+        currency,
+        location,
+        status,
+        category,
+        asset_types!inner(
+          id,
+          name,
+          color,
+          icon
+        )
+      `)
+      .eq('is_deleted', false)
+      .eq('asset_types.is_deleted', false);
+
+    if (itemsError) throw itemsError;
+
+    // Get inventory history for the reporting period and previous month
+    const previousMonthStart = new Date(dateRange.start);
+    previousMonthStart.setMonth(previousMonthStart.getMonth() - 1);
+    
+    const { data: historyData, error: historyError } = await supabase
+      .from('inventory_history')
+      .select(`
+        inventory_item_id,
+        event_type,
+        quantity,
+        previous_quantity,
+        created_at,
+        validation_status,
+        notes
+      `)
+      .gte('created_at', previousMonthStart.toISOString())
+      .lte('created_at', dateRange.end.toISOString())
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true });
+
+    if (historyError) throw historyError;
+
+    // Process data for monthly summary
+    const processedData = (inventoryItems || []).map(item => {
+      // Calculate starting balance (last record before reporting period)
+      const itemHistory = (historyData || []).filter(h => h.inventory_item_id === item.id);
+      const preReportHistory = itemHistory.filter(h => new Date(h.created_at) < dateRange.start);
+      const reportPeriodHistory = itemHistory.filter(h => 
+        new Date(h.created_at) >= dateRange.start && 
+        new Date(h.created_at) <= dateRange.end
+      );
+
+      // Starting quantity (from last record before period or 0)
+      const startingQuantity = preReportHistory.length > 0 
+        ? preReportHistory[preReportHistory.length - 1].quantity || 0
+        : 0;
+
+      // Calculate period totals
+      const additions = reportPeriodHistory
+        .filter(h => ['intake', 'addition', 'adjustment_up'].includes(h.event_type))
+        .reduce((sum, h) => sum + (Number(h.quantity) || 0), 0);
+
+      const usage = reportPeriodHistory
+        .filter(h => ['consumption', 'adjustment_down', 'removal'].includes(h.event_type))
+        .reduce((sum, h) => sum + (Number(h.quantity) || 0), 0);
+
+      const adjustments = reportPeriodHistory
+        .filter(h => h.event_type === 'adjustment')
+        .reduce((sum, h) => sum + (Number(h.quantity) || 0), 0);
+
+      return {
+        item_name: item.name,
+        sku: item.sku,
+        asset_type: item.asset_types?.name,
+        asset_type_color: item.asset_types?.color,
+        asset_type_icon: item.asset_types?.icon,
+        starting_quantity: startingQuantity,
+        total_additions: additions,
+        total_usage: usage,
+        total_adjustments: adjustments,
+        ending_quantity: item.quantity,
+        current_price: item.current_price,
+        currency: item.currency,
+        location: item.location,
+        status: item.status,
+        category: item.category,
+        period_activity_count: reportPeriodHistory.length,
+        validation_issues: reportPeriodHistory.filter(h => h.validation_status === 'flagged').length
+      };
+    });
+
+    // Group by asset type
+    const groupedData = processedData.reduce((groups: Record<string, any[]>, item) => {
+      const assetType = item.asset_type || 'Uncategorized';
+      if (!groups[assetType]) {
+        groups[assetType] = [];
+      }
+      groups[assetType].push(item);
+      return groups;
+    }, {});
+
+    // Format for display with asset type sections
+    const formattedData = Object.entries(groupedData).flatMap(([assetType, items]) => [
+      // Asset type header row
+      {
+        _isHeader: true,
+        _assetType: assetType,
+        item_name: `📦 ${assetType.toUpperCase()}`,
+        asset_type: assetType,
+        starting_quantity: items.reduce((sum, item) => sum + item.starting_quantity, 0),
+        total_additions: items.reduce((sum, item) => sum + item.total_additions, 0),
+        total_usage: items.reduce((sum, item) => sum + item.total_usage, 0),
+        total_adjustments: items.reduce((sum, item) => sum + item.total_adjustments, 0),
+        ending_quantity: items.reduce((sum, item) => sum + item.ending_quantity, 0),
+        _itemCount: items.length
+      },
+      // Individual items
+      ...items.sort((a, b) => a.item_name.localeCompare(b.item_name))
+    ]);
+
+    return {
+      data: formattedData,
+      stats: {
+        totalItems: processedData.length,
+        assetTypes: Object.keys(groupedData).length,
+        reportPeriod: `${dateRange.start.toISOString().split('T')[0]} to ${dateRange.end.toISOString().split('T')[0]}`,
+        totalStartingValue: processedData.reduce((sum, item) => sum + (item.starting_quantity * (item.current_price || 0)), 0),
+        totalEndingValue: processedData.reduce((sum, item) => sum + (item.ending_quantity * (item.current_price || 0)), 0),
+        generatedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('Error building monthly inventory report:', error);
+    throw new Error(`Failed to generate monthly inventory report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// 🚀 NEW: Asset Activity Detail Report
+export async function buildAssetActivityReport(config: any, assetId: string, dateRange: { start: Date; end: Date }) {
+  try {
+    // Get detailed activity for specific asset
+    const { data: activityData, error: activityError } = await supabase
+      .from('inventory_history')
+      .select(`
+        id,
+        event_type,
+        check_type,
+        quantity,
+        previous_quantity,
+        created_at,
+        notes,
+        validation_status,
+        created_by,
+        inventory_items!inner(
+          id,
+          name,
+          sku,
+          asset_types(name, color, icon)
+        )
+      `)
+      .eq('inventory_item_id', assetId)
+      .gte('created_at', dateRange.start.toISOString())
+      .lte('created_at', dateRange.end.toISOString())
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (activityError) throw activityError;
+
+    // Get form submissions for this asset during the period
+    const { data: formData, error: formError } = await supabase
+      .from('form_submissions')
+      .select(`
+        id,
+        submission_data,
+        created_at,
+        submitted_by,
+        forms!inner(
+          name,
+          form_type,
+          purpose
+        )
+      `)
+      .eq('asset_id', assetId)
+      .gte('created_at', dateRange.start.toISOString())
+      .lte('created_at', dateRange.end.toISOString())
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (formError) throw formError;
+
+    // Combine and format data
+    const combinedData = [
+      // Activity records
+      ...(activityData?.map(record => ({
+        type: 'activity',
+        timestamp: record.created_at,
+        description: `${record.event_type} - ${record.check_type}`,
+        quantity_before: record.previous_quantity,
+        quantity_after: record.quantity,
+        change_amount: (record.quantity || 0) - (record.previous_quantity || 0),
+        notes: record.notes,
+        validation_status: record.validation_status,
+        created_by: record.created_by,
+        item_name: record.inventory_items?.name,
+        asset_type: record.inventory_items?.asset_types?.name
+      })) || []),
+      
+      // Form submissions
+      ...(formData?.map(form => ({
+        type: 'form_submission',
+        timestamp: form.created_at,
+        description: `Form: ${form.forms?.name}`,
+        form_type: form.forms?.form_type,
+        form_purpose: form.forms?.purpose,
+        submission_data: form.submission_data,
+        submitted_by: form.submitted_by,
+        notes: `Form submission - ${form.forms?.form_type}`
+      })) || [])
+    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return {
+      data: combinedData,
+      stats: {
+        totalRecords: combinedData.length,
+        activityRecords: activityData?.length || 0,
+        formSubmissions: formData?.length || 0,
+        reportPeriod: `${dateRange.start.toISOString().split('T')[0]} to ${dateRange.end.toISOString().split('T')[0]}`,
+        assetName: activityData?.[0]?.inventory_items?.name,
+        assetType: activityData?.[0]?.inventory_items?.asset_types?.name,
+        generatedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('Error building asset activity report:', error);
+    throw new Error(`Failed to generate asset activity report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// 🚀 Enhanced executeReport function to handle new report types
+export async function executeReportEnhanced(report: any, customDateRange?: { start: Date; end: Date }) {
+  try {
+    const config = report.report_config || report;
+    const reportType = config.reportType;
+    
+    // Default date range (current month)
+    const defaultDateRange = customDateRange || {
+      start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+    };
+
+    // Handle specialized report types
+    if (reportType === 'monthly_summary') {
+      return await buildMonthlyInventoryReport(config, defaultDateRange);
+    } else if (reportType === 'activity_detail') {
+      // For activity detail, we need an assetId parameter
+      const assetId = config.assetId || config.filters?.find((f: any) => f.field === 'asset_id')?.value;
+      if (!assetId) {
+        throw new Error('Asset ID required for activity detail report');
+      }
+      return await buildAssetActivityReport(config, assetId, defaultDateRange);
+    }
+
+    // Fall back to existing executeReport logic for standard reports
+    return await executeReport(report as Report);
+  } catch (error) {
+    console.error('Error executing enhanced report:', error);
+    throw error;
+  }
+}

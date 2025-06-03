@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -11,7 +12,12 @@ import {
   Lightbulb,
   BarChart3,
   Users,
-  Calendar
+  Calendar,
+  Zap,
+  Shield,
+  DollarSign,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 interface SmartInsightsProps {
@@ -23,13 +29,17 @@ interface SmartInsightsProps {
 
 interface Insight {
   id: string;
-  type: 'trend' | 'anomaly' | 'recommendation' | 'summary';
-  severity: 'info' | 'warning' | 'success' | 'error';
+  type: 'trend' | 'anomaly' | 'recommendation' | 'summary' | 'business' | 'optimization';
+  severity: 'info' | 'warning' | 'success' | 'error' | 'critical';
   title: string;
   description: string;
   value?: string | number;
   icon: React.ReactNode;
   action?: string;
+  actionable?: boolean;
+  businessImpact?: 'low' | 'medium' | 'high';
+  estimatedSavings?: number;
+  priority?: number;
 }
 
 export function SmartInsights({ data, columns, formFields, reportConfig }: SmartInsightsProps) {
@@ -39,7 +49,7 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
     
     const allInsights: Insight[] = [];
 
-    // 1. Data Quality Insights
+    // 1. ENHANCED Data Quality Insights
     const missingDataFields = columns.filter(col => {
       const missingCount = data.filter(row => !row[col] || row[col] === '' || row[col] === null).length;
       return missingCount > data.length * 0.1; // More than 10% missing
@@ -51,70 +61,112 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
         type: 'anomaly',
         severity: 'warning',
         title: 'Data Quality Alert',
-        description: `${missingDataFields.length} field(s) have significant missing data`,
+        description: `${missingDataFields.length} field(s) have significant missing data (>10%)`,
         icon: <AlertTriangle className="h-4 w-4" />,
-        action: 'Review data collection processes'
+        action: 'Review data collection processes and form validation',
+        actionable: true,
+        businessImpact: 'medium',
+        priority: 8
       });
     }
 
-    // 2. Record Count Insights
-    if (data.length < 10) {
-      allInsights.push({
-        id: 'low-data',
-        type: 'summary',
-        severity: 'info',
-        title: 'Limited Data Set',
-        description: `Only ${data.length} records found`,
-        icon: <BarChart3 className="h-4 w-4" />,
-        action: 'Consider expanding date range or filters'
-      });
-    } else if (data.length > 1000) {
-      allInsights.push({
-        id: 'large-dataset',
-        type: 'summary',
-        severity: 'success',
-        title: 'Rich Data Set',
-        description: `Analyzing ${data.length.toLocaleString()} records`,
-        icon: <CheckCircle className="h-4 w-4" />
-      });
-    }
-
-    // 3. Numeric Field Analysis
-    const numericFields = formFields.filter(f => 
-      ['number', 'currency'].includes(f.field_type) && columns.includes(f.id)
+    // 2. NEW: Business Intelligence Insights for Inventory
+    const inventoryFields = formFields.filter(f => 
+      f.field_label.toLowerCase().includes('quantity') || 
+      f.field_label.toLowerCase().includes('stock') ||
+      f.field_label.toLowerCase().includes('inventory')
     );
 
-    numericFields.forEach(field => {
-      const values = data
-        .map(row => parseFloat(row[field.id]))
-        .filter(val => !isNaN(val) && val !== null);
-      
-      if (values.length > 0) {
-        const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
-        const max = Math.max(...values);
-        const min = Math.min(...values);
+    if (inventoryFields.length > 0) {
+      inventoryFields.forEach(field => {
+        const values = data
+          .map(row => parseFloat(row[field.id]))
+          .filter(val => !isNaN(val) && val !== null);
         
-        // Detect outliers (values more than 2 standard deviations from mean)
-        const stdDev = Math.sqrt(values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length);
-        const outliers = values.filter(val => Math.abs(val - avg) > 2 * stdDev);
-        
-        if (outliers.length > 0) {
-          allInsights.push({
-            id: `outliers-${field.id}`,
-            type: 'anomaly',
-            severity: 'info',
-            title: 'Statistical Outliers Detected',
-            description: `${outliers.length} unusual values in ${field.field_label}`,
-            value: `Range: ${min.toLocaleString()} - ${max.toLocaleString()}`,
-            icon: <Target className="h-4 w-4" />
-          });
+        if (values.length > 0) {
+          const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+          const lowStockItems = values.filter(val => val < avg * 0.2).length; // Less than 20% of average
+          
+          if (lowStockItems > 0) {
+            allInsights.push({
+              id: `low-stock-${field.id}`,
+              type: 'business',
+              severity: 'warning',
+              title: 'Low Stock Alert',
+              description: `${lowStockItems} items show critically low inventory levels`,
+              value: `${((lowStockItems / values.length) * 100).toFixed(1)}% of items`,
+              icon: <AlertCircle className="h-4 w-4" />,
+              action: 'Review reorder points and supplier lead times',
+              actionable: true,
+              businessImpact: 'high',
+              estimatedSavings: lowStockItems * 50, // Estimated cost per stockout
+              priority: 9
+            });
+          }
         }
-      }
-    });
+      });
+    }
 
-    // 4. Date Field Analysis
+    // 3. NEW: Financial Impact Analysis
+    const costFields = formFields.filter(f => 
+      f.field_type === 'currency' || 
+      f.field_label.toLowerCase().includes('cost') ||
+      f.field_label.toLowerCase().includes('price') ||
+      f.field_label.toLowerCase().includes('value')
+    );
+
+    if (costFields.length > 0) {
+      costFields.forEach(field => {
+        const values = data
+          .map(row => parseFloat(row[field.id]))
+          .filter(val => !isNaN(val) && val > 0);
+        
+        if (values.length > 0) {
+          const totalValue = values.reduce((sum, val) => sum + val, 0);
+          const avg = totalValue / values.length;
+          const highValueItems = values.filter(val => val > avg * 3).length; // 3x above average
+          
+          if (highValueItems > 0) {
+            allInsights.push({
+              id: `high-value-items-${field.id}`,
+              type: 'business',
+              severity: 'info',
+              title: 'High-Value Assets Identified',
+              description: `${highValueItems} items are significantly above average value`,
+              value: `Total value: $${totalValue.toLocaleString()}`,
+              icon: <DollarSign className="h-4 w-4" />,
+              action: 'Consider enhanced security and insurance for high-value items',
+              actionable: true,
+              businessImpact: 'medium',
+              priority: 6
+            });
+          }
+        }
+      });
+    }
+
+    // 4. NEW: Performance Optimization Insights
+    if (reportConfig.dataSources?.length > 3) {
+      allInsights.push({
+        id: 'complex-query',
+        type: 'optimization',
+        severity: 'warning',
+        title: 'Query Complexity Alert',
+        description: 'Multiple data sources may impact performance',
+        icon: <Zap className="h-4 w-4" />,
+        action: 'Consider breaking into focused reports or using data views',
+        actionable: true,
+        businessImpact: 'low',
+        priority: 4
+      });
+    }
+
+    // 5. NEW: Compliance and Audit Insights
     const dateFields = formFields.filter(f => 
-      ['date', 'datetime'].includes(f.field_type) && columns.includes(f.id)
+      ['date', 'datetime'].includes(f.field_type) && 
+      (f.field_label.toLowerCase().includes('audit') || 
+       f.field_label.toLowerCase().includes('inspection') ||
+       f.field_label.toLowerCase().includes('maintenance'))
     );
 
     dateFields.forEach(field => {
@@ -123,107 +175,120 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
         .filter(date => date && !isNaN(date.getTime()));
       
       if (dates.length > 0) {
-        const sortedDates = dates.sort((a, b) => a!.getTime() - b!.getTime());
-        const oldestDate = sortedDates[0];
-        const newestDate = sortedDates[sortedDates.length - 1];
-        const daysDiff = Math.ceil((newestDate!.getTime() - oldestDate!.getTime()) / (1000 * 60 * 60 * 24));
+        const today = new Date();
+        const overdueItems = dates.filter(date => {
+          const daysDiff = Math.ceil((today.getTime() - date!.getTime()) / (1000 * 60 * 60 * 24));
+          return daysDiff > 90; // More than 90 days old
+        }).length;
         
-        allInsights.push({
-          id: `date-range-${field.id}`,
-          type: 'summary',
-          severity: 'info',
-          title: 'Date Range Analysis',
-          description: `Data spans ${daysDiff} days`,
-          value: `${oldestDate!.toLocaleDateString()} to ${newestDate!.toLocaleDateString()}`,
-          icon: <Calendar className="h-4 w-4" />
-        });
-      }
-    });
-
-    // 5. Category Distribution Insights
-    const categoryFields = formFields.filter(f => 
-      ['text', 'select'].includes(f.field_type) && columns.includes(f.id)
-    );
-
-    categoryFields.forEach(field => {
-      const values = data.map(row => row[field.id]).filter(val => val);
-      const uniqueValues = [...new Set(values)];
-      
-      if (uniqueValues.length > 1) {
-        const distribution = uniqueValues.reduce((acc, val) => {
-          acc[val] = values.filter(v => v === val).length;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        const sortedDistribution = Object.entries(distribution)
-          .sort(([,a], [,b]) => b - a);
-        
-        const topCategory = sortedDistribution[0];
-        const topPercentage = (topCategory[1] / values.length * 100).toFixed(1);
-        
-        if (parseFloat(topPercentage) > 70) {
+        if (overdueItems > 0) {
           allInsights.push({
-            id: `dominance-${field.id}`,
-            type: 'trend',
-            severity: 'info',
-            title: 'Category Dominance',
-            description: `${topPercentage}% of records are "${topCategory[0]}"`,
-            icon: <TrendingUp className="h-4 w-4" />
+            id: `overdue-${field.id}`,
+            type: 'business',
+            severity: 'error',
+            title: 'Compliance Risk Detected',
+            description: `${overdueItems} items have overdue ${field.field_label.toLowerCase()}`,
+            value: `${((overdueItems / dates.length) * 100).toFixed(1)}% overdue`,
+            icon: <Shield className="h-4 w-4" />,
+            action: 'Schedule immediate inspections to maintain compliance',
+            actionable: true,
+            businessImpact: 'high',
+            estimatedSavings: overdueItems * 200, // Estimated cost per compliance violation
+            priority: 10
           });
         }
       }
     });
 
-    // 6. Performance Recommendations
-    if (columns.length > 15) {
+    // 6. Record Count Insights (Enhanced)
+    if (data.length < 10) {
       allInsights.push({
-        id: 'too-many-columns',
-        type: 'recommendation',
-        severity: 'warning',
-        title: 'Report Optimization',
-        description: 'Consider reducing columns for better performance',
-        icon: <Lightbulb className="h-4 w-4" />,
-        action: 'Focus on key metrics only'
-      });
-    }
-
-    if (reportConfig.dataSources?.length > 5) {
-      allInsights.push({
-        id: 'many-sources',
-        type: 'recommendation',
+        id: 'low-data',
+        type: 'summary',
         severity: 'info',
-        title: 'Complex Report Detected',
-        description: 'Multiple data sources may slow performance',
-        icon: <Brain className="h-4 w-4" />,
-        action: 'Consider breaking into smaller reports'
+        title: 'Limited Data Set',
+        description: `Only ${data.length} records found`,
+        icon: <BarChart3 className="h-4 w-4" />,
+        action: 'Consider expanding date range or removing restrictive filters',
+        actionable: true,
+        businessImpact: 'low',
+        priority: 3
+      });
+    } else if (data.length > 1000) {
+      allInsights.push({
+        id: 'large-dataset',
+        type: 'summary',
+        severity: 'success',
+        title: 'Rich Data Set',
+        description: `Analyzing ${data.length.toLocaleString()} records - excellent data coverage`,
+        icon: <CheckCircle className="h-4 w-4" />,
+        businessImpact: 'low',
+        priority: 2
       });
     }
 
-    // 7. Usage Insights
-    const formFields_with_data = columns.filter(col => {
-      const nonEmptyCount = data.filter(row => row[col] && row[col] !== '').length;
-      return nonEmptyCount > 0;
+    // 7. NEW: Trend Analysis
+    const numericFields = formFields.filter(f => ['number', 'currency'].includes(f.field_type));
+    numericFields.forEach(field => {
+      const values = data
+        .map(row => parseFloat(row[field.id]))
+        .filter(val => !isNaN(val) && val !== null);
+      
+      if (values.length > 5) {
+        // Simple trend detection - compare first half to second half
+        const midpoint = Math.floor(values.length / 2);
+        const firstHalf = values.slice(0, midpoint);
+        const secondHalf = values.slice(midpoint);
+        
+        const firstAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+        const secondAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+        const percentChange = ((secondAvg - firstAvg) / firstAvg) * 100;
+        
+        if (Math.abs(percentChange) > 20) {
+          allInsights.push({
+            id: `trend-${field.id}`,
+            type: 'trend',
+            severity: percentChange > 0 ? 'success' : 'warning',
+            title: `${percentChange > 0 ? 'Positive' : 'Negative'} Trend Detected`,
+            description: `${field.field_label} shows ${Math.abs(percentChange).toFixed(1)}% ${percentChange > 0 ? 'increase' : 'decrease'}`,
+            icon: percentChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />,
+            action: percentChange > 0 ? 'Monitor for sustainability' : 'Investigate root causes',
+            actionable: true,
+            businessImpact: Math.abs(percentChange) > 50 ? 'high' : 'medium',
+            priority: Math.abs(percentChange) > 50 ? 8 : 5
+          });
+        }
+      }
     });
 
-    const utilizationRate = (formFields_with_data.length / columns.length * 100).toFixed(1);
+    // 8. NEW: Utilization Insights
+    const utilizationRate = (columns.filter(col => {
+      const nonEmptyCount = data.filter(row => row[col] && row[col] !== '').length;
+      return nonEmptyCount > 0;
+    }).length / columns.length * 100);
     
-    if (parseFloat(utilizationRate) < 50) {
+    if (utilizationRate < 50) {
       allInsights.push({
         id: 'low-utilization',
-        type: 'recommendation',
+        type: 'optimization',
         severity: 'warning',
         title: 'Low Field Utilization',
-        description: `Only ${utilizationRate}% of selected fields contain data`,
+        description: `Only ${utilizationRate.toFixed(1)}% of selected fields contain data`,
         icon: <Target className="h-4 w-4" />,
-        action: 'Remove unused columns'
+        action: 'Remove unused columns to improve report clarity and performance',
+        actionable: true,
+        businessImpact: 'low',
+        priority: 3
       });
     }
 
-    return allInsights;
+    // Sort insights by priority (highest first)
+    return allInsights.sort((a, b) => (b.priority || 0) - (a.priority || 0));
   }, [data, columns, formFields, reportConfig]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
+      case 'critical': return 'border-red-500 bg-red-100 text-red-900';
       case 'error': return 'border-red-200 bg-red-50 text-red-800';
       case 'warning': return 'border-yellow-200 bg-yellow-50 text-yellow-800';
       case 'success': return 'border-green-200 bg-green-50 text-green-800';
@@ -234,6 +299,7 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
+      case 'critical': return 'destructive';
       case 'error': return 'destructive';
       case 'warning': return 'secondary';
       case 'success': return 'default';
@@ -242,12 +308,42 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
     }
   };
 
+  const getBusinessImpactBadge = (impact?: string) => {
+    switch (impact) {
+      case 'high': return { variant: 'destructive' as const, label: 'High Impact' };
+      case 'medium': return { variant: 'secondary' as const, label: 'Medium Impact' };
+      case 'low': return { variant: 'outline' as const, label: 'Low Impact' };
+      default: return null;
+    }
+  };
+
+  // Group insights by type for better organization
+  const groupedInsights = insights.reduce((acc, insight) => {
+    if (!acc[insight.type]) acc[insight.type] = [];
+    acc[insight.type].push(insight);
+    return acc;
+  }, {} as Record<string, Insight[]>);
+
+  const typeLabels = {
+    business: '💼 Business Insights',
+    optimization: '⚡ Performance',
+    anomaly: '🚨 Data Quality',
+    trend: '📈 Trends',
+    summary: '📊 Summary',
+    recommendation: '💡 Recommendations'
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Brain className="mr-2 h-5 w-5" />
-          Smart Insights
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Brain className="mr-2 h-5 w-5" />
+            Smart Insights
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {insights.length} insights
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -258,33 +354,65 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
             <p className="text-sm mt-1">Generate a report preview to see AI-powered insights</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {insights.map((insight) => (
-              <div
-                key={insight.id}
-                className={`p-4 rounded-lg border ${getSeverityColor(insight.severity)}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      {insight.icon}
-                    </div>
-                    <div className="flex-grow min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="font-medium text-sm">{insight.title}</h4>
-                        <Badge variant={getSeverityBadge(insight.severity) as any} className="text-xs">
-                          {insight.type}
-                        </Badge>
+          <div className="space-y-4">
+            {Object.entries(groupedInsights).map(([type, typeInsights]) => (
+              <div key={type}>
+                <h4 className="font-medium text-sm mb-2 text-muted-foreground">
+                  {typeLabels[type as keyof typeof typeLabels] || type}
+                </h4>
+                <div className="space-y-3">
+                  {typeInsights.map((insight) => (
+                    <div
+                      key={insight.id}
+                      className={`p-4 rounded-lg border ${getSeverityColor(insight.severity)}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3 flex-grow">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {insight.icon}
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                              <h4 className="font-medium text-sm">{insight.title}</h4>
+                              <Badge variant={getSeverityBadge(insight.severity) as any} className="text-xs">
+                                {insight.type}
+                              </Badge>
+                              {getBusinessImpactBadge(insight.businessImpact) && (
+                                <Badge 
+                                  variant={getBusinessImpactBadge(insight.businessImpact)!.variant} 
+                                  className="text-xs"
+                                >
+                                  {getBusinessImpactBadge(insight.businessImpact)!.label}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm mb-2">{insight.description}</p>
+                            {insight.value && (
+                              <p className="text-xs font-mono mb-2 opacity-75 bg-white/50 p-1 rounded">
+                                {insight.value}
+                              </p>
+                            )}
+                            {insight.estimatedSavings && (
+                              <p className="text-xs mb-2 font-medium text-green-700">
+                                💰 Potential savings: ${insight.estimatedSavings.toLocaleString()}
+                              </p>
+                            )}
+                            {insight.action && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-700 mb-1">💡 Recommended Action:</p>
+                                <p className="text-xs bg-white/70 p-2 rounded border">{insight.action}</p>
+                                {insight.actionable && (
+                                  <Button size="sm" variant="outline" className="mt-2 text-xs h-7">
+                                    Take Action
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm">{insight.description}</p>
-                      {insight.value && (
-                        <p className="text-xs font-mono mt-1 opacity-75">{insight.value}</p>
-                      )}
-                      {insight.action && (
-                        <p className="text-xs mt-2 font-medium">💡 {insight.action}</p>
-                      )}
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             ))}

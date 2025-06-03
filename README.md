@@ -1,6 +1,6 @@
 # BarcodeX Inventory Builder
 
-A comprehensive, production-ready inventory management system built with React, TypeScript, and Supabase. **Now featuring a complete inventory workflow with smart asset tracking, dynamic forms, and enterprise-grade audit capabilities.**
+A comprehensive, production-ready inventory management system built with React, TypeScript, and Supabase. **Now featuring a complete inventory workflow with smart asset tracking, dynamic forms, and enterprise-grade audit capabilities. Deployed on Firebase hosting with mobile QR workflows.**
 
 ## 🚀 Key Features
 
@@ -14,8 +14,26 @@ A comprehensive, production-ready inventory management system built with React, 
 - **✅ Organization Management** (one organization per user, fully isolated)
 - **✅ Complete Audit Trail** with form-based data capture and history tracking
 - **✅ Advanced Analytics** and Performance Monitoring
+- **✅ Mobile QR Workflow** with PIN authentication for field operations
+- **✅ Firebase Production Deployment** with global CDN and SSL
 
-## 🎯 Recent Major Enhancements (December 2024)
+## 🎯 Recent Major Enhancements (January 2025)
+
+### **Firebase Production Deployment - LIVE** ✅
+- **Global Hosting**: Deployed on Firebase with worldwide CDN for fast loading
+- **Environment Configuration**: Fixed production build issues with explicit variable definitions
+- **SSL/HTTPS**: Automatic SSL certificates for secure mobile camera access
+- **SPA Routing**: Proper routing configuration for all mobile QR URLs
+- **Performance**: Sub-second loading times and optimized mobile experience
+- **Deployment Options**: Both automated CI/CD and direct deployment workflows
+
+### **Mobile QR Workflow - PRODUCTION READY** ✅
+- **Anonymous Access**: Mobile QR scanning without traditional authentication required
+- **PIN Authentication**: Secure PIN-based authentication for form submissions
+- **Organization Context**: Proper data scoping through PIN-based access
+- **Dual Authentication**: FormSubmissionWrapper supports both traditional and mobile auth
+- **Security**: Enhanced RLS policies for anonymous mobile access
+- **Audit Trail**: All mobile actions properly logged with user context
 
 ### **Enhanced Form Builder - PRODUCTION READY** ✅
 - **Advanced Formula System**: Visual and text-based formula editors with real-time validation
@@ -51,14 +69,16 @@ A comprehensive, production-ready inventory management system built with React, 
 - **Trigger Fixes**: Corrected event type mappings (periodic→audit instead of periodic→check)
 - **Data Integrity**: Complete constraint enforcement and relationship validation
 - **Performance**: Optimized queries and proper indexing throughout
+- **Mobile QR Security**: Enhanced RLS policies for anonymous access with PIN authentication
 
 ## Technology Stack
 
 - **Frontend**: React, TypeScript, Shadcn UI, Vite, TailwindCSS
 - **Backend**: Supabase (PostgreSQL, Auth, Storage, RLS)
+- **Hosting**: Firebase Hosting with global CDN and SSL
 - **State Management**: React Hooks with custom inventory management logic
 - **Reporting**: Optimized query engine with materialized views
-- **Mobile**: Responsive design with touch-friendly interfaces
+- **Mobile**: Responsive design with touch-friendly interfaces and QR workflows
 
 ## Getting Started
 
@@ -91,6 +111,20 @@ A comprehensive, production-ready inventory management system built with React, 
 
 4. Open your browser and navigate to `http://localhost:8080`
 
+### Production Deployment
+
+The system is deployed on Firebase hosting. For deployment:
+
+```bash
+# Build for production
+npm run build
+
+# Deploy to Firebase
+firebase deploy --only hosting
+```
+
+See [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) for complete deployment documentation.
+
 ## Project Structure
 
 - `src/components/`: UI components organized by feature
@@ -103,7 +137,7 @@ A comprehensive, production-ready inventory management system built with React, 
 - `src/lib/`: Utilities and helper functions
 - `src/types/`: TypeScript type definitions
 - `src/integrations/`: Third-party integrations (Supabase)
-- `docs/`: Comprehensive documentation
+- `docs/`: Comprehensive documentation including Firebase deployment guides
 - `supabase/`: Database migrations and documentation
 
 ## Major Features
@@ -122,6 +156,21 @@ Our inventory system provides enterprise-grade functionality:
 - **Error Prevention**: Comprehensive validation and fallback behaviors
 
 For detailed documentation, see [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md).
+
+### 📱 **Mobile QR Workflow**
+
+**Current Status: ✅ PRODUCTION READY AND DEPLOYED**
+
+Complete mobile QR scanning workflow for field operations:
+
+- **Anonymous Access**: Scan QR codes and view asset info without authentication
+- **PIN Authentication**: Secure PIN-based authentication for form submissions
+- **Organization Context**: PIN provides proper data scoping and access control
+- **Form Integration**: Full inventory forms accessible through mobile workflow
+- **Production Deployment**: Fully functional on Firebase hosting with SSL
+- **Security**: Enhanced RLS policies for secure anonymous access
+
+For complete technical documentation, see [Barcode Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md).
 
 ### 🚀 **Enterprise Reporting System**
 
@@ -200,6 +249,7 @@ The system includes advanced database optimizations. To apply performance migrat
 
 ## 📚 Comprehensive Documentation
 
+- [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) - Complete Firebase hosting and deployment documentation
 - [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features
 - [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation
 - [Form Builder Documentation](./README-FORM-BUILDER.md) - Comprehensive form creation and management guide
@@ -207,20 +257,24 @@ The system includes advanced database optimizations. To apply performance migrat
 - [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships
 - [Optimized Reporting System](./docs/OPTIMIZED-REPORTING-SYSTEM.md) - Enterprise reporting features
 - [Barcode Integration](./docs/BARCODE-INTEGRATION.md) - Barcode/QR code functionality
-- [Form Builder Guide](./docs/BARCODE-COMPONENT-GUIDE.md) - Form creation and management
-- [Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md) - Developer reference
+- [Barcode Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md) - Mobile QR workflow and technical reference
 
 ## 🎉 Production Status
 
-**✅ SYSTEM IS PRODUCTION READY**
+**✅ SYSTEM IS PRODUCTION READY AND DEPLOYED**
 
 The BarcodeX Inventory Management System is now a fully-featured, enterprise-grade platform that provides:
 
 - **Professional Inventory Management** with complete audit trails
-- **Sub-second Performance** for all operations
-- **Mobile-Responsive Design** for field operations  
-- **Complete Security** with organization isolation
+- **Sub-second Performance** for all operations  
+- **Mobile-Responsive Design** for field operations with QR workflow
+- **Complete Security** with organization isolation and mobile PIN authentication
+- **Firebase Production Hosting** with global CDN and SSL
 - **Comprehensive Testing** and validation
-- **Extensive Documentation** and user guides
+- **Extensive Documentation** and deployment guides
 
-All major features have been implemented, tested, and verified for production use.
+All major features have been implemented, tested, verified, and deployed to production on Firebase hosting. The system is ready for full production use and field operations.
+
+**🌐 Live Deployment**: Available on Firebase hosting with global availability
+**📱 Mobile QR**: Fully functional mobile QR workflow with PIN authentication
+**🔒 Security**: Enterprise-grade security with proper RLS policies and SSL

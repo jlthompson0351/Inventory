@@ -164,12 +164,6 @@ export function BarcodeDisplay({
               size={150}
               level="M"
               includeMargin
-              imageSettings={{
-                src: "/logo-small.png",
-                excavate: true,
-                height: 24,
-                width: 24,
-              }}
             />
           </div>
         ) : (

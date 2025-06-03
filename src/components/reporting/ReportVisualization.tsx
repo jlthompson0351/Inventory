@@ -45,6 +45,16 @@ interface ReportVisualizationProps {
   onExportChart?: (chartType: string, chartData: any) => void;
 }
 
+// NEW: Enhanced export options
+interface ExportOptions {
+  format: 'png' | 'svg' | 'pdf' | 'excel' | 'powerpoint';
+  quality: 'standard' | 'high' | 'print';
+  includeData: boolean;
+  includeSummary: boolean;
+  customTitle?: string;
+  branding?: boolean;
+}
+
 const CHART_COLORS = [
   '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1', 
   '#d084d0', '#ffb347', '#87ceeb', '#dda0dd', '#98fb98'
@@ -55,6 +65,9 @@ const ChartTypeOptions = [
   { value: 'line', label: 'Line Chart', icon: TrendingUp },
   { value: 'area', label: 'Area Chart', icon: TrendingUp },
   { value: 'pie', label: 'Pie Chart', icon: PieChartIcon },
+  // NEW: Additional chart types
+  { value: 'scatter', label: 'Scatter Plot', icon: BarChart3 },
+  { value: 'combo', label: 'Combo Chart', icon: BarChart3 },
 ];
 
 export function ReportVisualization({ 
@@ -67,6 +80,15 @@ export function ReportVisualization({
   const [selectedChartType, setSelectedChartType] = React.useState('bar');
   const [xAxisField, setXAxisField] = React.useState('');
   const [yAxisField, setYAxisField] = React.useState('');
+  // NEW: Export options state
+  const [showExportOptions, setShowExportOptions] = React.useState(false);
+  const [exportOptions, setExportOptions] = React.useState<ExportOptions>({
+    format: 'png',
+    quality: 'high',
+    includeData: true,
+    includeSummary: true,
+    branding: true
+  });
 
   // Get numeric and text fields for chart axes
   const numericFields = useMemo(() => {
@@ -252,6 +274,33 @@ export function ReportVisualization({
     }
   };
 
+  // NEW: Enhanced export function
+  const handleExportChart = async (options: ExportOptions) => {
+    try {
+      // This would integrate with a chart export library
+      const exportData = {
+        chartType: selectedChartType,
+        data: chartData,
+        config: {
+          title: options.customTitle || `${reportName} - ${selectedChartType} Chart`,
+          xAxisLabel: formFields.find(f => f.id === xAxisField)?.field_label || 'Categories',
+          yAxisLabel: formFields.find(f => f.id === yAxisField)?.field_label || 'Values',
+          colors: CHART_COLORS,
+          ...options
+        }
+      };
+
+      if (onExportChart) {
+        onExportChart(selectedChartType, exportData);
+      }
+
+      // Success notification
+      console.log('Chart exported successfully', exportData);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
   if (!data.length) {
     return (
       <Card>
@@ -281,16 +330,110 @@ export function ReportVisualization({
           </CardTitle>
           <div className="flex items-center space-x-2">
             <Badge variant="outline">{data.length} records</Badge>
-            {onExportChart && (
+            {/* NEW: Enhanced export options */}
+            <div className="relative">
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => onExportChart(selectedChartType, chartData)}
+                onClick={() => setShowExportOptions(!showExportOptions)}
               >
                 <Download className="mr-1 h-4 w-4" />
                 Export
               </Button>
-            )}
+              
+              {showExportOptions && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white border rounded-lg shadow-lg p-4 z-50">
+                  <h4 className="font-medium mb-3">Export Options</h4>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Format</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['png', 'svg', 'pdf'].map(format => (
+                          <button
+                            key={format}
+                            onClick={() => setExportOptions(prev => ({ ...prev, format: format as any }))}
+                            className={`p-2 text-xs border rounded ${
+                              exportOptions.format === format ? 'bg-primary text-primary-foreground' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            {format.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Quality</label>
+                      <select 
+                        value={exportOptions.quality}
+                        onChange={(e) => setExportOptions(prev => ({ ...prev, quality: e.target.value as any }))}
+                        className="w-full p-2 text-xs border rounded"
+                      >
+                        <option value="standard">Standard</option>
+                        <option value="high">High Quality</option>
+                        <option value="print">Print Ready</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="flex items-center space-x-2">
+                        <input 
+                          type="checkbox" 
+                          checked={exportOptions.includeData}
+                          onChange={(e) => setExportOptions(prev => ({ ...prev, includeData: e.target.checked }))}
+                        />
+                        <span className="text-sm">Include data table</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <input 
+                          type="checkbox" 
+                          checked={exportOptions.includeSummary}
+                          onChange={(e) => setExportOptions(prev => ({ ...prev, includeSummary: e.target.checked }))}
+                        />
+                        <span className="text-sm">Include summary stats</span>
+                      </label>
+                      <label className="flex items-center space-x-2">
+                        <input 
+                          type="checkbox" 
+                          checked={exportOptions.branding}
+                          onChange={(e) => setExportOptions(prev => ({ ...prev, branding: e.target.checked }))}
+                        />
+                        <span className="text-sm">Include company branding</span>
+                      </label>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Custom Title (optional)</label>
+                      <input 
+                        type="text"
+                        placeholder={`${reportName} - ${selectedChartType} Chart`}
+                        value={exportOptions.customTitle || ''}
+                        onChange={(e) => setExportOptions(prev => ({ ...prev, customTitle: e.target.value }))}
+                        className="w-full p-2 text-xs border rounded"
+                      />
+                    </div>
+                    
+                    <div className="flex space-x-2 pt-2">
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleExportChart(exportOptions)}
+                        className="flex-1"
+                      >
+                        Export Chart
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setShowExportOptions(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </CardHeader>

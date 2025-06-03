@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -71,6 +71,34 @@ const availableDataSources = AVAILABLE_DATA_SOURCES;
 // 🎯 SMART REPORT TEMPLATES
 const reportTemplates = [
   {
+    id: 'monthly_inventory_excel',
+    name: '📊 Monthly Inventory (Excel Style)',
+    description: 'Customizable monthly report matching your Excel format - filter by asset types, choose fields, group by type',
+    icon: '📊',
+    dataSources: ['inventory_items', 'inventory_history', 'asset_types', 'form_submissions'],
+    suggestedColumns: [
+      'inventory_items.name',
+      'inventory_items.sku', 
+      'asset_types.name',
+      'starting_quantity',
+      'intake_quantity',
+      'usage_quantity', 
+      'ending_quantity',
+      'form_field.coating_amount_inches',
+      'form_field.partial_drums_inches',
+      'form_field.tank_amount',
+      'form_field.coating_gallons'
+    ],
+    assetTypes: [], // User will select which asset types they want
+    category: 'Monthly Reports',
+    customizable: true,
+    excelStyle: true,
+    schedule: {
+      recommended: 'monthly',
+      frequencies: ['monthly', 'quarterly']
+    }
+  },
+  {
     id: 'asset_inventory',
     name: '📦 Asset Inventory Report',
     description: 'Complete overview of all assets with status and details',
@@ -119,6 +147,63 @@ const reportTemplates = [
     suggestedColumns: ['inventory_items.name', 'calculated.usage', 'calculated.turnover_rate'],
     assetTypes: [],
     category: 'Analytics'
+  },
+  // NEW: Enhanced industry-specific templates
+  {
+    id: 'compliance_audit',
+    name: '🔍 Compliance Audit Report',
+    description: 'Track compliance status and audit requirements',
+    icon: '🔍',
+    dataSources: ['assets', 'form_submissions', 'asset_types'],
+    suggestedColumns: ['assets.name', 'assets.compliance_status', 'assets.last_inspection_date', 'form_submissions.compliance_score'],
+    assetTypes: [],
+    category: 'Compliance',
+    schedule: {
+      recommended: 'monthly',
+      frequencies: ['weekly', 'monthly', 'quarterly']
+    }
+  },
+  {
+    id: 'maintenance_schedule',
+    name: '🔧 Maintenance Schedule Report',
+    description: 'Upcoming and overdue maintenance tasks',
+    icon: '🔧',
+    dataSources: ['assets', 'form_submissions'],
+    suggestedColumns: ['assets.name', 'assets.next_maintenance_date', 'assets.maintenance_status', 'calculated.days_overdue'],
+    assetTypes: [],
+    category: 'Maintenance',
+    schedule: {
+      recommended: 'weekly',
+      frequencies: ['daily', 'weekly', 'bi-weekly']
+    }
+  },
+  {
+    id: 'cost_analysis',
+    name: '💸 Cost Analysis Report',
+    description: 'Detailed cost breakdown and ROI analysis',
+    icon: '💸',
+    dataSources: ['assets', 'inventory_items', 'form_submissions'],
+    suggestedColumns: ['assets.name', 'assets.acquisition_cost', 'calculated.total_maintenance_cost', 'calculated.roi'],
+    assetTypes: [],
+    category: 'Financial',
+    schedule: {
+      recommended: 'monthly',
+      frequencies: ['monthly', 'quarterly', 'annually']
+    }
+  },
+  {
+    id: 'performance_dashboard',
+    name: '📈 Performance Dashboard',
+    description: 'Key performance indicators and metrics',
+    icon: '📈',
+    dataSources: ['assets', 'inventory_items', 'form_submissions'],
+    suggestedColumns: ['assets.utilization_rate', 'inventory_items.turnover_rate', 'calculated.efficiency_score'],
+    assetTypes: [],
+    category: 'KPIs',
+    schedule: {
+      recommended: 'daily',
+      frequencies: ['daily', 'weekly', 'monthly']
+    }
   }
 ];
 
@@ -155,6 +240,13 @@ const ReportBuilder = () => {
   const [isFieldsLoading, setIsFieldsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(true);
+  
+  // NEW: Scheduling functionality
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState("monthly");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleRecipients, setScheduleRecipients] = useState<string[]>([]);
+  const [scheduleFormat, setScheduleFormat] = useState("email");
   
   // 🚀 NEW: Performance tracking and caching
   const [fieldCache, setFieldCache] = useState<Map<string, any[]>>(new Map());
@@ -829,15 +921,31 @@ const ReportBuilder = () => {
           </div>
         </div>
         <div className="flex space-x-2 flex-shrink-0 self-start md:self-center">
-          <Button variant="outline" onClick={exportExcel} disabled={isLoading || selectedColumns.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Export as Excel
+          <Button 
+            variant="outline" 
+            onClick={exportExcel} 
+            disabled={isExporting || selectedColumns.length === 0 || !currentOrganization?.id}
+            title={selectedColumns.length === 0 ? "Select columns first" : !currentOrganization?.id ? "No organization selected" : "Export to Excel"}
+          >
+            {isExporting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting...</>
+            ) : (
+              <><Download className="mr-2 h-4 w-4" />Export as Excel</>
+            )}
           </Button>
-          <Button onClick={exportCsv} disabled={isLoading || selectedColumns.length === 0}>
+          <Button 
+            onClick={exportCsv} 
+            disabled={isLoading || selectedColumns.length === 0 || !currentOrganization?.id}
+            title={selectedColumns.length === 0 ? "Select columns first" : !currentOrganization?.id ? "No organization selected" : "Export to CSV"}
+          >
             <Download className="mr-2 h-4 w-4" />
             Export as CSV
           </Button>
-          <Button onClick={saveReport} disabled={isLoading}>
+          <Button 
+            onClick={saveReport} 
+            disabled={isLoading || !reportName.trim() || !currentOrganization?.id}
+            title={!reportName.trim() ? "Enter a report name" : !currentOrganization?.id ? "No organization selected" : "Save report"}
+          >
             <Save className="mr-2 h-4 w-4" />
             {id ? 'Save Changes' : 'Save Report'}
           </Button>
@@ -851,7 +959,7 @@ const ReportBuilder = () => {
           <Card>
             <CardContent className="p-4 md:p-6">
               <Tabs defaultValue="templates" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="mb-4 grid grid-cols-3 sm:grid-cols-7 w-full h-auto">
+                <TabsList className="mb-4 grid grid-cols-3 sm:grid-cols-8 w-full h-auto">
                   <TabsTrigger value="templates">Templates</TabsTrigger>
                   <TabsTrigger value="data-sources">Sources</TabsTrigger>
                   <TabsTrigger value="columns">Columns</TabsTrigger>
@@ -859,6 +967,7 @@ const ReportBuilder = () => {
                   <TabsTrigger value="sorting">Sorting</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                   <TabsTrigger value="charts">📊 Charts</TabsTrigger>
+                  <TabsTrigger value="schedule">⏰ Schedule</TabsTrigger>
                 </TabsList>
 
                 {/* Templates Tab */}
@@ -870,22 +979,99 @@ const ReportBuilder = () => {
                         Start with a pre-built template or build a custom report from scratch.
                       </p>
                     </div>
+                    
+                    {/* NEW: Template categories filter */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedTemplate(null)}
+                        className={selectedTemplate === null ? 'bg-primary text-primary-foreground' : ''}
+                      >
+                        All Categories
+                      </Button>
+                      {[...new Set(reportTemplates.map(t => t.category))].map(category => (
+                        <Button 
+                          key={category}
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            // Filter templates by category logic can be added here
+                          }}
+                        >
+                          {category}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {/* NEW: Monthly Report Customization Guide */}
+                    {selectedTemplate === 'monthly_inventory_excel' && (
+                      <Card className="bg-blue-50 border-blue-200 mb-4">
+                        <CardContent className="p-4">
+                          <div className="flex items-start space-x-3">
+                            <div className="text-2xl">🎯</div>
+                            <div>
+                              <h3 className="font-semibold text-blue-900 mb-2">Monthly Report Customization Guide</h3>
+                              <div className="text-sm text-blue-800 space-y-2">
+                                <p><strong>📋 Steps to customize for your Excel format:</strong></p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                  <div className="space-y-1">
+                                    <p>• <strong>1. Sources Tab:</strong> Data sources pre-selected</p>
+                                    <p>• <strong>2. Columns Tab:</strong> Choose your form fields</p>
+                                    <p>• <strong>3. Filters Tab:</strong> Filter by asset type & month</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p>• <strong>Asset Types:</strong> Select Paint, Chemical, etc.</p>
+                                    <p>• <strong>Form Fields:</strong> All available automatically</p>
+                                    <p>• <strong>Grouping:</strong> Keeps asset types separate</p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 p-2 bg-blue-100 rounded">
+                                  <p className="text-xs"><strong>💡 Tip:</strong> This template replicates your Excel format with starting/ending balances!</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                       {reportTemplates.map((template) => (
                         <Card
                           key={template.id}
-                          className={`cursor-pointer transition-all duration-150 hover:shadow-lg hover:scale-[1.02] flex flex-col ${selectedTemplate === template.id ? 'ring-2 ring-primary shadow-xl' : 'hover:shadow-md'}`}
+                          className={`cursor-pointer transition-all duration-150 hover:shadow-lg hover:scale-[1.02] flex flex-col ${selectedTemplate === template.id ? 'ring-2 ring-primary shadow-xl' : 'hover:shadow-md'} ${template.id === 'monthly_inventory_excel' ? 'border-blue-300 bg-blue-50' : ''}`}
                           onClick={() => applyTemplate(template)}
                         >
                           <CardContent className="p-4 flex flex-col items-center text-center flex-grow">
                             <div className="text-3xl mb-2">{template.icon}</div>
-                            <h3 className="font-semibold text-base mb-1">{template.name}</h3>
+                            <h3 className="font-semibold text-base mb-1">
+                              {template.name}
+                              {template.id === 'monthly_inventory_excel' && (
+                                <Badge variant="outline" className="ml-2 text-xs bg-blue-100 text-blue-700 border-blue-300">
+                                  ✏️ Customizable
+                                </Badge>
+                              )}
+                            </h3>
                             <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-grow">{template.description}</p>
                             <div className="space-y-1 text-xs w-full">
                               <div className="flex items-center justify-center space-x-1.5">
                                 <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{template.category}</Badge>
                                 <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{template.dataSources.length} sources</Badge>
+                                {template.id === 'monthly_inventory_excel' && (
+                                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 border-green-300">
+                                    📊 Excel Style
+                                  </Badge>
+                                )}
                               </div>
+                              {/* NEW: Show recommended schedule */}
+                              {template.schedule && (
+                                <div className="mt-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    📅 Runs {template.schedule.recommended}
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                             {selectedTemplate === template.id && (
                               <div className="mt-2 p-1 bg-primary/10 rounded-md w-full">
@@ -1091,6 +1277,241 @@ const ReportBuilder = () => {
                       });
                     }}
                   />
+                </TabsContent>
+
+                {/* NEW: Schedule Tab */}
+                <TabsContent value="schedule" className="mt-0">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold">⏰ Report Scheduling</h2>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="enable-schedule"
+                          checked={scheduleEnabled}
+                          onCheckedChange={(checked) => setScheduleEnabled(checked === true)}
+                        />
+                        <Label htmlFor="enable-schedule" className="text-sm font-medium">
+                          Enable Automated Reports
+                        </Label>
+                      </div>
+                    </div>
+
+                    {scheduleEnabled ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Schedule Configuration */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">📅 Schedule Settings</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div>
+                              <Label className="text-sm font-medium">Frequency</Label>
+                              <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="daily">📅 Daily</SelectItem>
+                                  <SelectItem value="weekly">📅 Weekly</SelectItem>
+                                  <SelectItem value="bi-weekly">📅 Bi-weekly</SelectItem>
+                                  <SelectItem value="monthly">📅 Monthly</SelectItem>
+                                  <SelectItem value="quarterly">📅 Quarterly</SelectItem>
+                                  <SelectItem value="annually">📅 Annually</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Time</Label>
+                              <Input
+                                type="time"
+                                value={scheduleTime}
+                                onChange={(e) => setScheduleTime(e.target.value)}
+                                className="mt-1"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Next Run</Label>
+                              <div className="mt-1 p-2 bg-slate-50 rounded-md text-sm">
+                                {scheduleFrequency === 'daily' && `Tomorrow at ${scheduleTime}`}
+                                {scheduleFrequency === 'weekly' && `Next Monday at ${scheduleTime}`}
+                                {scheduleFrequency === 'monthly' && `1st of next month at ${scheduleTime}`}
+                                {scheduleFrequency === 'quarterly' && `Start of next quarter at ${scheduleTime}`}
+                                {scheduleFrequency === 'annually' && `Same date next year at ${scheduleTime}`}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Delivery Settings */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">📧 Delivery Settings</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div>
+                              <Label className="text-sm font-medium">Delivery Method</Label>
+                              <Select value={scheduleFormat} onValueChange={setScheduleFormat}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="email">📧 Email</SelectItem>
+                                  <SelectItem value="slack">💬 Slack</SelectItem>
+                                  <SelectItem value="teams">👥 Microsoft Teams</SelectItem>
+                                  <SelectItem value="webhook">🔗 Webhook</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Recipients</Label>
+                              <div className="mt-1 space-y-2">
+                                <Input
+                                  placeholder="Enter email addresses (comma separated)"
+                                  value={scheduleRecipients.join(', ')}
+                                  onChange={(e) => setScheduleRecipients(e.target.value.split(',').map(s => s.trim()).filter(s => s))}
+                                />
+                                <div className="text-xs text-muted-foreground">
+                                  Current recipients: {scheduleRecipients.length || 0}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Export Format</Label>
+                              <div className="mt-1 grid grid-cols-2 gap-2">
+                                <Card className="p-3 cursor-pointer hover:bg-slate-50">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="format-csv" defaultChecked />
+                                    <Label htmlFor="format-csv" className="text-sm">CSV</Label>
+                                  </div>
+                                </Card>
+                                <Card className="p-3 cursor-pointer hover:bg-slate-50">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="format-excel" />
+                                    <Label htmlFor="format-excel" className="text-sm">Excel</Label>
+                                  </div>
+                                </Card>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Advanced Options */}
+                        <Card className="md:col-span-2">
+                          <CardHeader>
+                            <CardTitle className="text-base">⚙️ Advanced Options</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <Label className="text-sm font-medium">Report Title Template</Label>
+                                <Input
+                                  placeholder="e.g., {{reportName}} - {{date}}"
+                                  className="mt-1"
+                                  defaultValue={`${reportName} - {{date}}`}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium">Subject Line</Label>
+                                <Input
+                                  placeholder="Automated Report: {{reportName}}"
+                                  className="mt-1"
+                                  defaultValue={`Automated Report: ${reportName}`}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium">Timezone</Label>
+                                <Select defaultValue="UTC">
+                                  <SelectTrigger className="mt-1">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="UTC">UTC</SelectItem>
+                                    <SelectItem value="EST">Eastern Time</SelectItem>
+                                    <SelectItem value="PST">Pacific Time</SelectItem>
+                                    <SelectItem value="CST">Central Time</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Conditions</Label>
+                                <div className="space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="skip-empty" />
+                                    <Label htmlFor="skip-empty" className="text-sm">Skip if no data</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="skip-errors" />
+                                    <Label htmlFor="skip-errors" className="text-sm">Skip on errors</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="include-summary" defaultChecked />
+                                    <Label htmlFor="include-summary" className="text-sm">Include summary stats</Label>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Notifications</Label>
+                                <div className="space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="notify-success" defaultChecked />
+                                    <Label htmlFor="notify-success" className="text-sm">On successful run</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="notify-failure" defaultChecked />
+                                    <Label htmlFor="notify-failure" className="text-sm">On failure</Label>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox id="notify-empty" />
+                                    <Label htmlFor="notify-empty" className="text-sm">When no data</Label>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ) : (
+                      <Card>
+                        <CardContent className="p-8 text-center">
+                          <div className="text-6xl mb-4">⏰</div>
+                          <h3 className="text-lg font-semibold mb-2">Schedule Automated Reports</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Set up automatic report generation and delivery to keep your team informed.
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-2xl mb-2">📅</div>
+                              <div className="font-medium text-sm">Flexible Scheduling</div>
+                              <div className="text-xs text-muted-foreground">Daily, weekly, monthly, or custom</div>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-2xl mb-2">📧</div>
+                              <div className="font-medium text-sm">Multiple Delivery Options</div>
+                              <div className="text-xs text-muted-foreground">Email, Slack, Teams, Webhooks</div>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-2xl mb-2">⚙️</div>
+                              <div className="font-medium text-sm">Smart Conditions</div>
+                              <div className="text-xs text-muted-foreground">Skip empty reports, error handling</div>
+                            </div>
+                          </div>
+                          <Button 
+                            onClick={() => setScheduleEnabled(true)}
+                            className="mt-4"
+                          >
+                            Enable Scheduling
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </TabsContent>
 
                 {/* Preview Tab */}
