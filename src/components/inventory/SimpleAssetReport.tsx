@@ -14,6 +14,7 @@ interface AssetReportData {
   asset_type: string;
   latest_submission: any;
   submission_date: string;
+  last_month_total?: string;
 }
 
 interface AssetType {
@@ -161,6 +162,12 @@ const SimpleAssetReport: React.FC = () => {
       const fieldSet = new Set<string>();
       const fieldLabelMap: Record<string, string> = {};
 
+      // Calculate date range for last month
+      const now = new Date();
+      const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayLastMonth = new Date(firstDayThisMonth.getTime() - 1);
+      const firstDayLastMonth = new Date(lastDayLastMonth.getFullYear(), lastDayLastMonth.getMonth(), 1);
+
       data?.forEach((asset: any) => {
         const latestSubmission = asset.form_submissions?.[0];
         const formId = asset.asset_types?.inventory_form_id;
@@ -170,6 +177,27 @@ const SimpleAssetReport: React.FC = () => {
         formFieldsForAsset.forEach((field: FormField) => {
           fieldLabelMap[field.id] = field.label;
         });
+        
+        // Find last month's submission (latest submission from last month)
+        const lastMonthSubmission = asset.form_submissions?.find((submission: any) => {
+          const submissionDate = new Date(submission.created_at);
+          return submissionDate >= firstDayLastMonth && submissionDate <= lastDayLastMonth;
+        });
+
+        // Try to find a "total" field from last month's submission
+        let lastMonthTotal = '';
+        if (lastMonthSubmission) {
+          const submissionData = lastMonthSubmission.submission_data || {};
+          // Look for common total field names
+          const totalField = Object.keys(submissionData).find(key => 
+            key.toLowerCase().includes('total') || 
+            key.toLowerCase().includes('ending') ||
+            key.toLowerCase().includes('balance')
+          );
+          if (totalField) {
+            lastMonthTotal = renderFieldValue(submissionData[totalField]);
+          }
+        }
         
         if (latestSubmission) {
           // Collect all field keys to determine columns
@@ -181,7 +209,8 @@ const SimpleAssetReport: React.FC = () => {
             asset_name: asset.name,
             asset_type: asset.asset_types.name,
             latest_submission: latestSubmission.submission_data || {},
-            submission_date: latestSubmission.created_at
+            submission_date: latestSubmission.created_at,
+            last_month_total: lastMonthTotal
           });
         } else {
           // Asset with no submissions
@@ -189,7 +218,8 @@ const SimpleAssetReport: React.FC = () => {
             asset_name: asset.name,
             asset_type: asset.asset_types.name,
             latest_submission: {},
-            submission_date: ''
+            submission_date: '',
+            last_month_total: lastMonthTotal
           });
         }
       });
@@ -205,14 +235,39 @@ const SimpleAssetReport: React.FC = () => {
           label: fieldLabelMap[fieldId] || fieldId.replace('field_', 'Field ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           type: 'unknown',
           selected: true,
-          order: index + 1
+          order: index + 4 // Start after the 3 special fields
         }));
 
-      setFormFields(fieldsWithLabels);
+      // Add special selectable fields
+      const specialFields: FormField[] = [
+        {
+          id: 'asset_type',
+          label: 'Asset Type',
+          type: 'special',
+          selected: true,
+          order: 1
+        },
+        {
+          id: 'last_updated',
+          label: 'Last Updated',
+          type: 'special',
+          selected: true,
+          order: 2
+        },
+        {
+          id: 'last_month_total',
+          label: 'Last Month Total',
+          type: 'special',
+          selected: true,
+          order: 3
+        }
+      ];
+
+      setFormFields([...specialFields, ...fieldsWithLabels]);
       setReportData(processedData);
       setShowColumnSelector(true); // Show column selector after generating report
 
-      toast.success(`Report generated! Found ${processedData.length} assets with ${fieldsWithLabels.length} form fields. Select columns below.`);
+      toast.success(`Report generated! Found ${processedData.length} assets with ${fieldsWithLabels.length + 3} form fields. Select columns below.`);
 
     } catch (error: any) {
       console.error('Report generation error:', error);
@@ -278,14 +333,22 @@ const SimpleAssetReport: React.FC = () => {
     setIsExporting(true);
     try {
       // Build CSV headers
-      const headers = ['Asset Name', 'Asset Type', 'Last Updated', ...selectedFields.map(f => f.label)];
+      const headers = ['Asset Name', ...selectedFields.map(f => f.label)];
       
       // Build CSV rows
       const rows = reportData.map(row => [
         row.asset_name,
-        row.asset_type,
-        row.submission_date ? new Date(row.submission_date).toLocaleDateString() : 'No data',
-        ...selectedFields.map(field => renderFieldValue(row.latest_submission[field.id]))
+        ...selectedFields.map(field => {
+          if (field.id === 'asset_type') {
+            return row.asset_type;
+          } else if (field.id === 'last_updated') {
+            return row.submission_date ? new Date(row.submission_date).toLocaleDateString() : 'No data';
+          } else if (field.id === 'last_month_total') {
+            return row.last_month_total || 'No data';
+          } else {
+            return renderFieldValue(row.latest_submission[field.id]);
+          }
+        })
       ]);
 
       // Create CSV content
@@ -531,8 +594,6 @@ const SimpleAssetReport: React.FC = () => {
                 <thead>
                   <tr className="border-b-2 border-gray-200">
                     <th className="text-left p-3 font-semibold bg-gray-50">Asset Name</th>
-                    <th className="text-left p-3 font-semibold bg-gray-50">Type</th>
-                    <th className="text-left p-3 font-semibold bg-gray-50">Last Updated</th>
                     {selectedFields.map((field) => (
                       <th key={field.id} className="text-left p-3 font-semibold bg-gray-50">
                         {field.label}
@@ -544,22 +605,25 @@ const SimpleAssetReport: React.FC = () => {
                   {previewData.map((row, index) => (
                     <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="p-3 font-medium text-blue-600">{row.asset_name}</td>
-                      <td className="p-3">
-                        <Badge variant="outline" className="text-xs">
-                          {row.asset_type}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-sm text-gray-500">
-                        {row.submission_date ? 
-                          new Date(row.submission_date).toLocaleDateString() : 
-                          <span className="text-red-500">No data</span>
-                        }
-                      </td>
                       {selectedFields.map((field) => (
                         <td key={field.id} className="p-3 text-sm">
-                          {renderFieldValue(row.latest_submission[field.id]) || 
+                          {field.id === 'asset_type' ? (
+                            <Badge variant="outline" className="text-xs">
+                              {row.asset_type}
+                            </Badge>
+                          ) : field.id === 'last_updated' ? (
+                            <span className="text-gray-500">
+                              {row.submission_date ? 
+                                new Date(row.submission_date).toLocaleDateString() : 
+                                <span className="text-red-500">No data</span>
+                              }
+                            </span>
+                          ) : field.id === 'last_month_total' ? (
+                            row.last_month_total || <span className="text-gray-400">No data</span>
+                          ) : (
+                            renderFieldValue(row.latest_submission[field.id]) || 
                             <span className="text-gray-400">-</span>
-                          }
+                          )}
                         </td>
                       ))}
                     </tr>
