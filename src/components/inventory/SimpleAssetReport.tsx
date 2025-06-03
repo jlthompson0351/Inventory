@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Download, RefreshCw, FileText, Clock, Users, Settings, Eye, EyeOff } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar, Download, RefreshCw, FileText, Clock, Users, Settings, Eye, EyeOff, Save, FolderOpen, CalendarDays, Filter, History, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/hooks/useOrganization';
 import { toast } from 'sonner';
@@ -15,6 +17,7 @@ interface AssetReportData {
   latest_submission: any;
   submission_date: string;
   last_month_total?: string;
+  all_submissions?: any[];
 }
 
 interface AssetType {
@@ -31,6 +34,26 @@ interface FormField {
   order?: number;
 }
 
+interface ReportTemplate {
+  id?: string;
+  name: string;
+  description: string;
+  asset_type_filter: string;
+  selected_fields: FormField[];
+  date_range_type: 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
+  custom_start_date?: string;
+  custom_end_date?: string;
+  view_mode: 'latest' | 'history' | 'comparison';
+  created_at?: string;
+}
+
+interface DateRange {
+  type: 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
+  start_date?: Date;
+  end_date?: Date;
+  label: string;
+}
+
 // Helper function to safely render form field values
 const renderFieldValue = (value: any): string => {
   if (value === null || value === undefined) return '';
@@ -45,21 +68,70 @@ const renderFieldValue = (value: any): string => {
   return String(value);
 };
 
+// Helper function to get date range
+const getDateRange = (type: string, customStart?: string, customEnd?: string): { start: Date; end: Date } => {
+  const now = new Date();
+  const end = new Date();
+  let start = new Date();
+
+  switch (type) {
+    case 'last_week':
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'last_month':
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end.setTime(new Date(now.getFullYear(), now.getMonth(), 0).getTime());
+      break;
+    case 'last_3_months':
+      start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      break;
+    case 'all_time':
+      start = new Date(2020, 0, 1); // Arbitrary old date
+      break;
+    case 'custom':
+      if (customStart && customEnd) {
+        start = new Date(customStart);
+        end.setTime(new Date(customEnd).getTime());
+      }
+      break;
+    default:
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end.setTime(new Date(now.getFullYear(), now.getMonth(), 0).getTime());
+  }
+
+  return { start, end };
+};
+
 const SimpleAssetReport: React.FC = () => {
   const { currentOrganization } = useOrganization();
   const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
-  const [selectedAssetType, setSelectedAssetType] = useState<string>('all');
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<string[]>(['all']);
   const [reportData, setReportData] = useState<AssetReportData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  
+  // New template and advanced features state
+  const [savedTemplates, setSavedTemplates] = useState<ReportTemplate[]>([]);
+  const [currentTemplate, setCurrentTemplate] = useState<ReportTemplate | null>(null);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateDescription, setNewTemplateDescription] = useState('');
+  
+  // Date range and view mode state
+  const [dateRangeType, setDateRangeType] = useState<'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom'>('last_month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [viewMode, setViewMode] = useState<'latest' | 'history' | 'comparison'>('latest');
+  const [selectedAssetForHistory, setSelectedAssetForHistory] = useState<string>('');
 
-  // Load asset types
+  // Load asset types and templates
   useEffect(() => {
     if (currentOrganization?.id) {
       loadAssetTypes();
+      loadSavedTemplates();
     }
   }, [currentOrganization?.id]);
 
@@ -70,13 +142,76 @@ const SimpleAssetReport: React.FC = () => {
         .select('id, name, color')
         .eq('organization_id', currentOrganization!.id)
         .eq('is_deleted', false)
-        .order('name');
+        .order('name') as { data: any[] | null; error: any };
 
       if (error) throw error;
       setAssetTypes(data || []);
     } catch (error: any) {
       toast.error('Failed to load asset types: ' + error.message);
     }
+  };
+
+  const loadSavedTemplates = async () => {
+    try {
+      // For now, use localStorage until we add templates to database
+      const saved = localStorage.getItem(`report_templates_${currentOrganization!.id}`);
+      if (saved) {
+        setSavedTemplates(JSON.parse(saved));
+      }
+    } catch (error: any) {
+      console.error('Failed to load templates:', error);
+    }
+  };
+
+  const saveTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      toast.error('Please enter a template name');
+      return;
+    }
+
+    const template: ReportTemplate = {
+      id: Date.now().toString(),
+      name: newTemplateName.trim(),
+      description: newTemplateDescription.trim(),
+      asset_type_filter: selectedAssetTypes[0] || 'all',
+      selected_fields: formFields.filter(f => f.selected),
+      date_range_type: dateRangeType,
+      custom_start_date: customStartDate,
+      custom_end_date: customEndDate,
+      view_mode: viewMode,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const newTemplates = [...savedTemplates, template];
+      setSavedTemplates(newTemplates);
+      localStorage.setItem(`report_templates_${currentOrganization!.id}`, JSON.stringify(newTemplates));
+      
+      setNewTemplateName('');
+      setNewTemplateDescription('');
+      setShowSaveTemplate(false);
+      toast.success(`Template "${template.name}" saved successfully!`);
+    } catch (error: any) {
+      toast.error('Failed to save template: ' + error.message);
+    }
+  };
+
+  const loadTemplate = (template: ReportTemplate) => {
+    setSelectedAssetTypes([template.asset_type_filter]);
+    setFormFields(template.selected_fields);
+    setDateRangeType(template.date_range_type);
+    setCustomStartDate(template.custom_start_date || '');
+    setCustomEndDate(template.custom_end_date || '');
+    setViewMode(template.view_mode);
+    setCurrentTemplate(template);
+    toast.success(`Template "${template.name}" loaded!`);
+  };
+
+  const deleteTemplate = (templateId: string) => {
+    const newTemplates = savedTemplates.filter(t => t.id !== templateId);
+    setSavedTemplates(newTemplates);
+    localStorage.setItem(`report_templates_${currentOrganization!.id}`, JSON.stringify(newTemplates));
+    toast.success('Template deleted');
   };
 
   const generateReport = async () => {
@@ -88,10 +223,16 @@ const SimpleAssetReport: React.FC = () => {
     setIsLoading(true);
     try {
       console.log('Generating report for organization:', currentOrganization.id);
-      console.log('Selected asset type:', selectedAssetType);
+      console.log('Selected asset types:', selectedAssetTypes);
+      console.log('Date range type:', dateRangeType);
+      console.log('View mode:', viewMode);
 
-      // Build query based on selected asset type
-      let query = supabase
+      // Get date range
+      const { start: startDate, end: endDate } = getDateRange(dateRangeType, customStartDate, customEndDate);
+      console.log('Date range:', startDate, 'to', endDate);
+
+      // Build query based on selected asset types
+      const { data, error } = await supabase
         .from('assets')
         .select(`
           id,
@@ -104,25 +245,45 @@ const SimpleAssetReport: React.FC = () => {
           )
         `)
         .eq('organization_id', currentOrganization.id)
-        .eq('is_deleted', false)
-        .order('created_at', { foreignTable: 'form_submissions', ascending: false });
+        .eq('is_deleted', false) as { data: any[] | null; error: any };
 
-      if (selectedAssetType !== 'all') {
-        query = query.eq('asset_type_id', selectedAssetType);
-        console.log('Filtering by asset type ID:', selectedAssetType);
+      // Apply additional filters after the base query
+      let filteredData = data;
+      
+      if (filteredData && !selectedAssetTypes.includes('all') && selectedAssetTypes.length > 0) {
+        filteredData = filteredData.filter((asset: any) => 
+          selectedAssetTypes.includes(asset.asset_type_id)
+        );
       }
 
-      const { data, error } = await query;
+      // Apply date filtering and sorting for submissions
+      if (filteredData && viewMode !== 'latest') {
+        filteredData = filteredData.map((asset: any) => ({
+          ...asset,
+          form_submissions: asset.form_submissions?.filter((submission: any) => {
+            const submissionDate = new Date(submission.created_at);
+            return submissionDate >= startDate && submissionDate <= endDate;
+          }).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        }));
+      } else if (filteredData) {
+        // For latest mode, just sort submissions by date
+        filteredData = filteredData.map((asset: any) => ({
+          ...asset,
+          form_submissions: asset.form_submissions?.sort((a: any, b: any) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        }));
+      }
       
       if (error) {
         console.error('Query error:', error);
         throw error;
       }
 
-      console.log('Query returned data:', data);
+      console.log('Query returned data:', filteredData);
 
-      if (!data || data.length === 0) {
-        toast.error('No assets found. Make sure you have assets created with the selected asset type.');
+      if (!filteredData || filteredData.length === 0) {
+        toast.error('No assets found. Make sure you have assets created with the selected criteria.');
         setReportData([]);
         setFormFields([]);
         setIsLoading(false);
@@ -130,7 +291,7 @@ const SimpleAssetReport: React.FC = () => {
       }
 
       // Get form schemas to map field IDs to labels
-      const formIds = Array.from(new Set(data?.map((asset: any) => asset.asset_types?.inventory_form_id).filter(Boolean)));
+      const formIds = Array.from(new Set(filteredData?.map((asset: any) => asset.asset_types?.inventory_form_id).filter(Boolean)));
       console.log('Form IDs found:', formIds);
       
       let formSchemas: Record<string, FormField[]> = {};
@@ -157,19 +318,18 @@ const SimpleAssetReport: React.FC = () => {
         }
       }
 
-      // Process data to get latest submission per asset
+      // Process data based on view mode
       const processedData: AssetReportData[] = [];
       const fieldSet = new Set<string>();
       const fieldLabelMap: Record<string, string> = {};
 
-      // Calculate date range for last month
+      // Calculate date range for last month total (always needed)
       const now = new Date();
       const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDayLastMonth = new Date(firstDayThisMonth.getTime() - 1);
       const firstDayLastMonth = new Date(lastDayLastMonth.getFullYear(), lastDayLastMonth.getMonth(), 1);
 
-      data?.forEach((asset: any) => {
-        const latestSubmission = asset.form_submissions?.[0];
+      filteredData?.forEach((asset: any) => {
         const formId = asset.asset_types?.inventory_form_id;
         const formFieldsForAsset = formSchemas[formId] || [];
 
@@ -177,97 +337,127 @@ const SimpleAssetReport: React.FC = () => {
         formFieldsForAsset.forEach((field: FormField) => {
           fieldLabelMap[field.id] = field.label;
         });
-        
-        // Find last month's submission (latest submission from last month)
-        const lastMonthSubmission = asset.form_submissions?.find((submission: any) => {
-          const submissionDate = new Date(submission.created_at);
-          return submissionDate >= firstDayLastMonth && submissionDate <= lastDayLastMonth;
-        });
 
-        // Try to find a "total" field from last month's submission
-        let lastMonthTotal = '';
-        if (lastMonthSubmission) {
-          const submissionData = lastMonthSubmission.submission_data || {};
-          // Look for common total field names
-          const totalField = Object.keys(submissionData).find(key => 
-            key.toLowerCase().includes('total') || 
-            key.toLowerCase().includes('ending') ||
-            key.toLowerCase().includes('balance')
-          );
-          if (totalField) {
-            lastMonthTotal = renderFieldValue(submissionData[totalField]);
-          }
+        if (viewMode === 'history' && selectedAssetForHistory && asset.id !== selectedAssetForHistory) {
+          return; // Skip if we're in history mode and this isn't the selected asset
         }
-        
-        if (latestSubmission) {
-          // Collect all field keys to determine columns
-          Object.keys(latestSubmission.submission_data || {}).forEach(key => {
-            fieldSet.add(key);
+
+        if (viewMode === 'latest') {
+          // Latest submission mode (original behavior)
+          const latestSubmission = asset.form_submissions?.[0];
+          
+          // Find last month's submission for comparison
+          const lastMonthSubmission = asset.form_submissions?.find((submission: any) => {
+            const submissionDate = new Date(submission.created_at);
+            return submissionDate >= firstDayLastMonth && submissionDate <= lastDayLastMonth;
           });
 
-          processedData.push({
-            asset_name: asset.name,
-            asset_type: asset.asset_types.name,
-            latest_submission: latestSubmission.submission_data || {},
-            submission_date: latestSubmission.created_at,
-            last_month_total: lastMonthTotal
-          });
+          let lastMonthTotal = '';
+          if (lastMonthSubmission) {
+            const submissionData = lastMonthSubmission.submission_data || {};
+            const totalField = Object.keys(submissionData).find(key => 
+              key.toLowerCase().includes('total') || 
+              key.toLowerCase().includes('ending') ||
+              key.toLowerCase().includes('balance')
+            );
+            if (totalField) {
+              lastMonthTotal = renderFieldValue(submissionData[totalField]);
+            }
+          }
+          
+          if (latestSubmission) {
+            Object.keys(latestSubmission.submission_data || {}).forEach(key => {
+              fieldSet.add(key);
+            });
+
+            processedData.push({
+              asset_name: asset.name,
+              asset_type: asset.asset_types.name,
+              latest_submission: latestSubmission.submission_data || {},
+              submission_date: latestSubmission.created_at,
+              last_month_total: lastMonthTotal
+            });
+          } else {
+            processedData.push({
+              asset_name: asset.name,
+              asset_type: asset.asset_types.name,
+              latest_submission: {},
+              submission_date: '',
+              last_month_total: lastMonthTotal
+            });
+          }
         } else {
-          // Asset with no submissions
-          processedData.push({
-            asset_name: asset.name,
-            asset_type: asset.asset_types.name,
-            latest_submission: {},
-            submission_date: '',
-            last_month_total: lastMonthTotal
-          });
+          // History mode - show all submissions for selected date range
+          const relevantSubmissions = asset.form_submissions?.filter((submission: any) => {
+            const submissionDate = new Date(submission.created_at);
+            return submissionDate >= startDate && submissionDate <= endDate;
+          }) || [];
+
+          if (relevantSubmissions.length > 0) {
+            relevantSubmissions.forEach((submission: any) => {
+              Object.keys(submission.submission_data || {}).forEach(key => {
+                fieldSet.add(key);
+              });
+
+              processedData.push({
+                asset_name: asset.name,
+                asset_type: asset.asset_types.name,
+                latest_submission: submission.submission_data || {},
+                submission_date: submission.created_at,
+                all_submissions: relevantSubmissions
+              });
+            });
+          }
         }
       });
 
       console.log('Processed data:', processedData);
       console.log('Field set:', Array.from(fieldSet));
 
-      // Convert field set to sorted array with labels
-      const fieldsWithLabels = Array.from(fieldSet)
-        .sort()
-        .map((fieldId, index) => ({
-          id: fieldId,
-          label: fieldLabelMap[fieldId] || fieldId.replace('field_', 'Field ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          type: 'unknown',
-          selected: true,
-          order: index + 4 // Start after the 3 special fields
-        }));
+      // Convert field set to sorted array with labels - only if no template is loaded
+      if (!currentTemplate || formFields.length === 0) {
+        const fieldsWithLabels = Array.from(fieldSet)
+          .sort()
+          .map((fieldId, index) => ({
+            id: fieldId,
+            label: fieldLabelMap[fieldId] || fieldId.replace('field_', 'Field ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            type: 'unknown',
+            selected: true,
+            order: index + 4 // Start after the 3 special fields
+          }));
 
-      // Add special selectable fields
-      const specialFields: FormField[] = [
-        {
-          id: 'asset_type',
-          label: 'Asset Type',
-          type: 'special',
-          selected: true,
-          order: 1
-        },
-        {
-          id: 'last_updated',
-          label: 'Last Updated',
-          type: 'special',
-          selected: true,
-          order: 2
-        },
-        {
-          id: 'last_month_total',
-          label: 'Last Month Total',
-          type: 'special',
-          selected: true,
-          order: 3
-        }
-      ];
+        // Add special selectable fields
+        const specialFields: FormField[] = [
+          {
+            id: 'asset_type',
+            label: 'Asset Type',
+            type: 'special',
+            selected: true,
+            order: 1
+          },
+          {
+            id: 'last_updated',
+            label: 'Last Updated',
+            type: 'special',
+            selected: true,
+            order: 2
+          },
+          {
+            id: 'last_month_total',
+            label: 'Last Month Total',
+            type: 'special',
+            selected: true,
+            order: 3
+          }
+        ];
 
-      setFormFields([...specialFields, ...fieldsWithLabels]);
+        setFormFields([...specialFields, ...fieldsWithLabels]);
+      }
+
       setReportData(processedData);
-      setShowColumnSelector(true); // Show column selector after generating report
+      setShowColumnSelector(true);
 
-      toast.success(`Report generated! Found ${processedData.length} assets with ${fieldsWithLabels.length + 3} form fields. Select columns below.`);
+      toast.success(`Report generated! Found ${processedData.length} ${viewMode === 'history' ? 'submissions' : 'assets'} with ${Array.from(fieldSet).length + 3} form fields.`);
 
     } catch (error: any) {
       console.error('Report generation error:', error);
@@ -362,8 +552,8 @@ const SimpleAssetReport: React.FC = () => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       
-      const assetTypeName = selectedAssetType === 'all' ? 'All_Assets' : 
-        assetTypes.find(t => t.id === selectedAssetType)?.name || 'Assets';
+      const assetTypeName = selectedAssetTypes.length > 1 ? 'Multiple_Assets' : selectedAssetTypes[0] === 'all' ? 'All_Assets' : 
+        assetTypes.find(t => t.id === selectedAssetTypes[0])?.name || 'Assets';
       
       link.download = `📊_Monthly_Inventory_${assetTypeName}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
@@ -385,23 +575,63 @@ const SimpleAssetReport: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            📊 Monthly Asset Inventory
+            🚀 Advanced Asset Reporting
           </h1>
           <p className="text-gray-600 mt-1">
-            Simple, asset-centric reporting - each row is an asset with latest form data
+            Complete reporting system with templates, flexible date ranges, and asset history
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
+          {savedTemplates.length > 0 && (
+            <Select value="" onValueChange={(value) => {
+              const template = savedTemplates.find(t => t.id === value);
+              if (template) loadTemplate(template);
+            }}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Load Template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {savedTemplates.map((template) => (
+                  <SelectItem key={template.id} value={template.id!}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{template.name}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTemplate(template.id!);
+                        }}
+                        className="h-4 w-4 p-0 ml-2"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {formFields.length > 0 && (
-            <Button
-              onClick={() => setShowColumnSelector(!showColumnSelector)}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              Select Columns ({selectedFields.length}/{formFields.length})
-            </Button>
+            <>
+              <Button
+                onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Save Template
+              </Button>
+              <Button
+                onClick={() => setShowColumnSelector(!showColumnSelector)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Columns ({selectedFields.length}/{formFields.length})
+              </Button>
+            </>
           )}
           <Button
             onClick={exportToCSV}
@@ -419,21 +649,112 @@ const SimpleAssetReport: React.FC = () => {
         </div>
       </div>
 
-      {/* Simple Controls */}
-      <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+      {/* Save Template Modal */}
+      {showSaveTemplate && (
+        <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5 text-green-600" />
+              Save Report Template
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="template-name">Template Name *</Label>
+              <Input
+                id="template-name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="e.g., Monthly Paint Inventory"
+              />
+            </div>
+            <div>
+              <Label htmlFor="template-description">Description</Label>
+              <Input
+                id="template-description"
+                value={newTemplateDescription}
+                onChange={(e) => setNewTemplateDescription(e.target.value)}
+                placeholder="e.g., Standard monthly report for paint assets"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={saveTemplate} className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                Save Template
+              </Button>
+              <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advanced Controls */}
+      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600" />
-            Generate Report
+            <Target className="h-5 w-5 text-purple-600" />
+            Report Configuration
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Asset Type Filter
-              </label>
-              <Select value={selectedAssetType} onValueChange={setSelectedAssetType}>
+        <CardContent className="space-y-6">
+          {/* View Mode Selector */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="block text-sm font-medium text-gray-700 mb-2">
+                View Mode
+              </Label>
+              <Select value={viewMode} onValueChange={(value: 'latest' | 'history' | 'comparison') => setViewMode(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest">
+                    <span className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Latest Submissions
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="history">
+                    <span className="flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      Historical View
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="comparison">
+                    <span className="flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      Period Comparison
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="block text-sm font-medium text-gray-700 mb-2">
+                Date Range
+              </Label>
+              <Select value={dateRangeType} onValueChange={(value: typeof dateRangeType) => setDateRangeType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last_week">Last 7 Days</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                  <SelectItem value="last_3_months">Last 3 Months</SelectItem>
+                  <SelectItem value="all_time">All Time</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="block text-sm font-medium text-gray-700 mb-2">
+                Asset Types
+              </Label>
+              <Select value={selectedAssetTypes[0]} onValueChange={(value) => setSelectedAssetTypes([value])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select asset type..." />
                 </SelectTrigger>
@@ -457,32 +778,71 @@ const SimpleAssetReport: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
-              {assetTypes.length === 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  No asset types found. Please create asset types first.
-                </p>
-              )}
-              {assetTypes.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Found {assetTypes.length} asset types
-                </p>
-              )}
             </div>
+          </div>
 
+          {/* Custom Date Range */}
+          {dateRangeType === 'custom' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div>
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Asset Selector for History Mode */}
+          {viewMode === 'history' && (
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <Label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Asset for History View
+              </Label>
+              <Select value={selectedAssetForHistory} onValueChange={setSelectedAssetForHistory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an asset to view its history..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {reportData.map((asset, index) => (
+                    <SelectItem key={index} value={asset.asset_name}>
+                      {asset.asset_name} ({asset.asset_type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Generate Button */}
+          <div className="flex justify-center">
             <Button 
               onClick={generateReport}
               disabled={isLoading || !currentOrganization?.id}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 px-12 py-3 text-lg"
+              size="lg"
             >
               {isLoading ? (
                 <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generate Report
+                  <Target className="mr-2 h-5 w-5" />
+                  Generate {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison' : 'Report'}
                 </>
               )}
             </Button>
@@ -491,7 +851,9 @@ const SimpleAssetReport: React.FC = () => {
           {/* Debug Info */}
           {currentOrganization && (
             <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-              <strong>Debug Info:</strong> Org: {currentOrganization.name} | Asset Types: {assetTypes.length} | Selected: {selectedAssetType}
+              <strong>Debug Info:</strong> Org: {currentOrganization.name} | Asset Types: {assetTypes.length} | 
+              Selected: {selectedAssetTypes.join(', ')} | View: {viewMode} | Date: {dateRangeType}
+              {currentTemplate && <span> | Template: {currentTemplate.name}</span>}
             </div>
           )}
         </CardContent>
@@ -568,23 +930,36 @@ const SimpleAssetReport: React.FC = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-green-600" />
-                Asset Inventory Report
+                {viewMode === 'history' ? (
+                  <History className="h-5 w-5 text-orange-600" />
+                ) : viewMode === 'comparison' ? (
+                  <CalendarDays className="h-5 w-5 text-purple-600" />
+                ) : (
+                  <Calendar className="h-5 w-5 text-green-600" />
+                )}
+                {viewMode === 'history' ? 'Asset History Report' : 
+                 viewMode === 'comparison' ? 'Period Comparison Report' : 
+                 'Asset Inventory Report'}
                 {showPreview && reportData.length > 3 && (
                   <Badge variant="outline" className="ml-2">
-                    Preview: {previewData.length} of {reportData.length} assets
+                    Preview: {previewData.length} of {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
                   </Badge>
                 )}
               </CardTitle>
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {reportData.length} assets
+                  {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   Generated {new Date().toLocaleString()}
                 </span>
+                {viewMode === 'history' && selectedAssetForHistory && (
+                  <Badge variant="secondary">
+                    Viewing: {selectedAssetForHistory}
+                  </Badge>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -594,6 +969,9 @@ const SimpleAssetReport: React.FC = () => {
                 <thead>
                   <tr className="border-b-2 border-gray-200">
                     <th className="text-left p-3 font-semibold bg-gray-50">Asset Name</th>
+                    {viewMode === 'history' && (
+                      <th className="text-left p-3 font-semibold bg-gray-50">Submission Date</th>
+                    )}
                     {selectedFields.map((field) => (
                       <th key={field.id} className="text-left p-3 font-semibold bg-gray-50">
                         {field.label}
@@ -605,6 +983,14 @@ const SimpleAssetReport: React.FC = () => {
                   {previewData.map((row, index) => (
                     <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="p-3 font-medium text-blue-600">{row.asset_name}</td>
+                      {viewMode === 'history' && (
+                        <td className="p-3 text-sm text-gray-500">
+                          {row.submission_date ? 
+                            new Date(row.submission_date).toLocaleString() : 
+                            <span className="text-red-500">No data</span>
+                          }
+                        </td>
+                      )}
                       {selectedFields.map((field) => (
                         <td key={field.id} className="p-3 text-sm">
                           {field.id === 'asset_type' ? (
@@ -635,7 +1021,36 @@ const SimpleAssetReport: React.FC = () => {
             {showPreview && reportData.length > 3 && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg text-center">
                 <p className="text-sm text-blue-700">
-                  📋 Showing preview of first 3 assets. Click "Show All" above to see all {reportData.length} assets, or export CSV for complete data.
+                  📋 Showing preview of first 3 {viewMode === 'history' ? 'submissions' : 'assets'}. 
+                  Click "Show All" above to see all {reportData.length} records, or export CSV for complete data.
+                </p>
+              </div>
+            )}
+
+            {/* View Mode Specific Info */}
+            {viewMode === 'history' && (
+              <div className="mt-4 p-3 bg-orange-50 rounded-lg">
+                <p className="text-sm text-orange-700">
+                  🕐 <strong>History Mode:</strong> Showing all submissions for selected asset(s) within the date range. 
+                  Each row represents one form submission with its timestamp.
+                </p>
+              </div>
+            )}
+
+            {viewMode === 'comparison' && (
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                <p className="text-sm text-purple-700">
+                  📊 <strong>Comparison Mode:</strong> Compare values across different time periods. 
+                  Perfect for analyzing trends and changes over time.
+                </p>
+              </div>
+            )}
+
+            {viewMode === 'latest' && (
+              <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-700">
+                  ✅ <strong>Latest Mode:</strong> Shows the most recent submission for each asset. 
+                  Ideal for current inventory status and monthly reports.
                 </p>
               </div>
             )}
@@ -643,16 +1058,27 @@ const SimpleAssetReport: React.FC = () => {
         </Card>
       )}
 
-      {/* Empty State */}
+      {/* Enhanced Empty State */}
       {!isLoading && reportData.length === 0 && (
         <Card className="border-dashed border-2 border-gray-300">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-16 w-16 text-gray-400 mb-4" />
+            {viewMode === 'history' ? (
+              <History className="h-16 w-16 text-gray-400 mb-4" />
+            ) : viewMode === 'comparison' ? (
+              <CalendarDays className="h-16 w-16 text-gray-400 mb-4" />
+            ) : (
+              <FileText className="h-16 w-16 text-gray-400 mb-4" />
+            )}
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
-              No Report Generated
+              No {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison Data' : 'Report'} Generated
             </h3>
             <p className="text-gray-500 text-center max-w-md">
-              Select an asset type and click "Generate Report" to see your monthly inventory data with assets as rows and form fields as columns.
+              {viewMode === 'history' 
+                ? 'Select an asset and date range to view its submission history over time.'
+                : viewMode === 'comparison'
+                ? 'Configure your comparison settings and date ranges to analyze trends.'
+                : 'Configure your settings and click "Generate Report" to see your asset data.'
+              }
             </p>
           </CardContent>
         </Card>
