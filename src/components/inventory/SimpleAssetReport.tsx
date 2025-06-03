@@ -40,7 +40,7 @@ interface ReportTemplate {
   description: string;
   asset_type_filter: string;
   selected_fields: FormField[];
-  date_range_type: 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
+  date_range_type: 'current_month' | 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
   custom_start_date?: string;
   custom_end_date?: string;
   view_mode: 'latest' | 'history' | 'comparison';
@@ -48,7 +48,7 @@ interface ReportTemplate {
 }
 
 interface DateRange {
-  type: 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
+  type: 'current_month' | 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom';
   start_date?: Date;
   end_date?: Date;
   label: string;
@@ -75,6 +75,10 @@ const getDateRange = (type: string, customStart?: string, customEnd?: string): {
   let start = new Date();
 
   switch (type) {
+    case 'current_month':
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end.setTime(now.getTime()); // End is today
+      break;
     case 'last_week':
       start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       break;
@@ -121,7 +125,7 @@ const SimpleAssetReport: React.FC = () => {
   const [newTemplateDescription, setNewTemplateDescription] = useState('');
   
   // Date range and view mode state
-  const [dateRangeType, setDateRangeType] = useState<'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom'>('last_month');
+  const [dateRangeType, setDateRangeType] = useState<'current_month' | 'last_month' | 'last_week' | 'last_3_months' | 'all_time' | 'custom'>('current_month');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [viewMode, setViewMode] = useState<'latest' | 'history' | 'comparison'>('latest');
@@ -416,7 +420,15 @@ const SimpleAssetReport: React.FC = () => {
 
       // Convert field set to sorted array with labels - only if no template is loaded
       if (!currentTemplate || formFields.length === 0) {
-        const fieldsWithLabels = Array.from(fieldSet)
+        // Filter out system fields that we handle specially
+        const systemFields = ['asset_type', 'asset_name', 'last_updated', 'last_month_total'];
+        const filteredFieldSet = Array.from(fieldSet).filter(fieldId => 
+          !systemFields.includes(fieldId) && 
+          !fieldId.toLowerCase().includes('asset_type') &&
+          !fieldId.toLowerCase().includes('asset_name')
+        );
+
+        const fieldsWithLabels = filteredFieldSet
           .sort()
           .map((fieldId, index) => ({
             id: fieldId,
@@ -426,7 +438,7 @@ const SimpleAssetReport: React.FC = () => {
             order: index + 4 // Start after the 3 special fields
           }));
 
-        // Add special selectable fields
+        // Add special selectable fields (these are the only system fields we want as columns)
         const specialFields: FormField[] = [
           {
             id: 'asset_type',
@@ -452,6 +464,8 @@ const SimpleAssetReport: React.FC = () => {
         ];
 
         setFormFields([...specialFields, ...fieldsWithLabels]);
+        console.log('System fields filtered out:', systemFields);
+        console.log('Final form fields:', [...specialFields, ...fieldsWithLabels]);
       }
 
       setReportData(processedData);
@@ -741,6 +755,7 @@ const SimpleAssetReport: React.FC = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="current_month">Current Month</SelectItem>
                   <SelectItem value="last_week">Last 7 Days</SelectItem>
                   <SelectItem value="last_month">Last Month</SelectItem>
                   <SelectItem value="last_3_months">Last 3 Months</SelectItem>
@@ -754,7 +769,7 @@ const SimpleAssetReport: React.FC = () => {
               <Label className="block text-sm font-medium text-gray-700 mb-2">
                 Asset Types
               </Label>
-              <Select value={selectedAssetTypes[0]} onValueChange={(value) => setSelectedAssetTypes([value])}>
+              <Select value={selectedAssetTypes[0] || 'all'} onValueChange={(value) => setSelectedAssetTypes([value])}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select asset type..." />
                 </SelectTrigger>
@@ -778,6 +793,16 @@ const SimpleAssetReport: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
+              {assetTypes.length === 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  No asset types found. Please create asset types first.
+                </p>
+              )}
+              {assetTypes.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Found {assetTypes.length} asset types
+                </p>
+              )}
             </div>
           </div>
 
