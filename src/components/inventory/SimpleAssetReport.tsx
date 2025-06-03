@@ -27,6 +27,7 @@ interface FormField {
   label: string;
   type: string;
   selected: boolean;
+  order?: number;
 }
 
 // Helper function to safely render form field values
@@ -144,11 +145,12 @@ const SimpleAssetReport: React.FC = () => {
           console.log('Form schemas:', forms);
           forms?.forEach((form: any) => {
             const fields = form.form_data?.fields || [];
-            formSchemas[form.id] = fields.map((field: any) => ({
+            formSchemas[form.id] = fields.map((field: any, index: number) => ({
               id: field.id,
               label: field.label || field.id.replace('field_', 'Field '),
               type: field.type,
-              selected: true
+              selected: true,
+              order: index + 1
             }));
           });
         }
@@ -198,11 +200,12 @@ const SimpleAssetReport: React.FC = () => {
       // Convert field set to sorted array with labels
       const fieldsWithLabels = Array.from(fieldSet)
         .sort()
-        .map(fieldId => ({
+        .map((fieldId, index) => ({
           id: fieldId,
           label: fieldLabelMap[fieldId] || fieldId.replace('field_', 'Field ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
           type: 'unknown',
-          selected: true
+          selected: true,
+          order: index + 1
         }));
 
       setFormFields(fieldsWithLabels);
@@ -220,22 +223,45 @@ const SimpleAssetReport: React.FC = () => {
   };
 
   const toggleColumn = (fieldId: string) => {
-    setFormFields(prev => 
-      prev.map(field => 
-        field.id === fieldId 
-          ? { ...field, selected: !field.selected }
-          : field
-      )
-    );
+    setFormFields(prev => {
+      const field = prev.find(f => f.id === fieldId);
+      if (!field) return prev;
+
+      if (field.selected) {
+        // If already selected, deselect it and remove from order
+        return prev.map(f => 
+          f.id === fieldId 
+            ? { ...f, selected: false, order: undefined }
+            : f.order && field.order && f.order > field.order 
+              ? { ...f, order: f.order - 1 } // Shift other columns down
+              : f
+        );
+      } else {
+        // If not selected, select it and assign next order number
+        const selectedFields = prev.filter(f => f.selected);
+        const nextOrder = selectedFields.length + 1;
+        return prev.map(f => 
+          f.id === fieldId 
+            ? { ...f, selected: true, order: nextOrder }
+            : f
+        );
+      }
+    });
   };
 
   const toggleAllColumns = (checked: boolean) => {
     setFormFields(prev => 
-      prev.map(field => ({ ...field, selected: checked }))
+      prev.map((field, index) => ({ 
+        ...field, 
+        selected: checked,
+        order: checked ? index + 1 : undefined
+      }))
     );
   };
 
-  const getSelectedFields = () => formFields.filter(f => f.selected);
+  const getSelectedFields = () => formFields
+    .filter(f => f.selected)
+    .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
 
   const exportToCSV = () => {
     if (reportData.length === 0) {
@@ -433,23 +459,31 @@ const SimpleAssetReport: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {formFields.map((field) => (
                 <div key={field.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={field.id}
-                    checked={field.selected}
-                    onCheckedChange={() => toggleColumn(field.id)}
-                  />
-                  <label
-                    htmlFor={field.id}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    {field.label}
-                  </label>
+                  <div className="flex items-center space-x-2 flex-1">
+                    <Checkbox
+                      id={field.id}
+                      checked={field.selected}
+                      onCheckedChange={() => toggleColumn(field.id)}
+                    />
+                    {field.selected && field.order && (
+                      <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-xs font-bold rounded-full">
+                        {field.order}
+                      </span>
+                    )}
+                    <label
+                      htmlFor={field.id}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      onClick={() => toggleColumn(field.id)}
+                    >
+                      {field.label}
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-orange-600">
-                ✨ Selected columns: {selectedFields.length} | Preview shows first 3 assets
+                ✨ Click columns to select and order them | Preview shows first 3 assets
               </p>
               <Button
                 onClick={() => setShowPreview(!showPreview)}
