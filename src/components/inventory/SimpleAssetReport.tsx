@@ -420,13 +420,34 @@ const SimpleAssetReport: React.FC = () => {
 
       // Convert field set to sorted array with labels - only if no template is loaded
       if (!currentTemplate || formFields.length === 0) {
-        // Filter out system fields that we handle specially
+        // Filter out system fields that we handle specially - be more aggressive with filtering
         const systemFields = ['asset_type', 'asset_name', 'last_updated', 'last_month_total'];
-        const filteredFieldSet = Array.from(fieldSet).filter(fieldId => 
-          !systemFields.includes(fieldId) && 
-          !fieldId.toLowerCase().includes('asset_type') &&
-          !fieldId.toLowerCase().includes('asset_name')
-        );
+        const filteredFieldSet = Array.from(fieldSet).filter(fieldId => {
+          const lowerFieldId = fieldId.toLowerCase();
+          
+          // Filter out exact matches
+          if (systemFields.includes(lowerFieldId)) return false;
+          
+          // Filter out any variation of asset_name
+          if (lowerFieldId.includes('asset') && lowerFieldId.includes('name')) return false;
+          if (lowerFieldId.includes('assetname')) return false;
+          if (lowerFieldId.includes('asset_name')) return false;
+          
+          // Filter out any variation of asset_type  
+          if (lowerFieldId.includes('asset') && lowerFieldId.includes('type')) return false;
+          if (lowerFieldId.includes('assettype')) return false;
+          if (lowerFieldId.includes('asset_type')) return false;
+          
+          // Filter out other system-like fields
+          if (lowerFieldId.includes('updated')) return false;
+          if (lowerFieldId.includes('created')) return false;
+          if (lowerFieldId.includes('timestamp')) return false;
+          
+          return true;
+        });
+
+        console.log('Original field set:', Array.from(fieldSet));
+        console.log('Filtered field set:', filteredFieldSet);
 
         const fieldsWithLabels = filteredFieldSet
           .sort()
