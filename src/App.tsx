@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import PageLayout from "./components/layout/PageLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
+import ErrorBoundary from "./components/common/ErrorBoundary";
+import FormErrorBoundary from "./components/common/FormErrorBoundary";
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Inventory = lazy(() => import("./pages/Inventory"));
@@ -111,10 +113,10 @@ const AppRoutes = () => {
         <Route path="/scan" element={<Navigate to="/inventory/add" replace />} />
         
         {/* New inventory workflow routes */}
-        <Route path="/inventory/add" element={user ? <PageLayout><InventoryAddSelectionPage /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/inventory/action/:assetId" element={user ? <PageLayout><InventoryActionSelectorPage /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/inventory/add/:assetId" element={user ? <PageLayout><AddInventoryPage /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/inventory/add-for-asset/:assetId" element={user ? <PageLayout><AddInventoryForAssetPage /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/add" element={user ? <PageLayout><ErrorBoundary context="Inventory Selection"><InventoryAddSelectionPage /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/action/:assetId" element={user ? <PageLayout><ErrorBoundary context="Inventory Actions"><InventoryActionSelectorPage /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/add/:assetId" element={user ? <PageLayout><ErrorBoundary context="Add Inventory"><AddInventoryPage /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/inventory/add-for-asset/:assetId" element={user ? <PageLayout><ErrorBoundary context="Asset Inventory"><AddInventoryForAssetPage /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/browse-assets" element={user ? <PageLayout><AssetTypeBrowserPage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/asset-type/:assetTypeId" element={user ? <PageLayout><AssetListByTypePage /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/inventory/item/:id" element={user ? <PageLayout><InventoryItemDetail /></PageLayout> : <Navigate to="/login" />} />
@@ -123,11 +125,11 @@ const AppRoutes = () => {
         
         {/* Form Management Routes */}
         <Route path="/forms" element={user ? <PageLayout><Forms /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/new" element={user ? <PageLayout><FormBuilder /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/edit/:id" element={user ? <PageLayout><FormBuilder /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/:id" element={user ? <PageLayout><FormDetail /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/preview/:id" element={user ? <PageLayout><FormPreview /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/forms/submit/:id" element={<FormSubmissionWrapper />} />
+        <Route path="/forms/new" element={user ? <PageLayout><FormErrorBoundary formName="Form Builder"><FormBuilder /></FormErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/forms/edit/:id" element={user ? <PageLayout><FormErrorBoundary formName="Form Builder"><FormBuilder /></FormErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/forms/:id" element={user ? <PageLayout><FormErrorBoundary formName="Form Detail"><FormDetail /></FormErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/forms/preview/:id" element={user ? <PageLayout><FormErrorBoundary formName="Form Preview"><FormPreview /></FormErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/forms/submit/:id" element={<FormErrorBoundary formName="Form Submission"><FormSubmissionWrapper /></FormErrorBoundary>} />
         
         {/* Asset Type Management Routes */}
         <Route path="/asset-types" element={user ? <PageLayout><AssetTypes /></PageLayout> : <Navigate to="/login" />} />
@@ -145,8 +147,8 @@ const AppRoutes = () => {
         
         {/* Reporting Routes */}
         <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/reports/new" element={user ? <PageLayout><ErrorBoundary context="Report Builder"><ReportBuilder /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/reports/:id" element={user ? <PageLayout><ErrorBoundary context="Report Builder"><ReportBuilder /></ErrorBoundary></PageLayout> : <Navigate to="/login" />} />
         
         {/* User and Organization Settings Routes */}
         <Route path="/profile" element={user ? <PageLayout><Profile /></PageLayout> : <Navigate to="/login" />} />
@@ -165,60 +167,27 @@ const AppRoutes = () => {
 };
 
 /**
- * AppErrorBoundary Component
+ * AppErrorBoundary Wrapper
  * 
- * Global error boundary to catch unhandled errors in the React component tree.
- * Provides detailed error information during development and a friendly
- * error page for users.
+ * Global error boundary wrapper using our improved ErrorBoundary component.
+ * Catches unhandled errors in the React component tree and provides a
+ * user-friendly error page with recovery options.
  */
-class AppErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: Error | null, errorInfo: ErrorInfo | null}> {
-  constructor(props: {children: ReactNode}) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("GLOBAL ERROR CAUGHT:", error);
-    console.error("Component Stack:", errorInfo.componentStack);
-    this.setState({ errorInfo });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '40px', margin: '20px', border: '2px solid red', borderRadius: '8px', backgroundColor: '#FFEEEE' }}>
-          <h1 style={{ color: 'red' }}>Something went wrong!</h1>
-          <p>The application encountered an error. Here are the details:</p>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '4px', marginTop: '20px' }}>
-            <h2>Error:</h2>
-            <pre style={{ color: 'red', overflow: 'auto' }}>
-              {this.state.error?.toString()}
-            </pre>
-            
-            <h2>Component Stack:</h2>
-            <pre style={{ fontSize: '12px', overflow: 'auto', maxHeight: '300px' }}>
-              {this.state.errorInfo?.componentStack}
-            </pre>
-          </div>
-          <div style={{ marginTop: '20px' }}>
-            <button 
-              onClick={() => window.location.reload()}
-              style={{ padding: '10px 20px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Reload Application
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+const AppErrorBoundary: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <ErrorBoundary
+    context="application"
+    showDetails={process.env.NODE_ENV === 'development'}
+    onError={(error, errorInfo) => {
+      console.error("GLOBAL ERROR CAUGHT:", error);
+      console.error("Component Stack:", errorInfo.componentStack);
+      
+      // Here you could send to error reporting service
+      // Example: Sentry.captureException(error, { extra: errorInfo });
+    }}
+  >
+    {children}
+  </ErrorBoundary>
+);
 
 /**
  * FormSubmissionWrapper Component
