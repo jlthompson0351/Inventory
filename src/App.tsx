@@ -1,57 +1,58 @@
+import React, { Component, ErrorInfo, ReactNode, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import PageLayout from "./components/layout/PageLayout";
-import Dashboard from "./pages/Dashboard";
-import Inventory from "./pages/Inventory";
-import NewItem from "./pages/NewItem";
-import BarcodeScanner from "./pages/BarcodeScanner";
-import Forms from "./pages/Forms";
-import FormBuilder from "./pages/FormBuilder";
-import FormDetail from "./pages/FormDetail";
-import AssetTypes from "./pages/AssetTypes";
-import Assets from "./pages/Assets";
-import NewAsset from "./pages/NewAsset";
-import AssetDetail from "./pages/AssetDetail";
-import AssetQRManager from "./pages/AssetQRManager";
-import Reports from "./pages/Reports";
-import ReportBuilder from "./pages/ReportBuilder";
-import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
-// import SystemAdmin from "./pages/SystemAdmin"; // Old import
-import OrganizationAdminPage from "./pages/OrganizationAdminPage"; // New import
-import Profile from "./pages/Profile";
-import AppSettings from "./pages/AppSettings";
-import OrganizationMembers from "./pages/OrganizationMembers";
-import InvitationAccept from "./pages/InvitationAccept";
-import AdminDebugPanel from "./pages/AdminDebugPanel";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
-import FormPreview from "./pages/FormPreview";
-import AssetTypeDetail from "./pages/AssetTypeDetail";
-import AssetTypeEdit from "./pages/AssetTypeEdit";
-import { InventoryItemDetail } from "./pages/InventoryItemDetail";
-import { EditInventoryItem } from "./pages/EditInventoryItem";
-import ScanAsset from './pages/ScanAsset';
-import BarcodeDemo from "./pages/BarcodeDemo";
-import SubmitForm from "./pages/SubmitForm";
-import InventoryCheck from "./pages/InventoryCheck";
-import QRScanHandler from "./pages/QRScanHandler";
-import MobileAssetWorkflow from "./pages/MobileAssetWorkflow";
+// Lazy load pages for better performance
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const NewItem = lazy(() => import("./pages/NewItem"));
+const BarcodeScanner = lazy(() => import("./pages/BarcodeScanner"));
+const Forms = lazy(() => import("./pages/Forms"));
+const FormBuilder = lazy(() => import("./pages/FormBuilder"));
+const FormDetail = lazy(() => import("./pages/FormDetail"));
+const AssetTypes = lazy(() => import("./pages/AssetTypes"));
+const Assets = lazy(() => import("./pages/Assets"));
+const NewAsset = lazy(() => import("./pages/NewAsset"));
+const AssetDetail = lazy(() => import("./pages/AssetDetail"));
+const AssetQRManager = lazy(() => import("./pages/AssetQRManager"));
+const Reports = lazy(() => import("./pages/Reports"));
+const ReportBuilder = lazy(() => import("./pages/ReportBuilder"));
+const Login = lazy(() => import("./pages/Login"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const OrganizationAdminPage = lazy(() => import("./pages/OrganizationAdminPage"));
+const Profile = lazy(() => import("./pages/Profile"));
+const AppSettings = lazy(() => import("./pages/AppSettings"));
+const OrganizationMembers = lazy(() => import("./pages/OrganizationMembers"));
+const InvitationAccept = lazy(() => import("./pages/InvitationAccept"));
+const AdminDebugPanel = lazy(() => import("./pages/AdminDebugPanel"));
+const FormPreview = lazy(() => import("./pages/FormPreview"));
+const AssetTypeDetail = lazy(() => import("./pages/AssetTypeDetail"));
+const AssetTypeEdit = lazy(() => import("./pages/AssetTypeEdit"));
+const InventoryItemDetail = lazy(() => import("./pages/InventoryItemDetail").then(m => ({ default: m.InventoryItemDetail })));
+const EditInventoryItem = lazy(() => import("./pages/EditInventoryItem").then(m => ({ default: m.EditInventoryItem })));
+const ScanAsset = lazy(() => import('./pages/ScanAsset'));
+const BarcodeDemo = lazy(() => import("./pages/BarcodeDemo"));
+const SubmitForm = lazy(() => import("./pages/SubmitForm"));
+const InventoryCheck = lazy(() => import("./pages/InventoryCheck"));
+const QRScanHandler = lazy(() => import("./pages/QRScanHandler"));
+const MobileAssetWorkflow = lazy(() => import("./pages/MobileAssetWorkflow"));
 
-// New inventory workflow pages
-import InventoryAddSelectionPage from "./pages/InventoryAddSelection";
-import AssetTypeBrowserPage from "./pages/AssetTypeBrowser";
-import AssetListByTypePage from "./pages/AssetListByType";
-import DynamicInventoryFormPage from "./pages/DynamicInventoryForm";
-import AddInventoryPage from "./pages/AddInventoryPage";
-import AddInventoryForAssetPage from "./pages/AddInventoryForAssetPage";
-import InventoryActionSelectorPage from "./pages/InventoryActionSelectorPage";
-import InventoryHistory from "./pages/InventoryHistory";
+// New inventory workflow pages - lazy loaded
+const InventoryAddSelectionPage = lazy(() => import("./pages/InventoryAddSelection"));
+const AssetTypeBrowserPage = lazy(() => import("./pages/AssetTypeBrowser"));
+const AssetListByTypePage = lazy(() => import("./pages/AssetListByType"));
+const DynamicInventoryFormPage = lazy(() => import("./pages/DynamicInventoryForm"));
+const AddInventoryPage = lazy(() => import("./pages/AddInventoryPage"));
+const AddInventoryForAssetPage = lazy(() => import("./pages/AddInventoryForAssetPage"));
+const InventoryActionSelectorPage = lazy(() => import("./pages/InventoryActionSelectorPage"));
+const InventoryHistory = lazy(() => import("./pages/InventoryHistory"));
 
-import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
+
 
 // Create a new query client for React Query
 const queryClient = new QueryClient();
@@ -79,7 +80,7 @@ const AppRoutes = () => {
   }
 
   return (
-    <>
+    <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public routes - accessible without login */}
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -159,7 +160,7 @@ const AppRoutes = () => {
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </Suspense>
   );
 };
 

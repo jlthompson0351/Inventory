@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -85,7 +84,8 @@ export async function generateMobileAssetQR(
     };
 
     // Generate QR code as data URL
-    const qrDataUrl = await QRCode.toDataURL(mobileUrl, qrOptions);
+    const QRCode = await import('qrcode');
+    const qrDataUrl = await QRCode.default.toDataURL(mobileUrl, qrOptions);
 
     return {
       asset_id: data.id,
@@ -135,7 +135,8 @@ export async function generateMobileAssetQRCanvas(
       errorCorrectionLevel: options?.errorCorrectionLevel || 'M' as const,
     };
 
-    await QRCode.toCanvas(canvas, mobileUrl, qrOptions);
+    const QRCode = await import('qrcode');
+    await QRCode.default.toCanvas(canvas, mobileUrl, qrOptions);
   } catch (error) {
     console.error('Error generating QR canvas:', error);
     throw error;
@@ -176,7 +177,8 @@ export async function generateMobileAssetQRSVG(
       errorCorrectionLevel: options?.errorCorrectionLevel || 'M' as const,
     };
 
-    return await QRCode.toString(mobileUrl, { 
+    const QRCode = await import('qrcode');
+    return await QRCode.default.toString(mobileUrl, { 
       type: 'svg',
       ...qrOptions 
     });

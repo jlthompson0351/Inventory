@@ -82,7 +82,7 @@ export default function InventoryHistory() {
   
   const [inventoryItem, setInventoryItem] = useState<any>(null);
   const [allEvents, setAllEvents] = useState<InventoryEvent[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<EventWithAnomalies[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dismissedAnomalies, setDismissedAnomalies] = useState<Set<string>>(new Set());
@@ -314,9 +314,9 @@ export default function InventoryHistory() {
     });
   }, [allEvents, eventIndexMap, verifiedEvents, inventoryItem]);
 
-  // Filter events based on selected filters
-  useEffect(() => {
-    let filtered = processedEvents;
+  // Filter events based on selected filters - optimized with useMemo
+  const filteredEvents = useMemo(() => {
+    let filtered = [...processedEvents];
 
     // Filter by event type
     if (eventTypeFilter !== "all") {
@@ -390,7 +390,7 @@ export default function InventoryHistory() {
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
 
-    setFilteredEvents(filtered);
+    return filtered;
   }, [processedEvents, eventTypeFilter, yearFilter, verificationFilter, quantityFilter, searchTerm, showOnlyAnomalies, sortOrder, dismissedAnomalies, verifiedEvents]);
 
   // Calculate enhanced statistics

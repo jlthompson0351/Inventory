@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -115,7 +115,7 @@ const processAssetData = (rawData: RawAssetData[]): Asset[] => {
   });
 };
 
-export default function AssetList({
+function AssetList({
   organizationId,
   assetTypeId,
   onEdit,
@@ -502,4 +502,11 @@ export default function AssetList({
       )}
     </div>
   );
-} 
+}
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(AssetList, (prevProps, nextProps) => {
+  // Re-render if organizationId or assetTypeId changes
+  return prevProps.organizationId === nextProps.organizationId &&
+         prevProps.assetTypeId === nextProps.assetTypeId;
+});

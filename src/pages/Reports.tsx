@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { 
   Plus, 
@@ -268,18 +268,20 @@ const Reports = () => {
     }
   };
 
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (report.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (report.tags || []).some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    if (searchCategory === "all") return matchesSearch;
-    if (searchCategory === "templates") return matchesSearch && report.is_template;
-    if (searchCategory === "favorites") return matchesSearch && report.is_favorite;
-    if (searchCategory === "recent") return matchesSearch && new Date(report.updated_at) > new Date(Date.now() - 7*24*60*60*1000);
-    
-    return matchesSearch;
-  });
+  const filteredReports = useMemo(() => {
+    return reports.filter(report => {
+      const matchesSearch = report.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (report.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (report.tags || []).some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      if (searchCategory === "all") return matchesSearch;
+      if (searchCategory === "templates") return matchesSearch && report.is_template;
+      if (searchCategory === "favorites") return matchesSearch && report.is_favorite;
+      if (searchCategory === "recent") return matchesSearch && new Date(report.updated_at) > new Date(Date.now() - 7*24*60*60*1000);
+      
+      return matchesSearch;
+    });
+  }, [reports, searchTerm, searchCategory]);
 
   const runQuickReport = async (templateId: string) => {
     if (!currentOrganization?.id) {

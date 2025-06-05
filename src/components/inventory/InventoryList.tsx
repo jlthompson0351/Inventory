@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ interface InventoryListProps {
   categoryFilter?: string;
 }
 
-export default function InventoryList({ 
+function InventoryList({ 
   organizationId, 
   searchTerm = "",
   categoryFilter
@@ -290,4 +290,12 @@ export default function InventoryList({
       ))}
     </div>
   );
-} 
+}
+
+// Memoize the component to prevent unnecessary re-renders
+export default memo(InventoryList, (prevProps, nextProps) => {
+  // Re-render if organizationId, searchTerm, or categoryFilter changes
+  return prevProps.organizationId === nextProps.organizationId &&
+         prevProps.searchTerm === nextProps.searchTerm &&
+         prevProps.categoryFilter === nextProps.categoryFilter;
+});

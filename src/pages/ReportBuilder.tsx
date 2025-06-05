@@ -63,7 +63,6 @@ import { ReportVisualization } from '@/components/reporting/ReportVisualization'
 import { SmartInsights } from '@/components/reporting/SmartInsights';
 import { SmartFilter } from '@/components/reporting/SmartFilter';
 import { debounce } from 'lodash';
-import * as XLSX from 'xlsx';
 
 // Use enhanced data sources from report service
 const availableDataSources = AVAILABLE_DATA_SOURCES;
@@ -735,6 +734,8 @@ const ReportBuilder = () => {
         return;
       }
 
+      // Dynamic import of XLSX library
+      const XLSX = await import('xlsx');
       const workbook = XLSX.utils.book_new();
       const headers = selectedColumns.map(colId => formFields.find(f => f.id === colId)?.field_label || colId);
       
