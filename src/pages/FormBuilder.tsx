@@ -64,8 +64,8 @@ import { createForm, updateForm, getFormById } from "@/services/formService";
 import { syncMappedFieldsForAssetType, getMappedFields, getAllMappedFieldsForAssetType } from "@/services/mappedFieldService";
 import { Badge } from "@/components/ui/badge";
 import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTypeService';
-import { registerMappedField, unregisterMappedField } from "@/services/mappedFieldService";
 import { getAssetTypes } from "@/services/assetTypeService";
+import { evaluateFormula, validateFormulaSyntax } from "@/lib/formulaEvaluator";
 import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
 
 // Field type options
@@ -133,6 +133,33 @@ interface MockValueSet {
   values: { [key: string]: string | number };
 }
 
+// Interface for mapped fields
+interface MappedField {
+  id: string;
+  field_id: string;
+  field_label: string;
+  field_type: string;
+  form_name: string;
+  source: 'conversion' | 'form';
+  description?: string;
+  form_id: string;
+}
+
+// Interface for asset types
+interface AssetType {
+  id: string;
+  name: string;
+  color?: string;
+  description?: string;
+}
+
+// Interface for asset type links
+interface AssetTypeLink {
+  id: string;
+  asset_type_id: string;
+  form_id: string;
+}
+
 // Helper function to validate inventory_action
 const validateInventoryAction = (action: any): 'add' | 'subtract' | 'set' | 'none' => {
   if (action === 'add' || action === 'subtract' || action === 'set' || action === 'none') {
@@ -141,80 +168,43 @@ const validateInventoryAction = (action: any): 'add' | 'subtract' | 'set' | 'non
   return 'none'; // Default to 'none' if invalid
 };
 
-// Helper function to validate formula
-const validateFormula = (formula: string, currentFields: FormField[], mappedFields: any[]): { 
+// Helper function to validate formula - now using safe evaluator!
+const validateFormula = (formula: string, currentFields: FormField[], mappedFields: MappedField[]): { 
   isValid: boolean; 
   error?: string;
   referencedFields: string[];
   referencedMappedFields: string[];
 } => {
-  const result = {
-    isValid: true,
-    referencedFields: [] as string[],
-    referencedMappedFields: [] as string[],
-  };
-
-  // Find all field references
-  const fieldMatches = formula.match(/\{field_\d+\}/g) || [];
-  result.referencedFields = fieldMatches.map(m => m.slice(1, -1));
+  // Use the safe formula validator
+  const validationResult = validateFormulaSyntax(formula);
   
-  // Find all mapped field references
-  const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
-  result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
-  
-  // Check if referenced fields exist
-  const nonExistentFields = result.referencedFields.filter(
+  // Check if referenced fields exist in current form
+  const nonExistentFields = validationResult.referencedFields.filter(
     fieldId => !currentFields.some(f => f.id === fieldId)
   );
   
   if (nonExistentFields.length > 0) {
     return {
-      ...result,
+      ...validationResult,
       isValid: false,
-      error: `Referenced fields don\'t exist: ${nonExistentFields.join(', ')}`
+      error: `Referenced fields don't exist: ${nonExistentFields.join(', ')}`
     };
   }
   
   // Check if referenced mapped fields exist
-  const nonExistentMappedFields = result.referencedMappedFields.filter(
+  const nonExistentMappedFields = validationResult.referencedMappedFields.filter(
     mappedKey => !mappedFields.some(f => `mapped.${f.field_id}` === mappedKey)
   );
   
   if (nonExistentMappedFields.length > 0) {
     return {
-      ...result,
+      ...validationResult,
       isValid: false,
-      error: `Referenced mapped fields don\'t exist: ${nonExistentMappedFields.join(', ')}`
+      error: `Referenced mapped fields don't exist: ${nonExistentMappedFields.join(', ')}`
     };
   }
   
-  // Check formula syntax (basic testing for balanced braces, operators)
-  try {
-    // Replace field references with 1 to test evaluation
-    let testFormula = formula;
-    result.referencedFields.forEach(fieldId => {
-      testFormula = testFormula.replace(new RegExp(`\\{${fieldId}\\}`, 'g'), '1');
-    });
-    result.referencedMappedFields.forEach(mappedKey => {
-      testFormula = testFormula.replace(new RegExp(`\\{${mappedKey}\\}`, 'g'), '1');
-    });
-    
-    // Clean comments
-    testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
-    
-    // Eval to see if it throws errors
-    // eslint-disable-next-line no-eval
-    eval(testFormula);
-    
-  } catch (e) {
-    return {
-      ...result,
-      isValid: false,
-      error: `Formula syntax error: ${e instanceof Error ? e.message : 'Invalid expression'}`
-    };
-  }
-  
-  return result;
+  return validationResult;
 };
 
 const FormBuilder = () => {
@@ -233,7 +223,7 @@ const FormBuilder = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!!id);
   const fieldRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const [mappedFields, setMappedFields] = useState<any[]>([]);
+  const [mappedFields, setMappedFields] = useState<MappedField[]>([]);
   const location = useLocation();
   const [mockMappedValues, setMockMappedValues] = useState<{ [key: string]: string | number }>({});
   const [mockValueSets, setMockValueSets] = useState<MockValueSet[]>([]);
@@ -241,13 +231,13 @@ const FormBuilder = () => {
   const [resetFormulaToTextMode, setResetFormulaToTextMode] = useState(false);
   
   // Asset type selection for new forms
-  const [assetTypes, setAssetTypes] = useState<any[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [selectedAssetTypeId, setSelectedAssetTypeId] = useState<string>('');
   const [showAssetTypeSelection, setShowAssetTypeSelection] = useState(false);
   const [selectedFormPurpose, setSelectedFormPurpose] = useState<string>(''); // Optional form purpose
   
   // Asset type links for existing forms
-  const [assetTypeLinks, setAssetTypeLinks] = useState<any[]>([]);
+  const [assetTypeLinks, setAssetTypeLinks] = useState<AssetTypeLink[]>([]);
   const [loadingAssetTypeLinks, setLoadingAssetTypeLinks] = useState(false);
   
   // Parse query params for assetType and purpose
@@ -648,7 +638,6 @@ const FormBuilder = () => {
 
   // Preview calculation
   const previewCalculation = (formula: string) => {
-    let sampleResult = "Error";
     try {
       // Replace field references with sample values
       const processedFormula = formula
@@ -656,13 +645,20 @@ const FormBuilder = () => {
         .replace(/\{field_2\}/g, "5")
         .replace(/\{field_3\}/g, "20");
       
-      // eslint-disable-next-line no-eval
-      sampleResult = eval(processedFormula).toString();
+      // Use the safe formula evaluator
+      const evaluationResult = evaluateFormula(processedFormula, {
+        fields: {},
+        mappedFields: {}
+      });
+      
+      if (evaluationResult.success) {
+        return evaluationResult.result.toString();
+      } else {
+        return "Error";
+      }
     } catch (e) {
-      // Formula evaluation failed
+      return "Error";
     }
-    
-    return sampleResult;
   };
 
   const getMappedFieldsFromFormula = (formula: string): string[] => {
@@ -741,33 +737,18 @@ const FormBuilder = () => {
       // Replace any remaining field references with 0
       processedFormula = processedFormula.replace(/\{([a-zA-Z0-9_.]+)\}/g, '0');
       
-      // Clean up the formula
-      processedFormula = processedFormula.trim().replace(/\s+/g, ' ');
+      // Use the safe formula evaluator
+      const evaluationResult = evaluateFormula(processedFormula, {
+        fields: {},
+        mappedFields: {}
+      });
       
-      // Validation checks
-      if (/[\+\-\*/]\s*$/.test(processedFormula)) {
-        return "Incomplete formula";
-      }
-      
-      const openParens = (processedFormula.match(/\(/g) || []).length;
-      const closeParens = (processedFormula.match(/\)/g) || []).length;
-      if (openParens !== closeParens) {
-        return "Unmatched parentheses";
-      }
-      
-      if (!processedFormula || processedFormula.trim() === '') {
-        return "Empty formula";
-      }
-  
-      // eslint-disable-next-line no-eval
-      const result = eval(processedFormula);
-      
-      if (typeof result !== 'number' || isNaN(result)) {
-        return "Invalid result";
+      if (!evaluationResult.success) {
+        return evaluationResult.error;
       }
       
       // Format the result nicely
-      return Number(result).toLocaleString('en-US', {
+      return Number(evaluationResult.result).toLocaleString('en-US', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 4
       });
