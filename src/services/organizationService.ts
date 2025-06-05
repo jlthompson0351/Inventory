@@ -38,7 +38,6 @@ export const getUserOrganization = async (): Promise<any> => {
     if (orgIdError) throw orgIdError;
     
     if (!orgId) {
-      console.log('No organization found for user');
       return null;
     }
     

@@ -1,14 +1,14 @@
-# Firebase Deployment Guide - BarcodeX Inventory Builder
+# Firebase Deployment Guide - Logistiq Inventory Builder
 
-**Status: ✅ PRODUCTION READY** (January 2025)
+**Status: ✅ PRODUCTION READY** (June 2025)
 
-This guide documents the complete Firebase hosting setup for the BarcodeX Inventory Management System, including environment variable configuration, production deployment strategies, and troubleshooting procedures.
+This guide documents the complete Firebase hosting setup for the Logistiq Inventory Management System, including environment variable configuration, production deployment strategies, and troubleshooting procedures.
 
 ---
 
 ## 🚀 Overview
 
-The BarcodeX system is deployed on **Firebase Hosting** for production, providing:
+The Logistiq system is deployed on **Firebase Hosting** for production, providing:
 
 - **Fast Global CDN**: Sub-second loading times worldwide
 - **SSL/HTTPS**: Automatic SSL certificates for secure mobile QR workflows  
@@ -442,7 +442,7 @@ lighthouse https://your-app.web.app --output=html
 
 ## 🎉 Conclusion
 
-**The Firebase deployment for BarcodeX Inventory Management System provides a robust, scalable, and secure platform for production use.**
+**The Firebase deployment for Logistiq Inventory Management System provides a robust, scalable, and secure platform for production use.**
 
 ### **Key Achievements:**
 - ✅ **Mobile QR Workflow**: Fully functional with anonymous access and PIN authentication
@@ -456,5 +456,5 @@ lighthouse https://your-app.web.app --output=html
 
 ---
 
-**Last Updated**: January 2025  
+**Last Updated**: June 2025  
 **Deployment Status**: ✅ ACTIVE AND OPERATIONAL 

@@ -1,6 +1,6 @@
 # Database Migration Documentation
 
-This directory contains SQL migration files for the Barcodex application database.
+This directory contains SQL migration files for the Logistiq application database.
 
 ## Migration Files
 

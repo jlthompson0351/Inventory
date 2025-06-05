@@ -1,6 +1,6 @@
-# Barcode Components Guide
+# Logistiq Components Guide
 
-This guide explains the usage of the barcode components available in the BarCodeX Inventory Builder application. These components allow you to generate, display, and print barcodes for inventory assets.
+This guide explains the usage of the barcode components available in the Logistiq Inventory Builder application. These components allow you to generate, display, and print barcodes for inventory assets.
 
 ## Available Components
 

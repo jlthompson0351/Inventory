@@ -44,8 +44,6 @@ export const getInventoryItems = async (
 ): Promise<any[] | null> => {
   try {
     if (assetId) {
-      console.log(`getInventoryItems: Attempting to find inventory for assetId: ${assetId}`);
-      
       // First, try to find inventory items with this asset_id
       const assetQuery = supabase
         .from('inventory_items')
@@ -58,10 +56,8 @@ export const getInventoryItems = async (
       if (assetError) {
         console.error('Error fetching inventory items by asset_id:', assetError);
       } else if (assetData && assetData.length > 0) {
-        console.log(`Found ${assetData.length} inventory items with asset_id = ${assetId}`);
         return assetData;
       } else {
-        console.log(`No inventory items found with asset_id = ${assetId}`);
       }
       
       // If no results by asset_id, try direct inventory item ID match
@@ -76,10 +72,9 @@ export const getInventoryItems = async (
       if (directError) {
         console.error('Error fetching inventory item by direct ID:', directError);
       } else if (directData && directData.length > 0) {
-        console.log(`Found inventory item with direct ID = ${assetId}`);
         return directData;
       } else {
-        console.log(`No inventory item found with direct ID = ${assetId}`);
+        // No inventory item found with direct ID
       }
       
       // If we got here, no items were found for this asset ID
@@ -211,7 +206,6 @@ export const createInventoryItem = async (
         console.warn(`Asset with ID ${itemData.asset_id} not found. Creating orphaned inventory item.`);
       } else {
         // Check if inventory already exists for this asset
-        console.log(`Checking if inventory already exists for asset ${itemData.asset_id}`);
         const { data: existingInventory, error: checkError } = await supabase
           .from('inventory_items')
           .select('id, name')

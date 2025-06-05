@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains components related to organization management, settings, and administration in the BarcodEx Inventory Management System. The components are organized in a hierarchical structure that provides different levels of access based on user roles.
+This directory contains components related to organization management, settings, and administration in the Logistiq Inventory Management System. The components are organized in a hierarchical structure that provides different levels of access based on user roles.
 
 ## Directory Structure
 

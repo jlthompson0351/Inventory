@@ -247,7 +247,7 @@ export async function submitForm(
               description: `Stock count set to ${setValue} (was ${previousQuantity}). ${changeDescription}`
             });
             
-            console.log(`Inventory SET action: ${previousQuantity} → ${setValue} (field: ${setField.label})`);
+            // Inventory SET action
           }
         } else {
           // Priority 2: Process add/subtract actions
@@ -266,7 +266,7 @@ export async function submitForm(
                       value: numValue,
                       description: `Added ${numValue} units via ${field.label}`
                     });
-                    console.log(`Inventory ADD action: +${numValue} (field: ${field.label})`);
+                    // Inventory ADD action
                     break;
                   case 'subtract':
                     newQuantity -= numValue;
@@ -277,7 +277,7 @@ export async function submitForm(
                       value: numValue,
                       description: `Subtracted ${numValue} units via ${field.label}`
                     });
-                    console.log(`Inventory SUBTRACT action: -${numValue} (field: ${field.label})`);
+                    // Inventory SUBTRACT action
                     break;
                 }
               }
@@ -372,9 +372,7 @@ export async function submitForm(
             status: 'active'
           });
           
-        console.log(`✅ Inventory updated: ${inventoryItem.quantity} → ${finalQuantity} for asset ${asset.name}`);
-        console.log(`📝 Changes tracked: ${changesSummary}`);
-        console.log(`🏷️ Event type: ${eventType}, Check type: ${checkType}`);
+        // Inventory updated successfully
       }
     }
 

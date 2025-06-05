@@ -1,10 +1,10 @@
-# Barcode Integration - Technical Documentation
+# Logistiq Integration - Technical Documentation
 
 ## Overview
 
-This document provides technical details about how the barcode system is implemented in the Barcodex Inventory Builder application. It's intended for developers who need to maintain, extend or troubleshoot the barcode functionality. **Updated for Firebase production deployment and mobile QR workflow capabilities (January 2025).**
+This document provides technical details about how the barcode system is implemented in the Logistiq Inventory Builder application. It's intended for developers who need to maintain, extend or troubleshoot the barcode functionality. **Updated for Firebase production deployment and mobile QR workflow capabilities (June 2025).**
 
-## 🚀 Firebase Production Deployment (January 2025)
+## 🚀 Firebase Production Deployment (June 2025)
 
 ### **Mobile QR Workflow Integration**
 
@@ -91,7 +91,7 @@ The `assets` table includes:
 |--------|------|-------------|
 | barcode | text | The unique barcode value for this asset |
 
-### **Enhanced RLS Policies for Mobile QR** (January 2025)
+### **Enhanced RLS Policies for Mobile QR** (June 2025)
 
 ```sql
 -- Allow anonymous mobile QR access to assets
@@ -173,7 +173,7 @@ Dependencies:
 - `qrcode.react` for QR code generation
 - `react-barcodes` for linear barcode generation
 
-### 4. **Mobile QR Workflow Components** (January 2025)
+### 4. **Mobile QR Workflow Components** (June 2025)
 
 **MobileAssetWorkflow Component:**
 - Main interface for mobile QR scanning workflows
@@ -220,7 +220,7 @@ This function:
 2. Returns asset data if a match is found
 3. Returns null if no match
 
-### **Mobile PIN Authentication** (January 2025)
+### **Mobile PIN Authentication** (June 2025)
 
 ```typescript
 export async function authenticateWithMobilePin(pin: string): Promise<any> {
@@ -339,7 +339,7 @@ In `src/pages/ScanAsset.tsx`:
 - Renders the BarcodeScanner component
 - Handles redirecting to asset details on successful scan
 
-### 4. **Mobile QR Workflow Integration** (January 2025)
+### 4. **Mobile QR Workflow Integration** (June 2025)
 
 **Mobile Asset Access:**
 - Direct QR code scanning to `/mobile/asset/:assetId` routes
@@ -351,7 +351,7 @@ In `src/pages/ScanAsset.tsx`:
 - Dual authentication support for seamless user experience
 - Organization context maintained through PIN-based access
 
-## **Firebase Deployment Integration** (January 2025)
+## **Firebase Deployment Integration** (June 2025)
 
 ### **Production Considerations**
 
@@ -404,13 +404,13 @@ In `src/pages/ScanAsset.tsx`:
    - Check that the barcode is properly printed/displayed
    - Try different barcode formats if one isn't scanning well
 
-4. **Mobile QR Workflow Issues** (January 2025)
+4. **Mobile QR Workflow Issues** (June 2025)
    - Verify Firebase SPA routing configuration
    - Check anonymous access RLS policies
    - Validate environment variable configuration in production
    - Test PIN authentication flow
 
-5. **Production Deployment Issues** (January 2025)
+5. **Production Deployment Issues** (June 2025)
    - Verify Firebase environment variable injection
    - Check build output for missing variables
    - Test mobile QR URLs directly in production
@@ -429,7 +429,7 @@ console.log('Asset type settings:', assetType);
 console.log('Scan result:', decodedText);
 console.log('Asset lookup result:', assetData);
 
-// For mobile QR workflow (January 2025):
+// For mobile QR workflow (June 2025):
 console.log('Mobile QR route accessed:', assetId);
 console.log('PIN authentication result:', authResult);
 console.log('Anonymous access granted:', accessGranted);
@@ -453,7 +453,7 @@ For specialized barcode formats:
 2. Extend the barcode generation logic in the RPC function
 3. Update the UI components to handle the new format
 
-### **Mobile QR Enhancements** (January 2025)
+### **Mobile QR Enhancements** (June 2025)
 
 For extending mobile QR capabilities:
 
@@ -480,5 +480,5 @@ The barcode integration system is now fully deployed on Firebase hosting with:
 
 ---
 
-**Last Updated**: January 2025  
+**Last Updated**: June 2025  
 **Deployment Status**: ✅ LIVE ON FIREBASE HOSTING 

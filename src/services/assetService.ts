@@ -29,7 +29,7 @@ export const getAssetById = async (id: string): Promise<Asset | null> => {
       return null;
     }
     
-    console.log(`Attempting to fetch asset with ID: ${id}`);
+    // Attempting to fetch asset
     
     // First get the asset
     const { data, error } = await supabase
@@ -49,7 +49,7 @@ export const getAssetById = async (id: string): Promise<Asset | null> => {
       return null;
     }
 
-    console.log(`Successfully found asset: ${data.name} (${data.id})`);
+    // Successfully found asset
 
     // Check if inventory item exists for this asset
     const { data: inventoryData, error: inventoryError } = await supabase

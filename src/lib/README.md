@@ -1,6 +1,6 @@
 # Formula Evaluator
 
-This module provides a secure way to evaluate mathematical formulas in BarcodeX without using unsafe `eval()` or `Function()` methods.
+This module provides a secure way to evaluate mathematical formulas in Logistiq without using unsafe `eval()` or `Function()` methods.
 
 ## Key Features
 

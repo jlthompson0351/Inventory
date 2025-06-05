@@ -1,6 +1,6 @@
 # Supabase Schema Guide for Developers
 
-This guide helps developers understand the BarcodEx database schema and how to properly interact with it.
+This guide helps developers understand the Logistiq database schema and how to properly interact with it.
 
 ## Core Tables and Relationships
 

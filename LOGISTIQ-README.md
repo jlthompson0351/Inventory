@@ -1,10 +1,10 @@
-# Welcome to BarcodEx Inventory Management System
+# Welcome to Logistiq Inventory Management System
 
 **Status: ✅ PRODUCTION READY AND DEPLOYED (January 2025)**
 
-## About BarcodEx
+## About Logistiq
 
-BarcodEx is a modern, enterprise-grade inventory management system designed to help businesses track and manage assets efficiently. It features complete inventory workflows, smart asset tracking, dynamic forms, and comprehensive audit capabilities with barcode scanning integration. **Now deployed on Firebase hosting with mobile QR workflow capabilities.**
+Logistiq is a modern, enterprise-grade inventory management system designed to help businesses track and manage assets efficiently. It features complete inventory workflows, smart asset tracking, dynamic forms, and comprehensive audit capabilities with barcode scanning integration. **Now deployed on Firebase hosting with mobile QR workflow capabilities.**
 
 ## 🚀 Key Features - FULLY IMPLEMENTED
 
@@ -314,7 +314,7 @@ See [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) for complet
 
 ---
 
-**🎉 The BarcodEx Inventory Management System is now a fully-featured, production-ready platform providing enterprise-grade inventory management with professional user experience, comprehensive audit capabilities, and global deployment on Firebase hosting with mobile QR workflow support.** 
+**🎉 The Logistiq Inventory Management System is now a fully-featured, production-ready platform providing enterprise-grade inventory management with professional user experience, comprehensive audit capabilities, and global deployment on Firebase hosting with mobile QR workflow support.** 
 
 **🌐 Live Status**: DEPLOYED AND OPERATIONAL on Firebase Hosting  
 **📱 Mobile QR**: FULLY FUNCTIONAL with PIN authentication  

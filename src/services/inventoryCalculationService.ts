@@ -375,7 +375,7 @@ export class InventoryCalculationService {
         };
       }
 
-      console.log(`✅ Updated inventory_items quantity: ${inventoryItem.quantity} → ${calculation.newQuantity}`);
+      // Updated inventory_items quantity
 
       return { 
         success: true, 

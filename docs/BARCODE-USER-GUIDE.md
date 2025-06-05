@@ -1,8 +1,8 @@
-# Barcode System - User Guide
+# Logistiq System - User Guide
 
 ## Introduction
 
-The Barcodex Inventory Builder application includes a powerful barcode system that automatically generates unique barcodes or QR codes for your assets. This guide will walk you through how to use this feature to streamline your inventory management.
+The Logistiq Inventory Builder application includes a powerful barcode system that automatically generates unique barcodes or QR codes for your assets. This guide will walk you through how to use this feature to streamline your inventory management.
 
 ## Setting Up Barcode Generation
 
@@ -65,7 +65,7 @@ To view or print the barcode for an asset:
 
 The scanning functionality works best on mobile devices:
 
-1. Access the Barcodex application on your mobile browser
+1. Access the Logistiq application on your mobile browser
 2. Navigate to **Inventory** > **Scan Asset**
 3. Allow camera access
 4. Scan the barcode or QR code

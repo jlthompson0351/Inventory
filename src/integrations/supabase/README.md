@@ -1,10 +1,10 @@
 # Supabase Integration Documentation
 
-This document provides information about the Supabase database integration used in BarcodEx, including database functions, schema, and client setup.
+This document provides information about the Supabase database integration used in Logistiq, including database functions, schema, and client setup.
 
 ## Database Schema
 
-The BarcodEx application uses the following main tables:
+The Logistiq application uses the following main tables:
 
 - **organizations**: Stores organization information (name, avatar, settings)
   - `id`: UUID primary key

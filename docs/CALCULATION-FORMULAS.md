@@ -1,6 +1,6 @@
 # Customizable Calculation Formulas
 
-This document explains the customizable calculation formulas feature in the Barcodex system.
+This document explains the customizable calculation formulas feature in the Logistiq system.
 
 ## Overview
 
@@ -102,7 +102,7 @@ The formulas are stored in a JSONB object with the following structure:
 
 This structure allows for flexibility in formula types while maintaining a consistent interface for both storage and application.
 
-## Decimal Precision Handling (January 2025 Update)
+## Decimal Precision Handling (June 2025 Update)
 
 ### Overview
 

@@ -67,7 +67,7 @@ export async function getArchivedForms(organizationId: string): Promise<Form[] |
       }
     });
   }
-  console.log(`[formService] Fetched ${data?.length || 0} archived forms.`);
+      // Fetched archived forms
   return data;
 }
 
@@ -151,7 +151,7 @@ export async function getFormById(formId: string) {
     if (error) {
       if (error.code === 'PGRST116') {
         // This is the "not found" error code for single()
-        console.log(`Form with ID ${formId} not found`);
+        // Form not found
         return null;
       }
       console.error('Error fetching form:', error);

@@ -1,4 +1,4 @@
-# BarcodeX Inventory Builder
+# Logistiq Inventory Builder
 
 A comprehensive, production-ready inventory management system built with React, TypeScript, and Supabase. **Now featuring a complete inventory workflow with smart asset tracking, dynamic forms, and enterprise-grade audit capabilities. Deployed on Firebase hosting with mobile QR workflows.**
 
@@ -92,7 +92,7 @@ A comprehensive, production-ready inventory management system built with React, 
 1. Clone the repository:
    ```bash
    git clone [repository-url]
-   cd barcodex-inventory-builder
+   cd logistiq-inventory-builder
    ```
 
 2. Install dependencies:
@@ -253,7 +253,7 @@ The system includes advanced database optimizations. To apply performance migrat
 - [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features
 - [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation
 - [Form Builder Documentation](./README-FORM-BUILDER.md) - Comprehensive form creation and management guide
-- [Main System Documentation](./BARCODEX-README.md) - Comprehensive system overview
+- [Main System Documentation](./LOGISTIQ-README.md) - Comprehensive system overview
 - [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships
 - [Optimized Reporting System](./docs/OPTIMIZED-REPORTING-SYSTEM.md) - Enterprise reporting features
 - [Barcode Integration](./docs/BARCODE-INTEGRATION.md) - Barcode/QR code functionality
@@ -263,7 +263,7 @@ The system includes advanced database optimizations. To apply performance migrat
 
 **✅ SYSTEM IS PRODUCTION READY AND DEPLOYED**
 
-The BarcodeX Inventory Management System is now a fully-featured, enterprise-grade platform that provides:
+The Logistiq Inventory Management System is now a fully-featured, enterprise-grade platform that provides:
 
 - **Professional Inventory Management** with complete audit trails
 - **Sub-second Performance** for all operations  

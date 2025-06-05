@@ -1,6 +1,6 @@
-# Barcode System - Technical Implementation
+# Logistiq System - Technical Implementation
 
-This document details the technical implementation of the barcode functionality in the Barcodex Inventory Builder application.
+This document details the technical implementation of the barcode functionality in the Logistiq Inventory Builder application.
 
 ## Architecture Overview
 
@@ -20,14 +20,14 @@ The barcode system is designed with the following components:
    - Services connecting the frontend components to the backend APIs
    - Type definitions for barcode-related data structures
 
-4. **Mobile QR Workflow** (January 2025):
+4. **Mobile QR Workflow** (June 2025):
    - Anonymous access workflow for mobile QR scanning
    - PIN-based authentication for mobile form submissions
    - Firebase deployment integration with production optimizations
 
 ---
 
-## 📱 Mobile QR Workflow - PRODUCTION READY (January 2025)
+## 📱 Mobile QR Workflow - PRODUCTION READY (June 2025)
 
 ### **Complete Mobile QR Implementation**
 
@@ -892,7 +892,7 @@ Common issues and their solutions:
 
 ## Conclusion
 
-The barcode system integrates seamlessly with the existing inventory management functionality, providing robust asset tracking capabilities through QR codes and traditional barcodes. **The January 2025 enhancements add comprehensive mobile QR workflow support with Firebase deployment optimization, making the system production-ready for field operations.**
+The barcode system integrates seamlessly with the existing inventory management functionality, providing robust asset tracking capabilities through QR codes and traditional barcodes. **The June 2025 enhancements add comprehensive mobile QR workflow support with Firebase deployment optimization, making the system production-ready for field operations.**
 
 ### **Key Achievements:**
 - ✅ **Mobile QR Workflow**: Complete implementation with PIN authentication

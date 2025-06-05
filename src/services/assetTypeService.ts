@@ -362,7 +362,7 @@ export const restoreAssetType = async (id: string): Promise<boolean> => {
       }
       throw error;
     }
-    console.log(`[assetTypeService] Asset type ${id} restored successfully.`);
+    // Asset type restored successfully
     return true;
   } catch (error) {
     console.error(`[assetTypeService] Failed to restore asset type ${id}:`, error);
@@ -388,7 +388,7 @@ export const softDeleteAssetType = async (id: string): Promise<boolean> => {
       console.error('[assetTypeService] Error soft deleting asset type:', error);
       throw error;
     }
-    console.log(`[assetTypeService] Asset type ${id} soft deleted successfully.`);
+    // Asset type soft deleted successfully
     return true;
   } catch (error) {
     console.error(`[assetTypeService] Failed to soft delete asset type ${id}:`, error);
@@ -434,6 +434,6 @@ export const getArchivedAssetTypesWithCounts = async (
       return { ...type, asset_count: count || 0 };
     })
   );
-  console.log(`[assetTypeService] Fetched ${typesWithCounts.length} archived asset types with counts.`);
+      // Fetched archived asset types with counts
   return typesWithCounts;
 }; 
