@@ -1,12 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useOrganization } from "@/hooks/useOrganization";
 import { Layers, Boxes, FileText, BarChart3, ChevronRight, ArrowUpRight, Clock, Plus, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
-export default function Dashboard() {
-  console.log("Dashboard component rendering");
+const Dashboard = memo(() => {
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   
@@ -163,4 +162,6 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+});
+
+export default Dashboard;

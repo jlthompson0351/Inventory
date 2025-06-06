@@ -1,4 +1,4 @@
-import { ReactNode, ErrorInfo, Component } from "react";
+import React, { ReactNode, ErrorInfo, Component, memo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   Package2, 
@@ -101,9 +101,7 @@ interface PageLayoutProps {
   children: ReactNode;
 }
 
-const PageLayout = ({ children }: PageLayoutProps) => {
-  console.log("PageLayout rendering, children:", children ? "PRESENT" : "MISSING");
-  
+const PageLayout = memo(({ children }: PageLayoutProps) => {
   // Detect if coming from mobile QR workflow
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -250,6 +248,6 @@ const PageLayout = ({ children }: PageLayoutProps) => {
       </div>
     </SidebarProvider>
   );
-};
+});
 
 export default PageLayout;

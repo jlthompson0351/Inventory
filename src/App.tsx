@@ -68,9 +68,10 @@ const AppRoutes = () => {
   useEffect(() => {
     if (loading) {
       console.log("Auth: Loading user data");
-    } else {
-      console.log("Auth: User " + (user ? "logged in" : "logged out"));
+    } else if (user) {
+      console.log("Auth: User logged in");
     }
+    // Only log significant changes, not every render
   }, [user, loading]);
 
   // Show loading screen while authentication is being checked
