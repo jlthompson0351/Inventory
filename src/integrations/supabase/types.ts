@@ -106,5 +106,5 @@ export type InventoryHistoryUpdate = TablesUpdate<'inventory_history'> & { event
 // export type SystemRoleInsert = TablesInsert<'system_roles'>;
 // export type SystemRoleUpdate = TablesUpdate<'system_roles'>;
 
-// Invitation types
-export type InvitationRow = TablesRow<"organization_invitations">;
+  // Invitation types
+  export type InvitationRow = TablesRow<"organization_invitations">;

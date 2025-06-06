@@ -14,7 +14,7 @@ export interface Organization {
   name: string;
   description?: string | null;
   avatar_url?: string | null;
-  owner_id: string;
+  owner_id?: string | null; // Made optional since it doesn't exist in database
   created_at: string;
   updated_at: string;
   // any other fields relevant to an organization

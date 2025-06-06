@@ -303,26 +303,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Fetch organization and membership data sequentially
         console.log('4. Fetching organization details...');
         try {
-          const orgResult = await Promise.race([
-            supabase
-              .from('organizations')
-              .select('*')
-              .eq('id', orgId)
-              .single(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Org details timeout')), 8000))
-          ]);
-
-          const { data: org, error: orgError } = orgResult;
+          const { data: orgData, error: orgError } = await (supabase as any)
+            .rpc('get_organization_details', { org_id: orgId });
+          
           if (orgError) {
             console.error('Error fetching organization details:', orgError);
             setOrganization(null);
-          } else {
+          } else if (orgData && orgData.length > 0) {
             console.log('Organization details fetched successfully');
+            const org = orgData[0];
             const orgWithDefaults = {
               ...org,
               owner_id: null
             };
             setOrganization(orgWithDefaults as FullOrganizationType);
+          } else {
+            console.log('No organization found');
+            setOrganization(null);
           }
         } catch (error) {
           console.error('Organization fetch failed:', error);

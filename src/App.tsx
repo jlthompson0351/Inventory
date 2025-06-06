@@ -27,8 +27,11 @@ import AppSettings from "./pages/AppSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import InvitationAccept from "./pages/InvitationAccept";
 import AdminDebugPanel from "./pages/AdminDebugPanel";
+import EnhancedPlatformDashboard from "./pages/EnhancedPlatformDashboard";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
+import { usePasswordRequirement } from "./hooks/usePasswordRequirement";
+import { ForcePasswordChange } from "./components/auth/ForcePasswordChange";
 import FormPreview from "./pages/FormPreview";
 import AssetTypeDetail from "./pages/AssetTypeDetail";
 import AssetTypeEdit from "./pages/AssetTypeEdit";
@@ -64,6 +67,7 @@ const queryClient = new QueryClient();
  */
 const AppRoutes = () => {
   const { user, loading } = useAuth();
+  const { isPasswordChangeRequired, isLoading: isLoadingPasswordRequirement } = usePasswordRequirement();
   
   useEffect(() => {
     if (loading) {
@@ -75,8 +79,13 @@ const AppRoutes = () => {
   }, [user, loading]);
 
   // Show loading screen while authentication is being checked
-  if (loading) {
+  if (loading || isLoadingPasswordRequirement) {
     return <LoadingScreen />;
+  }
+
+  // Show password change screen if user is logged in but needs to change password
+  if (user && isPasswordChangeRequired) {
+    return <ForcePasswordChange />;
   }
 
   return (
@@ -98,6 +107,7 @@ const AppRoutes = () => {
         
         {/* Protected admin routes */}
         <Route path="/organization-admin" element={user ? <OrganizationAdminPage /> : <Navigate to="/login" />} />
+        <Route path="/platform-dashboard" element={user ? <PageLayout><EnhancedPlatformDashboard /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Main application routes - require authentication */}
         <Route path="/" element={user ? <PageLayout><Dashboard /></PageLayout> : <Navigate to="/login" />} />
