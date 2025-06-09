@@ -1831,6 +1831,14 @@ export type Database = {
         Args: { org_id: string }
         Returns: boolean
       }
+      delete_organization_completely: {
+        Args: { org_id: string }
+        Returns: boolean
+      }
+      delete_user_completely: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       find_recommended_forms_for_asset_type: {
         Args: { p_asset_type_id: string }
         Returns: {
@@ -1997,6 +2005,10 @@ export type Database = {
           p_month: number
           p_asset_type_id?: string
         }
+        Returns: Json
+      }
+      get_organization_deletion_preview: {
+        Args: { org_id: string }
         Returns: Json
       }
       get_organization_invitations: {

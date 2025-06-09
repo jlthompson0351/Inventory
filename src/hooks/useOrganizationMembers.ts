@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { deleteUser } from '@/services/organizationService';
 import type { OrganizationMember } from '@/types/organization';
 
 export const useOrganizationMembers = () => {
@@ -98,6 +99,20 @@ export const useOrganizationMembers = () => {
     }
   };
 
+  const deleteUserCompletely = async (userId: string) => {
+    if (!user || !organization) return;
+
+    try {
+      const success = await deleteUser(userId);
+      if (success) {
+        fetchMembers();
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error("Failed to delete user");
+    }
+  };
+
   useEffect(() => {
     if (organization?.id) {
       fetchMembers();
@@ -112,6 +127,7 @@ export const useOrganizationMembers = () => {
     isLoading,
     fetchMembers,
     updateMemberRole,
-    removeMember
+    removeMember,
+    deleteUserCompletely
   };
 };

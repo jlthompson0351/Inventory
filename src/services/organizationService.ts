@@ -74,3 +74,57 @@ export const updateOrganization = async (orgId: string, updates: any): Promise<b
     return false;
   }
 };
+
+// Delete a user completely from the system
+export const deleteUser = async (userId: string): Promise<boolean> => {
+  try {
+    // Call the delete_user_completely function
+    const { error } = await supabase.rpc('delete_user_completely', {
+      target_user_id: userId
+    });
+
+    if (error) throw error;
+
+    toast.success('User deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    toast.error('Failed to delete user');
+    return false;
+  }
+};
+
+// Delete organization and all associated data
+export const deleteOrganization = async (orgId: string): Promise<boolean> => {
+  try {
+    // Call the delete_organization_completely function
+    const { error } = await supabase.rpc('delete_organization_completely', {
+      org_id: orgId
+    });
+
+    if (error) throw error;
+
+    toast.success('Organization deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error deleting organization:', error);
+    toast.error('Failed to delete organization');
+    return false;
+  }
+};
+
+// Get organization deletion preview (what will be deleted)
+export const getOrganizationDeletionPreview = async (orgId: string): Promise<any> => {
+  try {
+    const { data, error } = await supabase.rpc('get_organization_deletion_preview', {
+      org_id: orgId
+    });
+
+    if (error) throw error;
+
+    return data;
+  } catch (error) {
+    console.error('Error getting deletion preview:', error);
+    return null;
+  }
+};

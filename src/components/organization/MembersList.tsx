@@ -1,9 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { User, Trash2, CalendarDays } from 'lucide-react';
+import { User, Trash2, CalendarDays, UserMinus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { OrganizationMember } from '@/types/organization';
 import { format } from 'date-fns';
 
@@ -12,9 +25,10 @@ interface MembersListProps {
   isLoading: boolean;
   onRoleChange: (memberId: string, role: string) => void;
   onRemoveMember: (memberId: string) => void;
+  onDeleteUser?: (userId: string) => void;
 }
 
-const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember }: MembersListProps) => {
+const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDeleteUser }: MembersListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredMembers = useMemo(() => {
@@ -89,10 +103,53 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember }: Membe
                     variant="ghost" 
                     size="icon"
                     onClick={() => onRemoveMember(member.id)}
-                    title="Remove Member"
+                    title="Remove Member from Organization"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+
+                  {onDeleteUser && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          size="icon"
+                          title="Delete User Permanently"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-destructive" />
+                            Delete User Permanently?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-2">
+                            <p>
+                              You are about to permanently delete <strong>{member.full_name || member.email}</strong> from the system.
+                            </p>
+                            <Alert variant="destructive" className="mt-3">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertTitle>Warning</AlertTitle>
+                              <AlertDescription>
+                                This action cannot be undone. The user and all their associated data will be permanently removed from the system.
+                              </AlertDescription>
+                            </Alert>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => onDeleteUser(member.user_id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete User Permanently
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </div>
             ))}

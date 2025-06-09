@@ -13,7 +13,7 @@ const OrganizationMembersContent: React.FC = () => {
   const { currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState<string>("invite");
   
-  const { members, isLoading, updateMemberRole, removeMember } = useOrganizationMembers();
+  const { members, isLoading, updateMemberRole, removeMember, deleteUserCompletely } = useOrganizationMembers();
   const { 
     invitations, 
     newInviteEmail, 
@@ -51,6 +51,7 @@ const OrganizationMembersContent: React.FC = () => {
             isLoading={isLoading}
             onRoleChange={updateMemberRole}
             onRemoveMember={removeMember}
+            onDeleteUser={deleteUserCompletely}
           />
         </div>
       </div>

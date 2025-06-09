@@ -10,6 +10,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { 
   PlusCircle, 
@@ -23,9 +35,12 @@ import {
   Building,
   Crown,
   MoreHorizontal,
-  Eye
+  Eye,
+  Trash2,
+  UserX
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { deleteOrganization, deleteUser, getOrganizationDeletionPreview } from '@/services/organizationService';
 
 type Organization = {
   id: string;
@@ -98,6 +113,11 @@ const EnhancedPlatformDashboard: React.FC = () => {
   const [batchRole, setBatchRole] = useState('member');
   const [isBatchAdding, setIsBatchAdding] = useState(false);
 
+  // Deletion state
+  const [deletionPreview, setDeletionPreview] = useState<any>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isDeletingOrg, setIsDeletingOrg] = useState(false);
+
   useEffect(() => {
     if (!userRoles.isPlatformOperator) {
       toast.error("Access Denied: You are not a platform operator.");
@@ -146,6 +166,73 @@ const EnhancedPlatformDashboard: React.FC = () => {
       toast.error('Failed to load organization details.');
     } finally {
       setIsLoadingMembers(false);
+    }
+  };
+
+  const loadDeletionPreview = async (orgId: string) => {
+    setIsLoadingPreview(true);
+    try {
+      const preview = await getOrganizationDeletionPreview(orgId);
+      setDeletionPreview(preview);
+    } catch (error) {
+      console.error('Error loading deletion preview:', error);
+      toast.error('Failed to load deletion preview');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleDeleteOrganization = async (org: Organization) => {
+    await loadDeletionPreview(org.id);
+  };
+
+  const confirmDeleteOrganization = async () => {
+    if (!selectedOrg || !deletionPreview) return;
+
+    const confirmationText = "DELETE ORGANIZATION";
+    const userInput = prompt(
+      `⚠️ DANGER: This will permanently delete "${selectedOrg.name}" and ALL associated data:\n\n` +
+      `• ${deletionPreview.data_to_delete?.members || 0} users (COMPLETELY DELETED from system)\n` +
+      `• ${deletionPreview.data_to_delete?.assets || 0} assets\n` +
+      `• ${deletionPreview.data_to_delete?.inventory_items || 0} inventory items\n` +
+      `• ${deletionPreview.data_to_delete?.forms || 0} forms\n` +
+      `• ${deletionPreview.data_to_delete?.form_submissions || 0} form submissions\n` +
+      `• ${deletionPreview.data_to_delete?.reports || 0} reports\n\n` +
+      `This action CANNOT be undone!\n\n` +
+      `Type "${confirmationText}" to confirm:`
+    );
+
+    if (userInput !== confirmationText) {
+      if (userInput !== null) {
+        toast.error('Deletion cancelled - text did not match.');
+      }
+      return;
+    }
+
+    setIsDeletingOrg(true);
+    try {
+      const success = await deleteOrganization(selectedOrg.id);
+      if (success) {
+        setShowManageOrg(false);
+        setSelectedOrg(null);
+        setDeletionPreview(null);
+        fetchAllOrganizations();
+      }
+    } catch (error) {
+      console.error('Error deleting organization:', error);
+    } finally {
+      setIsDeletingOrg(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    try {
+      const success = await deleteUser(userId);
+      if (success && selectedOrg) {
+        await fetchOrganizationDetails(selectedOrg);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
     }
   };
 
@@ -200,6 +287,8 @@ Tell them: Email: ${newOrgAdminEmail.trim()} / Password: ${tempPassword}`, {
     setSelectedOrg(org);
     setShowManageOrg(true);
     await fetchOrganizationDetails(org);
+    // Pre-load deletion preview
+    await loadDeletionPreview(org.id);
   };
 
   const handleAddUser = async (e: React.FormEvent) => {
@@ -452,6 +541,7 @@ They can now login and will be prompted to change their password.`);
                       <Eye className="mr-2 h-4 w-4" /> 
                       Manage
                     </Button>
+
                   </div>
                 </div>
               ))}
@@ -534,9 +624,10 @@ They can now login and will be prompted to change their password.`);
           
           {selectedOrg && (
             <Tabs defaultValue="members" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="members">Members ({orgMembers.length})</TabsTrigger>
                 <TabsTrigger value="invitations">Invitations ({orgInvitations.length})</TabsTrigger>
+                <TabsTrigger value="danger" className="text-destructive">Danger Zone</TabsTrigger>
               </TabsList>
               
               <TabsContent value="members" className="space-y-4">
@@ -588,9 +679,50 @@ They can now login and will be prompted to change their password.`);
                             size="sm"
                             onClick={() => handleRemoveUser(member.user_id, member.email)}
                             className="text-destructive hover:text-destructive"
+                            title="Remove from Organization"
                           >
                             <UserMinus className="h-4 w-4" />
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                title="Delete User Permanently"
+                              >
+                                <UserX className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2">
+                                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                                  Delete User Permanently?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="space-y-2">
+                                  <p>
+                                    You are about to permanently delete <strong>{member.full_name || member.email}</strong> from the system.
+                                  </p>
+                                  <Alert variant="destructive" className="mt-3">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTitle>Warning</AlertTitle>
+                                    <AlertDescription>
+                                      This action cannot be undone. The user and all their associated data will be permanently removed from the system.
+                                    </AlertDescription>
+                                  </Alert>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteUser(member.user_id, member.email)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete User Permanently
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     ))}
@@ -626,6 +758,54 @@ They can now login and will be prompted to change their password.`);
                     ))}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="danger" className="space-y-4">
+                <div className="space-y-4">
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Danger Zone</AlertTitle>
+                    <AlertDescription>
+                      Irreversible actions that will permanently delete data.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Card className="border-destructive">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-destructive">
+                        <Trash2 className="h-5 w-5" />
+                        Delete Organization
+                      </CardTitle>
+                      <CardDescription>
+                        Permanently delete this organization and all associated data.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {deletionPreview && selectedOrg && (
+                        <div className="bg-muted/50 p-4 rounded-lg">
+                          <h4 className="font-semibold mb-2">What will be deleted:</h4>
+                          <ul className="text-sm space-y-1">
+                            <li>• {deletionPreview.data_to_delete?.members || 0} users (completely removed from system)</li>
+                            <li>• {deletionPreview.data_to_delete?.assets || 0} assets</li>
+                            <li>• {deletionPreview.data_to_delete?.inventory_items || 0} inventory items</li>
+                            <li>• {deletionPreview.data_to_delete?.forms || 0} forms</li>
+                            <li>• {deletionPreview.data_to_delete?.form_submissions || 0} form submissions</li>
+                            <li>• {deletionPreview.data_to_delete?.reports || 0} reports</li>
+                          </ul>
+                        </div>
+                      )}
+
+                      <Button
+                        variant="destructive"
+                        onClick={confirmDeleteOrganization}
+                        disabled={isDeletingOrg || isLoadingPreview || !deletionPreview}
+                        className="w-full"
+                      >
+                        {isDeletingOrg ? 'Deleting Organization...' : 'Delete Organization Permanently'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
             </Tabs>
           )}

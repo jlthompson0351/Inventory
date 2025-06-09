@@ -278,3 +278,27 @@ All major features have been implemented, tested, verified, and deployed to prod
 **🌐 Live Deployment**: Available on Firebase hosting with global availability
 **📱 Mobile QR**: Fully functional mobile QR workflow with PIN authentication
 **🔒 Security**: Enterprise-grade security with proper RLS policies and SSL
+
+## Organization and User Deletion
+
+### Organization Deletion
+Organization admins can permanently delete their entire organization through the Advanced Settings tab. This action:
+
+- Removes all organization members (users are completely deleted)
+- Deletes all assets, inventory items, forms, and reports
+- Cannot be undone
+- Requires typing "DELETE ORGANIZATION" to confirm
+
+### User Deletion
+Organization admins have two options for managing users:
+
+1. **Remove from Organization**: Removes user from the organization but keeps their account
+2. **Delete User Permanently**: Completely removes the user and all their data from the system
+
+Both actions are available in the Members tab of Organization Settings.
+
+## Security
+
+- Role-based permissions ensure only authorized users can delete data
+- Multiple confirmation steps prevent accidental deletions
+- All deletion actions are logged for audit purposes
