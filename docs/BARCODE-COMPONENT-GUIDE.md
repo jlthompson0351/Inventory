@@ -483,6 +483,104 @@ describe('BarcodeToggle', () => {
 });
 ```
 
+## QR Code Print Manager
+
+### Overview
+
+The QR Code Print Manager (`src/pages/QRCodePrintManager.tsx`) is a comprehensive solution for bulk QR code printing. It replaces the technical barcode demo page with a practical tool for generating print-ready QR code sheets.
+
+### Features
+
+- **Asset Browser**: Grid and list views with search and filtering
+- **Bulk Selection**: Select multiple assets for batch printing
+- **Print Configuration**: Multiple QR code sizes and paper formats
+- **Smart Layout**: Automatic grid calculation for optimal paper usage
+- **Professional Output**: Print-ready sheets with proper spacing and margins
+
+### Technical Implementation
+
+```typescript
+interface Asset {
+  id: string;
+  name: string;
+  barcode: string;
+  asset_type_name: string;
+  organization_id: string;
+}
+
+interface QRCodePrintManagerState {
+  assets: Asset[];
+  selectedAssets: Set<string>;
+  qrSize: string; // '0.5' to '3' inches
+  paperSize: 'letter' | 'a4' | 'legal';
+  showAssetNames: boolean;
+  viewMode: 'grid' | 'list';
+}
+```
+
+### Print Settings
+
+**QR Code Sizes:**
+- 0.5" × 0.5" through 3" × 3" in 0.25" increments
+- Optimal for different use cases from small labels to outdoor signage
+
+**Paper Formats:**
+- Letter (8.5" × 11")
+- A4 (8.27" × 11.69") 
+- Legal (8.5" × 14")
+
+**Layout Calculation:**
+- Automatic grid sizing based on QR code size and paper dimensions
+- 0.25" margins and 0.125" spacing between codes
+- Multi-page support for large selections
+
+### QR Code Generation
+
+The system uses the `qrcode` library to generate actual QR codes (not placeholders):
+
+```typescript
+const generateQRCode = async (assetId: string) => {
+  const qrUrl = `${window.location.origin}/mobile-asset-workflow/${assetId}`;
+  const qrSvg = await QRCode.toString(qrUrl, {
+    type: 'svg',
+    width: layout.sizeInches * 60,
+    margin: 1,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    }
+  });
+  return qrSvg;
+};
+```
+
+### Usage Example
+
+```typescript
+// Access from main navigation
+// Barcode Tools → QR Code Print Manager
+
+// Key user actions:
+1. Browse/search assets
+2. Select assets (individual or bulk)
+3. Configure print settings
+4. Generate print sheet
+5. Print from browser dialog
+```
+
+### Print Output
+
+The generated print sheets include:
+- Actual scannable QR codes (not placeholder images)
+- Optional asset names for identification
+- Professional layout with cutting guides
+- Multi-page support for large batches
+- Print-optimized CSS with proper margins and page breaks
+
+### Integration
+
+The QR Code Print Manager is integrated into the main application navigation under "Barcode Tools" and replaces the previous technical demo functionality with a production-ready tool for practical QR code management.
+
 ## Best Practices
 
 1. **Barcode Prefixes**: Use short, meaningful prefixes (3-5 characters) to identify asset types.
@@ -491,4 +589,7 @@ describe('BarcodeToggle', () => {
 4. **Validation**: Always validate barcode formats on the server-side before storing them in the database.
 5. **Handling**: Add error handling for cases where a barcode might be invalid or missing.
 6. **Downloads**: Always provide a download option for users to save and print barcodes separately.
-7. **Asset Integration**: Configure barcode settings at the asset type level for consistency across similar assets. 
+7. **Asset Integration**: Configure barcode settings at the asset type level for consistency across similar assets.
+8. **Bulk Operations**: Use the QR Code Print Manager for efficient bulk QR code printing rather than individual asset downloads.
+9. **Print Testing**: Always test print output with your specific printer and label stock before large batches.
+10. **Size Selection**: Choose QR code sizes appropriate for your scanning distance and label application. 

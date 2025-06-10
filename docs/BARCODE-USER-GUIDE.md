@@ -46,11 +46,45 @@ When you create a new asset of a type that has barcode generation enabled:
 
 ## Viewing and Printing Barcodes
 
-To view or print the barcode for an asset:
+### Individual Asset Barcodes
+
+To view or print the barcode for a single asset:
 
 1. Navigate to the asset's detail page
 2. Look for the barcode display in the header section
 3. Use your browser's print function to print the barcode for labeling
+
+### QR Code Print Manager (Bulk Printing)
+
+For efficient bulk QR code printing, use the dedicated QR Code Print Manager:
+
+1. Navigate to **Barcode Tools** in the main navigation
+2. Browse all available assets with their QR code previews
+3. **Select Assets**: Use the grid or list view to select multiple assets
+4. **Configure Print Settings**:
+   - Choose QR code size (0.5" × 0.5" to 3" × 3")
+   - Select paper size (Letter, A4, or Legal)
+   - Toggle asset names on/off
+5. **Generate Print Sheet**: Click "Generate Print Sheet" to create a print-ready document
+6. The system will open a new window with properly formatted QR codes ready for printing
+
+#### QR Code Print Manager Features
+
+- **Asset Selection**: Choose from grid or list view with visual QR code previews
+- **Search & Filter**: Quickly find specific assets by name, barcode, or type
+- **Flexible Sizing**: Multiple QR code sizes from 0.5" to 3" for different label needs
+- **Smart Layout**: Automatically calculates optimal grid layout for your chosen paper size
+- **Professional Output**: Print-ready sheets with proper spacing and cutting guides
+- **Asset Identification**: Optional asset names printed below QR codes for easy identification
+- **Multi-page Support**: Large selections automatically split across multiple pages
+
+#### Print Size Recommendations
+
+- **0.5" × 0.5"**: Small labels for compact assets
+- **1" × 1"**: Standard size for most general-purpose labels
+- **1.5" × 1.5"**: Good visibility for medium-distance scanning
+- **2" × 2"**: High visibility for assets in challenging environments
+- **3" × 3"**: Maximum size for long-distance scanning or outdoor use
 
 ## Scanning Assets
 

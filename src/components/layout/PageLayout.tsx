@@ -139,7 +139,7 @@ const PageLayout = memo(({ children }: PageLayoutProps) => {
       path: "/assets",
     },
     {
-      title: "Barcode Tools",
+      title: "QR Print Manager",
       icon: <QrCode className="w-4 h-4" />,
       path: "/barcode-tools",
     }

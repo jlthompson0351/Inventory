@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +16,22 @@ interface ProfileFormProps {
   };
   loading: boolean;
   setLoading: (loading: boolean) => void;
+  refetchProfile: () => Promise<void>;
 }
 
-const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
+const ProfileForm = ({ profile, loading, setLoading, refetchProfile }: ProfileFormProps) => {
   const [formData, setFormData] = useState({
     full_name: profile.full_name,
     quick_access_pin: profile.quick_access_pin || ''
   });
+
+  // Sync form data when profile changes (after refetch)
+  useEffect(() => {
+    setFormData({
+      full_name: profile.full_name,
+      quick_access_pin: '' // Always start with empty PIN field for security
+    });
+  }, [profile.full_name, profile.quick_access_pin]);
 
   const updateProfile = async () => {
     try {
@@ -34,17 +43,30 @@ const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
         return;
       }
 
+      // Prepare update data
+      const updateData: any = {
+        full_name: formData.full_name,
+      };
+
+      // Only update PIN if user provided a new value
+      if (formData.quick_access_pin.trim() !== '') {
+        updateData.quick_access_pin = formData.quick_access_pin;
+      } else if (formData.quick_access_pin === '' && profile.quick_access_pin) {
+        // User specifically cleared the PIN (empty string when there was a PIN before)
+        updateData.quick_access_pin = null;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          full_name: formData.full_name,
-          quick_access_pin: formData.quick_access_pin || null
-        })
+        .update(updateData)
         .eq('id', profile.id);
 
       if (error) throw error;
 
       toast.success("Profile updated successfully");
+      
+      // Refetch profile data to update the parent component
+      await refetchProfile();
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error("Error updating profile");
@@ -101,6 +123,11 @@ const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
             <Label htmlFor="quick_access_pin" className="flex items-center gap-2">
               <Smartphone className="h-4 w-4" />
               Quick Access PIN
+              {profile.quick_access_pin && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                  ✓ PIN Set
+                </span>
+              )}
             </Label>
             <div className="flex gap-2">
               <Input 
@@ -110,7 +137,7 @@ const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
                 pattern="[0-9]{4}"
                 value={formData.quick_access_pin}
                 onChange={(e) => handlePinChange(e.target.value)}
-                placeholder="••••"
+                placeholder={profile.quick_access_pin ? "Enter new PIN to change" : "••••"}
                 className="text-center text-2xl tracking-widest max-w-[120px]"
                 maxLength={4}
               />
@@ -122,7 +149,7 @@ const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
                   onClick={() => {
                     if (confirm('Are you sure you want to clear your PIN? You will need to set a new one to use mobile scanning.')) {
                       setFormData({...formData, quick_access_pin: ''});
-                      toast.success("PIN cleared. Remember to save changes.");
+                      toast.success("PIN will be cleared when you save changes.");
                     }
                   }}
                   className="text-muted-foreground hover:text-destructive"
@@ -132,11 +159,19 @@ const ProfileForm = ({ profile, loading, setLoading }: ProfileFormProps) => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Set a 4-digit PIN for mobile QR code scanning. Leave empty to disable.
+              {profile.quick_access_pin 
+                ? "Your PIN is set. Enter a new 4-digit PIN to change it, or leave empty to keep current PIN."
+                : "Set a 4-digit PIN for mobile QR code scanning."
+              }
             </p>
             {!profile.quick_access_pin && formData.quick_access_pin.length === 4 && (
               <p className="text-xs text-green-600">
                 ✓ PIN is ready. Click "Save Changes" to activate mobile scanning.
+              </p>
+            )}
+            {profile.quick_access_pin && formData.quick_access_pin.length === 4 && (
+              <p className="text-xs text-orange-600">
+                ⚠ PIN will be changed to the new value when you save.
               </p>
             )}
           </div>

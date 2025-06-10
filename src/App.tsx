@@ -38,7 +38,7 @@ import AssetTypeEdit from "./pages/AssetTypeEdit";
 import { InventoryItemDetail } from "./pages/InventoryItemDetail";
 import { EditInventoryItem } from "./pages/EditInventoryItem";
 import ScanAsset from './pages/ScanAsset';
-import BarcodeDemo from "./pages/BarcodeDemo";
+import QRCodePrintManager from "./pages/QRCodePrintManager";
 import SubmitForm from "./pages/SubmitForm";
 import InventoryCheck from "./pages/InventoryCheck";
 import QRScanHandler from "./pages/QRScanHandler";
@@ -165,7 +165,7 @@ const AppRoutes = () => {
         
         {/* Utilities and Tools */}
         <Route path="/admin/debug" element={user ? <PageLayout><AdminDebugPanel /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/barcode-tools" element={user ? <PageLayout><BarcodeDemo /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/barcode-tools" element={user ? <PageLayout><QRCodePrintManager /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
