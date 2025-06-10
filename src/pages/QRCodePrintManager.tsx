@@ -124,13 +124,16 @@ export default function QRCodePrintManager() {
     const margin = 0.25; // 0.25" margins
     const spacing = 0.125; // 0.125" spacing between QR codes
     
+    // Add extra height for asset names if enabled
+    const itemHeight = showAssetNames ? sizeInches + 0.3 : sizeInches;
+    
     // Calculate usable area
     const usableWidth = paper.width - (2 * margin);
     const usableHeight = paper.height - (2 * margin);
     
     // Calculate how many QR codes fit
     const codesPerRow = Math.floor((usableWidth + spacing) / (sizeInches + spacing));
-    const codesPerColumn = Math.floor((usableHeight + spacing) / (sizeInches + spacing));
+    const codesPerColumn = Math.floor((usableHeight + spacing) / (itemHeight + spacing));
     const codesPerPage = codesPerRow * codesPerColumn;
     
     return { codesPerRow, codesPerColumn, codesPerPage, sizeInches, spacing, margin };
@@ -216,24 +219,33 @@ export default function QRCodePrintManager() {
               display: flex;
               flex-direction: column;
               align-items: center;
-              justify-content: center;
+              justify-content: ${showAssetNames ? 'flex-start' : 'center'};
               width: ${layout.sizeInches}in;
-              height: ${layout.sizeInches}in;
+              height: ${showAssetNames ? layout.sizeInches + 0.3 : layout.sizeInches}in;
               border: 1px dashed #ccc;
               text-align: center;
               padding: 0.05in;
               box-sizing: border-box;
             }
             .qr-code {
-              max-width: ${layout.sizeInches * 0.8}in;
-              max-height: ${layout.sizeInches * 0.6}in;
+              width: ${layout.sizeInches * 0.85}in;
+              height: ${layout.sizeInches * 0.85}in;
+              flex-shrink: 0;
+            }
+            .qr-code svg {
+              width: 100% !important;
+              height: 100% !important;
             }
             .asset-name {
-              font-size: ${Math.max(6, layout.sizeInches * 4)}px;
+              font-size: ${Math.max(8, layout.sizeInches * 5)}px;
               font-weight: bold;
-              margin-top: 2px;
+              margin-top: 4px;
               word-break: break-word;
-              line-height: 1;
+              line-height: 1.1;
+              max-width: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              color: #000;
             }
             .page-header {
               text-align: center;
