@@ -40,22 +40,19 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
   }, [members, searchTerm]);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <CardTitle>Members</CardTitle>
-            <CardDescription>Manage your organization's members</CardDescription>
-          </div>
-          <Input
-            placeholder="Search members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-xs"
-          />
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-4">
+      {/* Search Input */}
+      <div className="flex items-center justify-between">
+        <Input
+          placeholder="Search members..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      {/* Members List */}
+      <div>
         {isLoading ? (
           <div className="py-4 text-center">Loading members...</div>
         ) : filteredMembers.length === 0 ? (
@@ -63,22 +60,22 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
             {searchTerm ? 'No members match your search.' : 'No members found'}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredMembers.map((member) => (
-              <div key={member.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md gap-3">
-                <div className="flex items-center gap-3 flex-grow">
-                  <div className="bg-muted h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-muted-foreground" />
+              <div key={member.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-muted/20 border border-border rounded-lg gap-4 hover:bg-muted/30 transition-colors">
+                <div className="flex items-center gap-4 flex-grow">
+                  <div className="bg-primary/10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 border">
+                    <User className="h-6 w-6 text-primary" />
                   </div>
                   <div className="flex-grow">
-                    <p className="font-medium">
+                    <p className="font-semibold text-base">
                       {member.full_name || "Unnamed User"}
                     </p>
                     <p className="text-sm text-muted-foreground">{member.email}</p>
                     {member.joined_at && (
                       <div className="flex items-center text-xs text-muted-foreground mt-1">
                         <CalendarDays className="h-3 w-3 mr-1" />
-                        Joined: {format(new Date(member.joined_at), 'PPP')}
+                        Joined: {format(new Date(member.joined_at), 'MMM dd, yyyy')}
                       </div>
                     )}
                   </div>
@@ -89,7 +86,7 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
                     defaultValue={member.role} 
                     onValueChange={(value) => onRoleChange(member.id, value)}
                   >
-                    <SelectTrigger className="w-28 sm:w-24">
+                    <SelectTrigger className="w-28">
                       <SelectValue placeholder="Role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -104,6 +101,7 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
                     size="icon"
                     onClick={() => onRemoveMember(member.id)}
                     title="Remove Member from Organization"
+                    className="h-9 w-9"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -115,6 +113,7 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
                           variant="destructive" 
                           size="icon"
                           title="Delete User Permanently"
+                          className="h-9 w-9"
                         >
                           <UserMinus className="h-4 w-4" />
                         </Button>
@@ -155,8 +154,8 @@ const MembersList = ({ members, isLoading, onRoleChange, onRemoveMember, onDelet
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

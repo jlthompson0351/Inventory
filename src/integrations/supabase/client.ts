@@ -13,7 +13,45 @@ if (!SUPABASE_PUBLISHABLE_KEY) {
   throw new Error('Supabase publishable key is required but not found in environment variables');
 }
 
+// Log configuration on startup (only in development)
+if (import.meta.env.DEV) {
+  console.log('Supabase client initializing with URL:', SUPABASE_URL);
+  console.log('Supabase anon key configured:', SUPABASE_PUBLISHABLE_KEY ? 'Yes' : 'No');
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Utility function for debugging connectivity issues
+export const testSupabaseConnectivity = async (): Promise<{
+  connected: boolean;
+  latency?: number;
+  error?: string;
+}> => {
+  const startTime = Date.now();
+  try {
+    const { data: { session }, error } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Connectivity test timeout')), 10000)
+      )
+    ]);
+    
+    const latency = Date.now() - startTime;
+    
+    if (error) {
+      return { connected: false, error: error.message, latency };
+    }
+    
+    return { connected: true, latency };
+  } catch (error) {
+    const latency = Date.now() - startTime;
+    return { 
+      connected: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      latency 
+    };
+  }
+};

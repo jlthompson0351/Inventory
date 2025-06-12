@@ -42,52 +42,81 @@ const OrganizationMembersContent: React.FC = () => {
 
   // Main layout for member management content
   return (
-    <div className="grid lg:grid-cols-5 gap-6">
-      <div className="lg:col-span-3 space-y-4">
-        <div className="bg-card text-card-foreground shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Current Members</h2>
-          <MembersList 
-            members={members || []} 
-            isLoading={isLoading}
-            onRoleChange={updateMemberRole}
-            onRemoveMember={removeMember}
-            onDeleteUser={deleteUserCompletely}
-          />
+    <div className="space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold tracking-tight">Members Settings</h2>
+          <div className="text-sm text-muted-foreground">
+            Manage team members
+          </div>
         </div>
+        <p className="text-muted-foreground">
+          View current members and invite new ones to join your organization.
+        </p>
       </div>
-      
-      <div className="lg:col-span-2">
-        <div className="bg-card text-card-foreground shadow rounded-lg">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-2">
-              <TabsTrigger value="invite">Invite Members</TabsTrigger>
-              <TabsTrigger value="pending">Pending ({invitations?.length || 0})</TabsTrigger>
-            </TabsList>
-            
-            <div className="p-6">
-              <TabsContent value="invite" className="mt-0">
-                <InviteForm
-                  email={newInviteEmail}
-                  setEmail={setNewInviteEmail}
-                  role={newInviteRole}
-                  setRole={setNewInviteRole}
-                  customMessage={newInviteCustomMessage}
-                  setCustomMessage={setNewInviteCustomMessage}
-                  onSubmit={sendInvitation}
-                  isSubmitting={isSubmitting}
-                />
-              </TabsContent>
-              
-              <TabsContent value="pending" className="mt-0">
-                <PendingInvitationsList
-                  invitations={invitations || []}
-                  onDelete={deleteInvitation}
-                  onResend={resendInvitation}
-                  onRefresh={fetchInvitations}
-                />
-              </TabsContent>
+
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Current Members Section */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-card border rounded-xl shadow-sm">
+            <div className="p-6 border-b">
+              <h3 className="text-lg font-semibold">Current Members</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {members?.length || 0} member{(members?.length || 0) !== 1 ? 's' : ''} in your organization
+              </p>
             </div>
-          </Tabs>
+            <div className="p-6">
+              <MembersList 
+                members={members || []} 
+                isLoading={isLoading}
+                onRoleChange={updateMemberRole}
+                onRemoveMember={removeMember}
+                onDeleteUser={deleteUserCompletely}
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Sidebar */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-card border rounded-xl shadow-sm">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="p-6 border-b">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="invite" className="text-xs">Invite Members</TabsTrigger>
+                  <TabsTrigger value="pending" className="text-xs">
+                    Pending ({invitations?.length || 0})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <div className="p-6">
+                <TabsContent value="invite" className="mt-0 space-y-0">
+                  <InviteForm
+                    email={newInviteEmail}
+                    setEmail={setNewInviteEmail}
+                    role={newInviteRole}
+                    setRole={setNewInviteRole}
+                    customMessage={newInviteCustomMessage}
+                    setCustomMessage={setNewInviteCustomMessage}
+                    onSubmit={sendInvitation}
+                    isSubmitting={isSubmitting}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="pending" className="mt-0 space-y-0">
+                  <PendingInvitationsList
+                    invitations={invitations || []}
+                    onDelete={deleteInvitation}
+                    onResend={resendInvitation}
+                    onRefresh={fetchInvitations}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
         </div>
       </div>
     </div>

@@ -19,56 +19,57 @@ interface InviteFormProps {
 
 const InviteForm = ({ email, setEmail, role, setRole, customMessage, setCustomMessage, isSubmitting, onSubmit }: InviteFormProps) => {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Invite New Members</CardTitle>
-        <CardDescription>Send invitations to join your organization</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="invite-email">Email Address</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="Enter email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="invite-role">Role</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="invite-custom-message">Custom Message (Optional)</Label>
-            <Textarea
-              id="invite-custom-message"
-              placeholder="Add a personal message to the invitation..."
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              rows={3}
-            />
-          </div>
-          
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Sending..." : "Send Invitation"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-1">Invite New Members</h3>
+        <p className="text-sm text-muted-foreground">Send invitations to join your organization</p>
+      </div>
+      
+      <form onSubmit={onSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="invite-email" className="text-sm font-medium">Email Address</Label>
+          <Input
+            id="invite-email"
+            type="email"
+            placeholder="Enter email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="h-10"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="invite-role" className="text-sm font-medium">Role</Label>
+          <Select value={role} onValueChange={setRole}>
+            <SelectTrigger className="h-10">
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="viewer">Viewer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="invite-custom-message" className="text-sm font-medium">Custom Message (Optional)</Label>
+          <Textarea
+            id="invite-custom-message"
+            placeholder="Add a personal message to the invitation..."
+            value={customMessage}
+            onChange={(e) => setCustomMessage(e.target.value)}
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+        
+        <Button type="submit" className="w-full h-10" disabled={isSubmitting}>
+          {isSubmitting ? "Sending..." : "Send Invitation"}
+        </Button>
+      </form>
+    </div>
   );
 };
 

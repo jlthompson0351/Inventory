@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadingTimeout = setTimeout(() => {
       console.warn('Auth loading timeout reached, forcing completion');
       setLoading(false);
-    }, 15000); // Increase to 15 seconds
+    }, 25000); // Increased to 25 seconds to match improved connectivity timeouts
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
@@ -186,90 +186,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('fetchUserData taking too long, forcing completion');
       isFetchingUserData.current = false;
       setLoading(false);
-    }, 20000); // 20 second safety timeout
+    }, 20000); // Reduced to 20 seconds for faster completion
     
     try {
       console.log('Starting individual database queries...');
       
-      // Test Supabase connectivity first
-      console.log('Testing Supabase connectivity...');
+      // Simplified connectivity test - just check if we can get the session
+      // Skip the complex connectivity testing that's causing issues
+      console.log('Testing basic connectivity...');
       try {
-        const connectTest = await Promise.race([
-          supabase.from('organizations').select('count', { count: 'exact', head: true }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Connectivity test timeout')), 5000))
-        ]);
-        console.log('Supabase connectivity test result:', connectTest);
-        
-        // Additional check: verify the connection returned expected data structure
-        if (!connectTest || typeof (connectTest as any)?.count !== 'number') {
-          console.warn('Connectivity test returned unexpected result, but continuing...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.warn('No session found during connectivity check');
+        } else {
+          console.log('Basic connectivity confirmed');
         }
       } catch (connectError) {
-        console.error('Supabase connectivity test failed:', connectError);
-        
-        // Try a fallback connectivity test using auth status
-        console.log('Attempting fallback connectivity test...');
-        try {
-          const authTest = await Promise.race([
-            supabase.auth.getSession(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Auth test timeout')), 3000))
-          ]);
-          console.log('Fallback auth test succeeded, continuing with normal flow');
-        } catch (fallbackError) {
-          console.error('Fallback connectivity test also failed:', fallbackError);
-          console.log('Continuing with fallback mode - app will work without user data');
-          
-          // Set minimal fallback data to allow app to function
-          setProfile({ full_name: 'User', avatar_url: null });
-          setIsPlatformOperatorState(false);
-          setOrganization(null);
-          setMembership(null);
-          
-          console.log('Fallback mode activated - app should be functional');
-          return;
-        }
+        console.warn('Basic connectivity test failed, but continuing:', connectError);
+        // Don't fail here - continue with data fetching
       }
       
-      // Try sequential queries to identify which one hangs
-      console.log('1. Fetching profile data...');
-      try {
-        const profileResult = await Promise.race([
+      // Run profile and operator queries in parallel for better performance
+      console.log('1. Fetching profile and operator status in parallel...');
+      
+      const [profileResult, operatorResult] = await Promise.allSettled([
+        Promise.race([
           supabase
             .from('profiles')
             .select('full_name, avatar_url')
             .eq('id', currentUser.id)
             .single(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Profile query timeout')), 8000))
-        ]);
-
-        const { data: profileData, error: profileError } = profileResult;
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          setProfile(null);
-        } else {
-          console.log('Profile data fetched successfully');
-          setProfile(profileData ? { 
-            full_name: profileData.full_name, 
-            avatar_url: profileData.avatar_url 
-          } : null);
-        }
-      } catch (error) {
-        console.error('Profile fetch failed:', error);
-        setProfile({ full_name: 'User', avatar_url: null }); // Fallback
-      }
-
-      console.log('2. Checking platform operator status...');
-      try {
-        const operatorResult = await Promise.race([
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile query timeout')), 10000))
+        ]),
+        Promise.race([
           supabase
             .from('platform_operators')
             .select('user_id')
             .eq('user_id', currentUser.id)
             .maybeSingle(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Operator query timeout')), 8000))
-        ]);
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Operator query timeout')), 10000))
+        ])
+      ]);
 
-        const { data: operatorData, error: operatorError } = operatorResult;
+      // Handle profile result
+      if (profileResult.status === 'fulfilled') {
+        const { data: profileData, error: profileError } = profileResult.value;
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          setProfile({ full_name: 'User', avatar_url: null });
+        } else {
+          console.log('Profile data fetched successfully');
+          setProfile(profileData ? { 
+            full_name: profileData.full_name, 
+            avatar_url: profileData.avatar_url 
+          } : { full_name: 'User', avatar_url: null });
+        }
+      } else {
+        console.error('Profile fetch failed:', profileResult.reason);
+        setProfile({ full_name: 'User', avatar_url: null });
+      }
+
+      // Handle operator result
+      if (operatorResult.status === 'fulfilled') {
+        const { data: operatorData, error: operatorError } = operatorResult.value;
         if (operatorError) {
           console.error('Error checking platform operator status:', operatorError);
           setIsPlatformOperatorState(false);
@@ -277,16 +256,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('Platform operator check completed');
           setIsPlatformOperatorState(!!operatorData);
         }
-      } catch (error) {
-        console.error('Operator check failed:', error);
-        setIsPlatformOperatorState(false); // Safe fallback
+      } else {
+        console.error('Operator check failed:', operatorResult.reason);
+        setIsPlatformOperatorState(false);
       }
 
-      console.log('3. Getting organization ID...');
+      console.log('2. Getting organization ID...');
       try {
         const orgIdResult = await Promise.race([
           supabase.rpc('get_current_organization_id'),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('OrgID query timeout')), 8000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OrgID query timeout')), 10000))
         ]);
 
         const { data: orgId, error: orgIdError } = orgIdResult;
@@ -301,19 +280,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Organization ID found:', orgId, 'fetching org details...');
 
         // Fetch organization and membership data sequentially
-        console.log('4. Fetching organization details...');
+        console.log('3. Fetching organization details...');
         try {
-          const { data: orgData, error: orgError } = await (supabase as any)
-            .rpc('get_organization_details', { org_id: orgId });
+          const orgResult = await Promise.race([
+            supabase
+              .from('organizations')
+              .select('*')
+              .eq('id', orgId)
+              .single(),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Organization query timeout')), 8000))
+          ]);
+
+          const { data: orgData, error: orgError } = orgResult;
           
           if (orgError) {
             console.error('Error fetching organization details:', orgError);
             setOrganization(null);
-          } else if (orgData && orgData.length > 0) {
+          } else if (orgData) {
             console.log('Organization details fetched successfully');
-            const org = orgData[0];
             const orgWithDefaults = {
-              ...org,
+              ...orgData,
               owner_id: null
             };
             setOrganization(orgWithDefaults as FullOrganizationType);
@@ -326,7 +312,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setOrganization(null);
         }
 
-        console.log('5. Fetching membership details...');
+        console.log('4. Fetching membership details...');
         try {
           const membershipResult = await Promise.race([
             supabase
@@ -335,7 +321,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               .eq('user_id', currentUser.id)
               .eq('organization_id', orgId)
               .single(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Membership timeout')), 8000))
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Membership timeout')), 8000))
           ]);
 
           const { data: memberRec, error: membershipError } = membershipResult;
