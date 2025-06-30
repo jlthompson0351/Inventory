@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,17 +19,28 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
+// Import our bulletproof inventory utilities
+import { 
+  getInventoryReportingData, 
+  validateInventoryConsistency, 
+  getLastMonthTotal 
+} from '@/services/inventoryReportingUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/hooks/useOrganization';
+import { format } from 'date-fns';
 
 interface SmartInsightsProps {
   data: any[];
   columns: string[];
   formFields: any[];
   reportConfig: any;
+  // New optional prop for standalone inventory analysis
+  enableInventoryAnalysis?: boolean;
 }
 
 interface Insight {
   id: string;
-  type: 'trend' | 'anomaly' | 'recommendation' | 'summary' | 'business' | 'optimization';
+  type: 'trend' | 'anomaly' | 'recommendation' | 'summary' | 'business' | 'optimization' | 'inventory_quality';
   severity: 'info' | 'warning' | 'success' | 'error' | 'critical';
   title: string;
   description: string;
@@ -40,14 +51,177 @@ interface Insight {
   businessImpact?: 'low' | 'medium' | 'high';
   estimatedSavings?: number;
   priority?: number;
+  dataQualityScore?: number;
 }
 
-export function SmartInsights({ data, columns, formFields, reportConfig }: SmartInsightsProps) {
+export function SmartInsights({ 
+  data, 
+  columns, 
+  formFields, 
+  reportConfig, 
+  enableInventoryAnalysis = false 
+}: SmartInsightsProps) {
+  const { currentOrganization } = useOrganization();
+  const [inventoryQualityData, setInventoryQualityData] = useState<any[]>([]);
+  const [isLoadingInventoryAnalysis, setIsLoadingInventoryAnalysis] = useState(false);
+  
+  // Load comprehensive inventory quality analysis
+  useEffect(() => {
+    if (enableInventoryAnalysis && currentOrganization?.id) {
+      loadInventoryQualityAnalysis();
+    }
+  }, [enableInventoryAnalysis, currentOrganization?.id]);
+
+  const loadInventoryQualityAnalysis = async () => {
+    setIsLoadingInventoryAnalysis(true);
+    try {
+      // Get all inventory items for quality analysis
+      const { data: inventoryItems, error } = await supabase
+        .from('inventory_items')
+        .select(`
+          id,
+          name,
+          sku,
+          quantity,
+          status,
+          asset_types(name),
+          assets(id, name)
+        `)
+        .eq('organization_id', currentOrganization!.id);
+
+      if (error) throw error;
+
+      const currentMonth = format(new Date(), 'yyyy-MM');
+      const qualityPromises = inventoryItems?.map(async (item) => {
+        try {
+          const qualityData = await getInventoryReportingData(item.id, currentMonth);
+          return {
+            ...item,
+            quality_data: qualityData
+          };
+        } catch (error) {
+          console.warn(`Could not get quality data for item ${item.id}:`, error);
+          return {
+            ...item,
+            quality_data: null
+          };
+        }
+      }) || [];
+
+      const qualityResults = await Promise.allSettled(qualityPromises);
+      const validResults = qualityResults
+        .filter(result => result.status === 'fulfilled')
+        .map(result => (result as PromiseFulfilledResult<any>).value);
+
+      setInventoryQualityData(validResults);
+    } catch (error) {
+      console.error('Error loading inventory quality analysis:', error);
+    } finally {
+      setIsLoadingInventoryAnalysis(false);
+    }
+  };
   
   const insights = useMemo((): Insight[] => {
-    if (!data.length) return [];
-    
     const allInsights: Insight[] = [];
+    
+    // Enhanced Inventory Quality Analysis (NEW)
+    if (enableInventoryAnalysis && inventoryQualityData.length > 0) {
+      // Overall system quality score
+      const qualityScores = inventoryQualityData
+        .filter(item => item.quality_data?.data_quality_score)
+        .map(item => item.quality_data.data_quality_score);
+      
+      if (qualityScores.length > 0) {
+        const avgQualityScore = qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length;
+        
+        allInsights.push({
+          id: 'system-quality-score',
+          type: 'inventory_quality',
+          severity: avgQualityScore >= 80 ? 'success' : avgQualityScore >= 60 ? 'warning' : 'error',
+          title: 'System Data Quality',
+          description: `Overall inventory data quality score`,
+          value: `${avgQualityScore.toFixed(1)}/100`,
+          icon: avgQualityScore >= 80 ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />,
+          action: avgQualityScore < 70 ? 'Review data collection processes and implement quality improvements' : 'Maintain current data standards',
+          actionable: avgQualityScore < 70,
+          businessImpact: avgQualityScore < 60 ? 'high' : avgQualityScore < 80 ? 'medium' : 'low',
+          priority: avgQualityScore < 60 ? 10 : avgQualityScore < 80 ? 7 : 3,
+          dataQualityScore: avgQualityScore
+        });
+      }
+      
+      // Items with missing last month data
+      const itemsWithMissingData = inventoryQualityData.filter(item => 
+        item.quality_data?.last_month_total?.source === 'none' || 
+        !item.quality_data?.last_month_total?.amount
+      );
+      
+      if (itemsWithMissingData.length > 0) {
+        const percentage = (itemsWithMissingData.length / inventoryQualityData.length) * 100;
+        allInsights.push({
+          id: 'missing-last-month-data',
+          type: 'inventory_quality',
+          severity: percentage > 50 ? 'error' : percentage > 25 ? 'warning' : 'info',
+          title: 'Missing Historical Data',
+          description: `${itemsWithMissingData.length} items lack reliable last month inventory data`,
+          value: `${percentage.toFixed(1)}% of inventory`,
+          icon: <Calendar className="h-4 w-4" />,
+          action: 'Establish baseline inventory tracking for these items',
+          actionable: true,
+          businessImpact: percentage > 50 ? 'high' : 'medium',
+          priority: percentage > 50 ? 9 : 6
+        });
+      }
+      
+      // Data consistency issues
+      const inconsistentItems = inventoryQualityData.filter(item => 
+        item.quality_data?.consistency_check?.isConsistent === false
+      );
+      
+      if (inconsistentItems.length > 0) {
+        const percentage = (inconsistentItems.length / inventoryQualityData.length) * 100;
+        allInsights.push({
+          id: 'data-consistency-issues',
+          type: 'inventory_quality',
+          severity: 'warning',
+          title: 'Data Consistency Alert',
+          description: `${inconsistentItems.length} items show discrepancies between sources`,
+          value: `${percentage.toFixed(1)}% inconsistent`,
+          icon: <AlertTriangle className="h-4 w-4" />,
+          action: 'Audit and reconcile inventory data sources',
+          actionable: true,
+          businessImpact: 'high',
+          priority: 8
+        });
+      }
+      
+      // High-confidence items
+      const highConfidenceItems = inventoryQualityData.filter(item => 
+        item.quality_data?.data_quality_score >= 90
+      );
+      
+      if (highConfidenceItems.length > 0) {
+        const percentage = (highConfidenceItems.length / inventoryQualityData.length) * 100;
+        allInsights.push({
+          id: 'high-confidence-data',
+          type: 'inventory_quality',
+          severity: 'success',
+          title: 'High-Quality Data Assets',
+          description: `${highConfidenceItems.length} items have excellent data quality (90%+)`,
+          value: `${percentage.toFixed(1)}% excellent`,
+          icon: <CheckCircle className="h-4 w-4" />,
+          action: 'Use these items as examples for best practices',
+          actionable: false,
+          businessImpact: 'low',
+          priority: 2
+        });
+      }
+    }
+
+    // Only proceed with report-based analysis if we have data
+    if (!data.length) {
+      return allInsights.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+    }
 
     // 1. ENHANCED Data Quality Insights
     const missingDataFields = columns.filter(col => {
@@ -284,7 +458,7 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
 
     // Sort insights by priority (highest first)
     return allInsights.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-  }, [data, columns, formFields, reportConfig]);
+  }, [data, columns, formFields, reportConfig, inventoryQualityData, enableInventoryAnalysis]);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -330,7 +504,8 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
     anomaly: '🚨 Data Quality',
     trend: '📈 Trends',
     summary: '📊 Summary',
-    recommendation: '💡 Recommendations'
+    recommendation: '💡 Recommendations',
+    inventory_quality: '🎯 Inventory Quality'
   };
 
   return (
@@ -347,11 +522,22 @@ export function SmartInsights({ data, columns, formFields, reportConfig }: Smart
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {insights.length === 0 ? (
+        {isLoadingInventoryAnalysis ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+            <p>Analyzing inventory data quality...</p>
+            <p className="text-sm mt-1">This may take a moment for large inventories</p>
+          </div>
+        ) : insights.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Brain className="mx-auto h-12 w-12 mb-3 opacity-50" />
             <p>No insights available</p>
-            <p className="text-sm mt-1">Generate a report preview to see AI-powered insights</p>
+            <p className="text-sm mt-1">
+              {enableInventoryAnalysis 
+                ? "Enable inventory analysis or generate a report preview to see insights" 
+                : "Generate a report preview to see AI-powered insights"
+              }
+            </p>
           </div>
         ) : (
           <div className="space-y-4">

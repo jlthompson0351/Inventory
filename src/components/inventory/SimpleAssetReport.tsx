@@ -350,22 +350,48 @@ const SimpleAssetReport: React.FC = () => {
           // Latest submission mode (original behavior)
           const latestSubmission = asset.form_submissions?.[0];
           
-          // Find last month's submission for comparison
+          // ENHANCED: Improved last month total calculation with better fallback logic
+          let lastMonthTotal = '';
+          
+          // Method 1: Find last month's submission (original logic)
           const lastMonthSubmission = asset.form_submissions?.find((submission: any) => {
             const submissionDate = new Date(submission.created_at);
             return submissionDate >= firstDayLastMonth && submissionDate <= lastDayLastMonth;
           });
 
-          let lastMonthTotal = '';
           if (lastMonthSubmission) {
             const submissionData = lastMonthSubmission.submission_data || {};
-            const totalField = Object.keys(submissionData).find(key => 
-              key.toLowerCase().includes('total') || 
-              key.toLowerCase().includes('ending') ||
-              key.toLowerCase().includes('balance')
-            );
+            // Enhanced field detection - look for more field patterns
+            const totalField = Object.keys(submissionData).find(key => {
+              const lowerKey = key.toLowerCase();
+              return lowerKey.includes('total') || 
+                     lowerKey.includes('ending') || 
+                     lowerKey.includes('balance') ||
+                     key === 'field_13' || // Known paint total field
+                     lowerKey.includes('gallons') && lowerKey.includes('total');
+            });
+            
             if (totalField) {
               lastMonthTotal = renderFieldValue(submissionData[totalField]);
+            }
+          }
+          
+          // Method 2: If no last month submission, try to find any recent submission with total field
+          if (!lastMonthTotal && asset.form_submissions?.length > 0) {
+            for (const submission of asset.form_submissions) {
+              const submissionData = submission.submission_data || {};
+              const totalField = Object.keys(submissionData).find(key => {
+                const lowerKey = key.toLowerCase();
+                return lowerKey.includes('total') || 
+                       lowerKey.includes('ending') || 
+                       lowerKey.includes('balance') ||
+                       key === 'field_13';
+              });
+              
+              if (totalField && submissionData[totalField]) {
+                lastMonthTotal = `${renderFieldValue(submissionData[totalField])} 📅`;
+                break; // Use first found total, add calendar icon to indicate it's not from last month
+              }
             }
           }
           

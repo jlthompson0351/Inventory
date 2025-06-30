@@ -28,6 +28,7 @@ import OrganizationMembers from "./pages/OrganizationMembers";
 import InvitationAccept from "./pages/InvitationAccept";
 import AdminDebugPanel from "./pages/AdminDebugPanel";
 import EnhancedPlatformDashboard from "./pages/EnhancedPlatformDashboard";
+import DataQualityDashboard from "./pages/DataQualityDashboard";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
 import { usePasswordRequirement } from "./hooks/usePasswordRequirement";
@@ -157,6 +158,7 @@ const AppRoutes = () => {
         <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/data-quality" element={user ? <PageLayout><DataQualityDashboard /></PageLayout> : <Navigate to="/login" />} />
         
         {/* User and Organization Settings Routes */}
         <Route path="/profile" element={user ? <PageLayout><Profile /></PageLayout> : <Navigate to="/login" />} />

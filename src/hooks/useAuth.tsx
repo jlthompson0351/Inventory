@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadingTimeout = setTimeout(() => {
       console.warn('Auth loading timeout reached, forcing completion');
       setLoading(false);
-    }, 25000); // Increased to 25 seconds to match improved connectivity timeouts
+    }, 15000); // Reduced to 15 seconds
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
@@ -181,171 +181,114 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     isFetchingUserData.current = true;
     
-    // Add overall timeout to prevent infinite hanging
+    // Add overall timeout to prevent infinite hanging - reduced timeout
     const timeoutId = setTimeout(() => {
       console.error('fetchUserData taking too long, forcing completion');
       isFetchingUserData.current = false;
       setLoading(false);
-    }, 20000); // Reduced to 20 seconds for faster completion
+    }, 10000); // Reduced to 10 seconds for faster completion
     
     try {
-      console.log('Starting individual database queries...');
+      console.log('Starting optimized user data fetch...');
       
-      // Simplified connectivity test - just check if we can get the session
-      // Skip the complex connectivity testing that's causing issues
-      console.log('Testing basic connectivity...');
+      // Use the new optimized function to get all data in one call
+      console.log('Calling optimized get_user_profile_with_org function...');
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.warn('No session found during connectivity check');
-        } else {
-          console.log('Basic connectivity confirmed');
-        }
-      } catch (connectError) {
-        console.warn('Basic connectivity test failed, but continuing:', connectError);
-        // Don't fail here - continue with data fetching
-      }
-      
-      // Run profile and operator queries in parallel for better performance
-      console.log('1. Fetching profile and operator status in parallel...');
-      
-      const [profileResult, operatorResult] = await Promise.allSettled([
-        Promise.race([
-          supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', currentUser.id)
-            .single(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Profile query timeout')), 10000))
-        ]),
-        Promise.race([
-          supabase
-            .from('platform_operators')
-            .select('user_id')
-            .eq('user_id', currentUser.id)
-            .maybeSingle(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Operator query timeout')), 10000))
-        ])
-      ]);
-
-      // Handle profile result
-      if (profileResult.status === 'fulfilled') {
-        const { data: profileData, error: profileError } = profileResult.value;
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          setProfile({ full_name: 'User', avatar_url: null });
-        } else {
-          console.log('Profile data fetched successfully');
-          setProfile(profileData ? { 
-            full_name: profileData.full_name, 
-            avatar_url: profileData.avatar_url 
-          } : { full_name: 'User', avatar_url: null });
-        }
-      } else {
-        console.error('Profile fetch failed:', profileResult.reason);
-        setProfile({ full_name: 'User', avatar_url: null });
-      }
-
-      // Handle operator result
-      if (operatorResult.status === 'fulfilled') {
-        const { data: operatorData, error: operatorError } = operatorResult.value;
-        if (operatorError) {
-          console.error('Error checking platform operator status:', operatorError);
-          setIsPlatformOperatorState(false);
-        } else {
-          console.log('Platform operator check completed');
-          setIsPlatformOperatorState(!!operatorData);
-        }
-      } else {
-        console.error('Operator check failed:', operatorResult.reason);
-        setIsPlatformOperatorState(false);
-      }
-
-      console.log('2. Getting organization ID...');
-      try {
-        const orgIdResult = await Promise.race([
-          supabase.rpc('get_current_organization_id'),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OrgID query timeout')), 10000))
+        const { data: userData, error: userDataError } = await Promise.race([
+          supabase.rpc('get_user_profile_with_org'),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('User data query timeout')), 8000)
+          )
         ]);
 
-        const { data: orgId, error: orgIdError } = orgIdResult;
-        
-        if (orgIdError || !orgId) {
-          console.log('No organization ID found for user');
-          setOrganization(null);
-          setMembership(null);
-          return;
+        if (userDataError) {
+          console.error('Error fetching user data:', userDataError);
+          throw userDataError;
         }
 
-        console.log('Organization ID found:', orgId, 'fetching org details...');
+        console.log('User data fetched successfully:', userData);
 
-        // Fetch organization and membership data sequentially
-        console.log('3. Fetching organization details...');
-        try {
-          const orgResult = await Promise.race([
-            supabase
-              .from('organizations')
-              .select('*')
-              .eq('id', orgId)
-              .single(),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Organization query timeout')), 8000))
-          ]);
+        // Parse the returned data
+        if (userData) {
+          // Set profile
+          if (userData.profile) {
+            console.log('Setting profile data');
+            setProfile(userData.profile);
+          } else {
+            console.log('No profile data, setting default');
+            setProfile({ full_name: 'User', avatar_url: null });
+          }
 
-          const { data: orgData, error: orgError } = orgResult;
-          
-          if (orgError) {
-            console.error('Error fetching organization details:', orgError);
-            setOrganization(null);
-          } else if (orgData) {
-            console.log('Organization details fetched successfully');
+          // Set organization
+          if (userData.organization) {
+            console.log('Setting organization data');
             const orgWithDefaults = {
-              ...orgData,
+              ...userData.organization,
               owner_id: null
             };
             setOrganization(orgWithDefaults as FullOrganizationType);
           } else {
-            console.log('No organization found');
+            console.log('No organization data');
             setOrganization(null);
           }
-        } catch (error) {
-          console.error('Organization fetch failed:', error);
-          setOrganization(null);
-        }
 
-        console.log('4. Fetching membership details...');
-        try {
-          const membershipResult = await Promise.race([
-            supabase
-              .from('organization_members')
-              .select('*')
-              .eq('user_id', currentUser.id)
-              .eq('organization_id', orgId)
-              .single(),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Membership timeout')), 8000))
-          ]);
-
-          const { data: memberRec, error: membershipError } = membershipResult;
-          if (membershipError) {
-            console.error('Error fetching membership:', membershipError);
-            setMembership(null);
+          // Set membership
+          if (userData.membership) {
+            console.log('Setting membership data');
+            setMembership(userData.membership);
           } else {
-            console.log('Membership details fetched successfully');
-            setMembership(memberRec || null);
+            console.log('No membership data');
+            setMembership(null);
           }
-        } catch (error) {
-          console.error('Membership fetch failed:', error);
-          setMembership(null);
-        }
 
-        console.log('Organization and membership queries completed');
+          // Set platform operator status
+          console.log('Setting platform operator status:', userData.is_platform_operator);
+          setIsPlatformOperatorState(userData.is_platform_operator || false);
+        } else {
+          console.log('No user data returned, setting defaults');
+          setProfile({ full_name: 'User', avatar_url: null });
+          setOrganization(null);
+          setMembership(null);
+          setIsPlatformOperatorState(false);
+        }
 
       } catch (error) {
-        console.error('Organization ID fetch failed:', error);
+        console.error('Optimized fetch failed, falling back to individual queries:', error);
+        
+        // Fallback to individual queries if the optimized function fails
+        console.log('Executing fallback individual queries...');
+        
+        // Simplified fallback - just get basic profile data
+        try {
+          const { data: profileData, error: profileError } = await Promise.race([
+            supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', currentUser.id)
+              .single(),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Profile query timeout')), 5000)
+            )
+          ]);
+
+          if (profileError) {
+            console.warn('Profile fetch failed:', profileError);
+            setProfile({ full_name: 'User', avatar_url: null });
+          } else {
+            setProfile(profileData || { full_name: 'User', avatar_url: null });
+          }
+        } catch (fallbackError) {
+          console.error('Fallback profile fetch failed:', fallbackError);
+          setProfile({ full_name: 'User', avatar_url: null });
+        }
+
+        // Set safe defaults for organization data
         setOrganization(null);
         setMembership(null);
+        setIsPlatformOperatorState(false);
       }
 
-      console.log('All individual queries completed, processing results...');
+      console.log('User data fetch completed successfully');
       
     } catch (error) {
       console.error('Error in fetchUserData (caught):', error);
@@ -357,6 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       clearTimeout(timeoutId);
       isFetchingUserData.current = false;
+      setLoading(false);
       console.log('fetchUserData function ending for user:', currentUser.id);
     }
   };
@@ -370,18 +314,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsPlatformOperatorState(false);
   };
 
-  const value = {
-    user,
-    profile,
-    loading,
-    organization,
-    organizationRole,
-    signOut,
-    userRoles,
-    fetchUserData
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      loading,
+      organization,
+      organizationRole,
+      signOut,
+      userRoles,
+      fetchUserData
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);

@@ -1,17 +1,47 @@
-import React, { useEffect, memo } from 'react';
+import React, { useEffect, memo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useOrganization } from "@/hooks/useOrganization";
-import { Layers, Boxes, FileText, BarChart3, ChevronRight, ArrowUpRight, Clock, Plus, QrCode } from "lucide-react";
+import { Layers, Boxes, FileText, BarChart3, ChevronRight, ArrowUpRight, Clock, Plus, QrCode, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { getDashboardStats } from "@/services/statsService";
+import type { DashboardStats } from "@/types/stats";
 
 const Dashboard = memo(() => {
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
+  const [stats, setStats] = useState<DashboardStats>({
+    inventoryCount: 0,
+    formCount: 0,
+    assetTypeCount: 0,
+    teamMemberCount: 0,
+    inventoryStatus: { inStock: 0, lowStock: 0 },
+    recentActivities: [],
+    popularAssetTypes: [],
+    recentForms: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     console.log("Dashboard component mounted");
-  }, []);
+    if (currentOrganization?.id) {
+      loadStats();
+    }
+  }, [currentOrganization?.id]);
+
+  const loadStats = async () => {
+    if (!currentOrganization?.id) return;
+    
+    setIsLoading(true);
+    try {
+      const dashboardStats = await getDashboardStats(currentOrganization.id);
+      setStats(dashboardStats);
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   return (
     <div>
@@ -24,6 +54,7 @@ const Dashboard = memo(() => {
           <p className="mb-2">If you can see this, Dashboard page component is rendering correctly!</p>
           <p>Active Organization: {currentOrganization?.name || 'No organization selected'}</p>
           <p>Organization ID: {currentOrganization?.id || 'None'}</p>
+          <p>Stats loaded: {isLoading ? 'Loading...' : 'Loaded'}</p>
         </div>
       </details>
       
@@ -49,7 +80,9 @@ const Dashboard = memo(() => {
               <Boxes className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {isLoading ? '...' : (stats.inventoryCount || 0)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Manage your organization's assets
               </p>
@@ -67,7 +100,9 @@ const Dashboard = memo(() => {
               <Layers className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {isLoading ? '...' : (stats.assetTypeCount || 0)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Create and manage asset types
               </p>
@@ -85,7 +120,9 @@ const Dashboard = memo(() => {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {isLoading ? '...' : (stats.formCount || 0)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Create and customize forms
               </p>
@@ -99,18 +136,20 @@ const Dashboard = memo(() => {
           
           <Card className="border-l-4 border-l-amber-500">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reports</CardTitle>
+              <CardTitle className="text-sm font-medium">Team Members</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {isLoading ? '...' : (stats.teamMemberCount || 0)}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Generate and view reports
+                Organization team size
               </p>
             </CardContent>
             <CardFooter className="pt-0 pb-2">
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => navigate('/reports')}>
-                Create Reports <ChevronRight className="ml-1 h-3 w-3" />
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => navigate('/organization/members')}>
+                View Team <ChevronRight className="ml-1 h-3 w-3" />
               </Button>
             </CardFooter>
           </Card>
@@ -128,9 +167,24 @@ const Dashboard = memo(() => {
               </CardDescription>
             </CardHeader>
             <CardContent className="pb-6">
-              <p className="text-center text-muted-foreground py-8">
-                No recent activity to display
-              </p>
+              {isLoading ? (
+                <p className="text-center text-muted-foreground py-8">Loading activities...</p>
+              ) : stats.recentActivities.length > 0 ? (
+                <div className="space-y-2">
+                  {stats.recentActivities.slice(0, 5).map((activity, index) => (
+                    <div key={index} className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">{activity.description}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(activity.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  No recent activity to display
+                </p>
+              )}
             </CardContent>
           </Card>
           
@@ -150,6 +204,10 @@ const Dashboard = memo(() => {
                 <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/assets/new')}>
                   <Plus className="mr-2 h-4 w-4" />
                   Create New Asset
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/data-quality')}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Data Quality Dashboard
                 </Button>
                 <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/barcode-tools')}>
                   <QrCode className="mr-2 h-4 w-4" />

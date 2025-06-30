@@ -2138,7 +2138,7 @@ export async function executeAssetInventoryReport(
 }
 
 
-// 🚀 NEW: Monthly Inventory Report Builder
+// 🚀 ENHANCED: Monthly Inventory Report Builder with Bulletproof Last Month Calculation
 export async function buildMonthlyInventoryReport(config: any, dateRange: { start: Date; end: Date }) {
   try {
     // Get all inventory items with their asset types
@@ -2188,8 +2188,11 @@ export async function buildMonthlyInventoryReport(config: any, dateRange: { star
 
     if (historyError) throw historyError;
 
-    // Process data for monthly summary
-    const processedData = (inventoryItems || []).map(item => {
+    // Get current month string for last month calculation
+    const currentMonth = `${dateRange.start.getFullYear()}-${(dateRange.start.getMonth() + 1).toString().padStart(2, '0')}`;
+
+    // Process data for monthly summary with enhanced last month calculation
+    const processedData = await Promise.all((inventoryItems || []).map(async item => {
       // Calculate starting balance (last record before reporting period)
       const itemHistory = (historyData || []).filter(h => h.inventory_item_id === item.id);
       const preReportHistory = itemHistory.filter(h => new Date(h.created_at) < dateRange.start);
@@ -2198,10 +2201,20 @@ export async function buildMonthlyInventoryReport(config: any, dateRange: { star
         new Date(h.created_at) <= dateRange.end
       );
 
-      // Starting quantity (from last record before period or 0)
-      const startingQuantity = preReportHistory.length > 0 
-        ? preReportHistory[preReportHistory.length - 1].quantity || 0
-        : 0;
+      // Enhanced starting quantity calculation with bulletproof last month total
+      let startingQuantity = 0;
+      let lastMonthData = null;
+      
+      try {
+        lastMonthData = await getLastMonthTotal(item.id, currentMonth);
+        startingQuantity = lastMonthData.amount;
+      } catch (error) {
+        console.warn(`Failed to get last month total for ${item.name}, falling back to history:`, error);
+        // Fallback to original logic
+        startingQuantity = preReportHistory.length > 0 
+          ? preReportHistory[preReportHistory.length - 1].quantity || 0
+          : 0;
+      }
 
       // Calculate period totals
       const additions = reportPeriodHistory
@@ -2233,9 +2246,11 @@ export async function buildMonthlyInventoryReport(config: any, dateRange: { star
         status: item.status,
         category: item.category,
         period_activity_count: reportPeriodHistory.length,
-        validation_issues: reportPeriodHistory.filter(h => h.validation_status === 'flagged').length
+        validation_issues: reportPeriodHistory.filter(h => h.validation_status === 'flagged').length,
+        // Enhanced data with source tracking
+        last_month_data: lastMonthData
       };
-    });
+    }));
 
     // Group by asset type
     const groupedData = processedData.reduce((groups: Record<string, any[]>, item) => {
@@ -2415,3 +2430,112 @@ export async function executeReportEnhanced(report: any, customDateRange?: { sta
     throw error;
   }
 }
+
+// 🚀 BULLETPROOF: Enhanced Last Month Total Calculator with Fallbacks
+export async function getLastMonthTotal(inventoryItemId: string, currentMonth: string): Promise<{
+  amount: number;
+  source: 'form_submission' | 'inventory_history' | 'calculated' | 'none';
+  confidence: 'high' | 'medium' | 'low';
+  details: string;
+}> {
+  try {
+    // Parse current month to get previous month
+    const [year, month] = currentMonth.split('-').map(Number);
+    const lastMonth = month === 1 ? 12 : month - 1;
+    const lastYear = month === 1 ? year - 1 : year;
+    const lastMonthStr = `${lastYear}-${lastMonth.toString().padStart(2, '0')}`;
+    
+    // METHOD 1: Look for form submissions with total/ending fields (HIGHEST CONFIDENCE)
+    const { data: formSubmissions, error: formError } = await supabase
+      .from('form_submissions')
+      .select(`
+        submission_data,
+        created_at
+      `)
+      .eq('asset_id', inventoryItemId)
+      .gte('created_at', `${lastYear}-${lastMonth.toString().padStart(2, '0')}-01`)
+      .lt('created_at', `${year}-${month.toString().padStart(2, '0')}-01`)
+      .order('created_at', { ascending: false });
+
+    if (!formError && formSubmissions && formSubmissions.length > 0) {
+      // Look for the most recent form with total/ending field
+      for (const submission of formSubmissions) {
+        const data = submission.submission_data || {};
+        const totalField = Object.keys(data).find(key => {
+          const lowerKey = key.toLowerCase();
+          return lowerKey.includes('total') || 
+                 lowerKey.includes('ending') || 
+                 lowerKey.includes('balance') ||
+                 key === 'field_13'; // Known total field
+        });
+        
+        if (totalField && data[totalField] !== undefined && data[totalField] !== '') {
+          const amount = Number(data[totalField]) || 0;
+          return {
+            amount,
+            source: 'form_submission',
+            confidence: 'high',
+            details: `Found in form submission from ${submission.created_at}, field: ${totalField}`
+          };
+        }
+      }
+    }
+
+    // METHOD 2: Get last inventory_history record from previous month (MEDIUM CONFIDENCE)
+    const { data: historyRecords, error: historyError } = await supabase
+      .from('inventory_history')
+      .select('quantity, created_at, event_type, month_year')
+      .eq('inventory_item_id', inventoryItemId)
+      .eq('month_year', lastMonthStr)
+      .order('created_at', { ascending: false });
+
+    if (!historyError && historyRecords && historyRecords.length > 0) {
+      // Get the last record of the previous month
+      const lastRecord = historyRecords[0];
+      return {
+        amount: Number(lastRecord.quantity) || 0,
+        source: 'inventory_history',
+        confidence: 'medium',
+        details: `Last inventory record from ${lastRecord.created_at}, event: ${lastRecord.event_type}`
+      };
+    }
+
+    // METHOD 3: Get earliest record of current month and use its quantity (LOW CONFIDENCE)
+    const { data: currentMonthHistory, error: currentError } = await supabase
+      .from('inventory_history')
+      .select('quantity, created_at, event_type')
+      .eq('inventory_item_id', inventoryItemId)
+      .eq('month_year', currentMonth)
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (!currentError && currentMonthHistory && currentMonthHistory.length > 0) {
+      const firstRecord = currentMonthHistory[0];
+      return {
+        amount: Number(firstRecord.quantity) || 0,
+        source: 'calculated',
+        confidence: 'low',
+        details: `Using first record quantity from current month: ${firstRecord.created_at}`
+      };
+    }
+
+    // METHOD 4: No data found
+    return {
+      amount: 0,
+      source: 'none',
+      confidence: 'low',
+      details: 'No previous month data found'
+    };
+
+  } catch (error) {
+    console.error('Error calculating last month total:', error);
+    return {
+      amount: 0,
+      source: 'none',
+      confidence: 'low',
+      details: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+}
+
+// 🚀 ENHANCED: Monthly Inventory Report Builder with Bulletproof Last Month Calculation
