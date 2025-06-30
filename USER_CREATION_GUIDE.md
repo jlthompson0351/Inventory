@@ -2,6 +2,17 @@
 
 This guide explains how to create users directly from the Platform Dashboard and manage them in your inventory management system.
 
+## 🚨 **TODO: REVAMP USER ADDITION PROCESS**
+
+**Current Status**: The invitation system creates database records but **doesn't actually send emails**. Users aren't receiving invitation emails.
+
+**Need to implement**:
+- Actual email service integration (SendGrid, Mailgun, etc.)
+- Or switch to manual invitation link sharing
+- Or use Supabase Auth's built-in invitation system
+
+**Priority**: Medium - can be addressed after core functionality issues are resolved.
+
 ## Features Added
 
 ### 1. Create New Users

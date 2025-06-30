@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const loadingTimeout = setTimeout(() => {
       console.warn('Auth loading timeout reached, forcing completion');
       setLoading(false);
-    }, 15000); // Reduced to 15 seconds
+    }, 12000); // Reduced to 12 seconds for faster response
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
@@ -181,114 +181,114 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     isFetchingUserData.current = true;
     
-    // Add overall timeout to prevent infinite hanging - reduced timeout
+    // Reduced timeout to prevent infinite hanging
     const timeoutId = setTimeout(() => {
       console.error('fetchUserData taking too long, forcing completion');
       isFetchingUserData.current = false;
       setLoading(false);
-    }, 10000); // Reduced to 10 seconds for faster completion
+    }, 10000); // Increased timeout to allow for all queries
     
     try {
-      console.log('Starting optimized user data fetch...');
+      console.log('Starting user data fetch with direct queries (no RPC)...');
       
-      // Use the new optimized function to get all data in one call
-      console.log('Calling optimized get_user_profile_with_org function...');
+      // Use ONLY direct database queries - RPC functions have auth context issues
+      console.log('Executing direct database queries...');
+      
+      // Execute queries sequentially to avoid timeout issues
       try {
-        const { data: userData, error: userDataError } = await Promise.race([
-          supabase.rpc('get_user_profile_with_org'),
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('User data query timeout')), 8000)
-          )
-        ]);
+        // Get user profile
+        console.log('Fetching profile...');
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', currentUser.id)
+          .single();
 
-        if (userDataError) {
-          console.error('Error fetching user data:', userDataError);
-          throw userDataError;
+        if (profileError) {
+          console.warn('Profile fetch failed:', profileError);
+          setProfile({ full_name: 'User', avatar_url: null });
+        } else {
+          console.log('Setting profile data:', profileData);
+          setProfile(profileData as UserProfile);
         }
+      } catch (error) {
+        console.error('Profile query failed:', error);
+        setProfile({ full_name: 'User', avatar_url: null });
+      }
 
-        console.log('User data fetched successfully:', userData);
+      try {
+        // Get user membership first
+        console.log('Fetching membership...');
+        const { data: membershipData, error: membershipError } = await supabase
+          .from('organization_members')
+          .select('id, organization_id, role')
+          .eq('user_id', currentUser.id)
+          .eq('is_deleted', false)
+          .single();
 
-        // Parse the returned data
-        if (userData) {
-          // Set profile
-          if (userData.profile) {
-            console.log('Setting profile data');
-            setProfile(userData.profile);
-          } else {
-            console.log('No profile data, setting default');
-            setProfile({ full_name: 'User', avatar_url: null });
-          }
+        if (membershipError) {
+          console.warn('Membership fetch failed:', membershipError);
+          setMembership(null);
+          setOrganization(null);
+        } else {
+          console.log('Setting membership data:', membershipData);
+          
+          // Set membership
+          setMembership({
+            id: membershipData.id,
+            user_id: currentUser.id,
+            organization_id: membershipData.organization_id,
+            role: membershipData.role
+          });
 
-          // Set organization
-          if (userData.organization) {
-            console.log('Setting organization data');
-            const orgWithDefaults = {
-              ...userData.organization,
-              owner_id: null
-            };
-            setOrganization(orgWithDefaults as FullOrganizationType);
-          } else {
-            console.log('No organization data');
+          // Get organization data separately
+          try {
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('*')
+              .eq('id', membershipData.organization_id)
+              .single();
+
+            if (orgError) {
+              console.warn('Organization fetch failed:', orgError);
+              setOrganization(null);
+            } else {
+              console.log('Setting organization data:', orgData);
+              const orgWithDefaults = {
+                ...orgData,
+                owner_id: null
+              };
+              setOrganization(orgWithDefaults as FullOrganizationType);
+            }
+          } catch (orgFetchError) {
+            console.error('Organization query failed:', orgFetchError);
             setOrganization(null);
           }
-
-          // Set membership
-          if (userData.membership) {
-            console.log('Setting membership data');
-            setMembership(userData.membership);
-          } else {
-            console.log('No membership data');
-            setMembership(null);
-          }
-
-          // Set platform operator status
-          console.log('Setting platform operator status:', userData.is_platform_operator);
-          setIsPlatformOperatorState(userData.is_platform_operator || false);
-        } else {
-          console.log('No user data returned, setting defaults');
-          setProfile({ full_name: 'User', avatar_url: null });
-          setOrganization(null);
-          setMembership(null);
-          setIsPlatformOperatorState(false);
         }
-
       } catch (error) {
-        console.error('Optimized fetch failed, falling back to individual queries:', error);
-        
-        // Fallback to individual queries if the optimized function fails
-        console.log('Executing fallback individual queries...');
-        
-        // Simplified fallback - just get basic profile data
-        try {
-          const { data: profileData, error: profileError } = await Promise.race([
-            supabase
-              .from('profiles')
-              .select('full_name, avatar_url')
-              .eq('id', currentUser.id)
-              .single(),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Profile query timeout')), 5000)
-            )
-          ]);
-
-          if (profileError) {
-            console.warn('Profile fetch failed:', profileError);
-            setProfile({ full_name: 'User', avatar_url: null });
-          } else {
-            setProfile(profileData || { full_name: 'User', avatar_url: null });
-          }
-        } catch (fallbackError) {
-          console.error('Fallback profile fetch failed:', fallbackError);
-          setProfile({ full_name: 'User', avatar_url: null });
-        }
-
-        // Set safe defaults for organization data
-        setOrganization(null);
+        console.error('Membership query failed:', error);
         setMembership(null);
+        setOrganization(null);
+      }
+
+      try {
+        // Check if user is platform operator
+        console.log('Checking platform operator status...');
+        const { data: operatorData, error: operatorError } = await supabase
+          .from('platform_operators')
+          .select('user_id')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        const isPlatformOperator = !operatorError && operatorData;
+        console.log('Setting platform operator status:', isPlatformOperator);
+        setIsPlatformOperatorState(!!isPlatformOperator);
+      } catch (error) {
+        console.error('Platform operator query failed:', error);
         setIsPlatformOperatorState(false);
       }
 
-      console.log('User data fetch completed successfully');
+      console.log('Direct queries user data fetch completed successfully');
       
     } catch (error) {
       console.error('Error in fetchUserData (caught):', error);
