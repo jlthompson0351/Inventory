@@ -62,10 +62,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [membership, setMembership] = useState<OrganizationMember | null>(null);
   const [isPlatformOperatorState, setIsPlatformOperatorState] = useState(false);
   
-  // Use useRef to prevent multiple simultaneous calls and track initialization
+  // Use refs to track state and prevent multiple calls
   const isFetchingUserData = useRef(false);
   const isInitialized = useRef(false);
   const lastUserId = useRef<string | null>(null);
+  const pendingUserToFetch = useRef<User | null>(null);
 
   const organizationRole = membership?.role || null;
 
@@ -77,99 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isPlatformOperator: isPlatformOperatorState
   };
 
-  useEffect(() => {
-    console.log('Auth provider initializing... Build:', new Date().toISOString());
-    
-    // Set a maximum loading timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      console.warn('Auth loading timeout reached, forcing completion');
-      setLoading(false);
-    }, 12000); // Reduced to 12 seconds for faster response
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
-      clearTimeout(loadingTimeout);
-      
-      const sessionUser = session?.user ?? null;
-      const currentUserId = sessionUser?.id || null;
-      
-      setUser(sessionUser);
-      
-      // Only fetch data if:
-      // 1. User exists
-      // 2. It's not an INITIAL_SESSION event (unless we haven't initialized yet)
-      // 3. We're not already fetching
-      // 4. The user ID has changed OR we haven't fetched for this user yet
-      const shouldFetchData = sessionUser && 
-        (event !== 'INITIAL_SESSION' || !isInitialized.current) &&
-        !isFetchingUserData.current &&
-        (lastUserId.current !== currentUserId);
-      
-      if (shouldFetchData) {
-        console.log('Triggering fetchUserData for event:', event, 'userId:', currentUserId);
-        try {
-          await fetchUserData(sessionUser);
-          lastUserId.current = currentUserId;
-          isInitialized.current = true;
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-        }
-      } else if (!sessionUser) {
-        console.log('Clearing user state - no session user');
-        // Clear all user-related state
-        setOrganization(null);
-        setMembership(null);
-        setProfile(null);
-        setIsPlatformOperatorState(false);
-        lastUserId.current = null;
-      } else {
-        console.log('Skipping fetchUserData - shouldFetchData:', shouldFetchData, 'reasons:', {
-          hasUser: !!sessionUser,
-          eventType: event,
-          isInitialized: isInitialized.current,
-          isFetching: isFetchingUserData.current,
-          userIdChanged: lastUserId.current !== currentUserId
-        });
-      }
-      
-      setLoading(false);
-    });
-
-    // Initial auth check - but don't fetch data here, let the auth state change handle it
-    const initializeAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session check failed:', error);
-          clearTimeout(loadingTimeout);
-          setLoading(false);
-          return;
-        }
-        
-        // Don't fetch data here - let the auth state change listener handle it
-        console.log('Initial session check completed, session exists:', !!session);
-        
-        // If no session exists after initial check, ensure loading is false
-        if (!session) {
-          clearTimeout(loadingTimeout);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Auth initialization failed:', error);
-        clearTimeout(loadingTimeout);
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      clearTimeout(loadingTimeout);
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
+  // Separate function to fetch user data - NOT called inside onAuthStateChange
   const fetchUserData = async (currentUser: User) => {
     console.log('fetchUserData started for user:', currentUser.id, 'isFetching:', isFetchingUserData.current);
     
@@ -181,20 +90,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     isFetchingUserData.current = true;
     
-    // Reduced timeout to prevent infinite hanging
+    // Timeout for safety
     const timeoutId = setTimeout(() => {
       console.error('fetchUserData taking too long, forcing completion');
       isFetchingUserData.current = false;
       setLoading(false);
-    }, 10000); // Increased timeout to allow for all queries
+    }, 8000);
     
     try {
-      console.log('Starting user data fetch with direct queries (no RPC)...');
+      console.log('Starting user data fetch with direct queries...');
       
-      // Use ONLY direct database queries - RPC functions have auth context issues
-      console.log('Executing direct database queries...');
-      
-      // Execute queries sequentially to avoid timeout issues
+      // Execute queries sequentially to avoid issues
       try {
         // Get user profile
         console.log('Fetching profile...');
@@ -305,6 +211,105 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Effect to handle pending user data fetching
+  useEffect(() => {
+    if (pendingUserToFetch.current && !isFetchingUserData.current) {
+      const userToFetch = pendingUserToFetch.current;
+      pendingUserToFetch.current = null;
+      fetchUserData(userToFetch);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    console.log('Auth provider initializing... Build:', new Date().toISOString());
+    
+    // Set a maximum loading timeout
+    const loadingTimeout = setTimeout(() => {
+      console.warn('Auth loading timeout reached, forcing completion');
+      setLoading(false);
+    }, 10000);
+
+    // THE FIX: NO async calls inside onAuthStateChange
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
+      clearTimeout(loadingTimeout);
+      
+      const sessionUser = session?.user ?? null;
+      const currentUserId = sessionUser?.id || null;
+      
+      setUser(sessionUser);
+      
+      if (sessionUser) {
+        // Only schedule fetchUserData if:
+        // 1. It's not an INITIAL_SESSION event (unless we haven't initialized yet)
+        // 2. We're not already fetching
+        // 3. The user ID has changed OR we haven't fetched for this user yet
+        const shouldFetchData = (event !== 'INITIAL_SESSION' || !isInitialized.current) &&
+          !isFetchingUserData.current &&
+          (lastUserId.current !== currentUserId);
+        
+        if (shouldFetchData) {
+          console.log('Scheduling fetchUserData for event:', event, 'userId:', currentUserId);
+          lastUserId.current = currentUserId;
+          isInitialized.current = true;
+          // Schedule the async call to happen OUTSIDE this handler
+          pendingUserToFetch.current = sessionUser;
+        } else {
+          console.log('Skipping fetchUserData - shouldFetchData:', shouldFetchData, 'reasons:', {
+            hasUser: !!sessionUser,
+            eventType: event,
+            isInitialized: isInitialized.current,
+            isFetching: isFetchingUserData.current,
+            userIdChanged: lastUserId.current !== currentUserId
+          });
+        }
+      } else {
+        console.log('Clearing user state - no session user');
+        // Clear all user-related state
+        setOrganization(null);
+        setMembership(null);
+        setProfile(null);
+        setIsPlatformOperatorState(false);
+        lastUserId.current = null;
+        pendingUserToFetch.current = null;
+      }
+      
+      setLoading(false);
+    });
+
+    // Initial auth check
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session check failed:', error);
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('Initial session check completed, session exists:', !!session);
+        
+        if (!session) {
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        clearTimeout(loadingTimeout);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      clearTimeout(loadingTimeout);
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -312,6 +317,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMembership(null);
     setProfile(null);
     setIsPlatformOperatorState(false);
+    pendingUserToFetch.current = null;
   };
 
   return (
