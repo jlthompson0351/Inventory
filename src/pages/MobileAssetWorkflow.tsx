@@ -256,7 +256,7 @@ const MobileAssetWorkflow = () => {
     // Navigate to form with QR context
     if (option.form_id) {
       // Determine the form behavior based on type
-      let navigationState: any = {
+      const navigationState: any = {
         assetId: assetData?.asset_id,
         assetName: assetData?.asset_name,
         formType: option.type,

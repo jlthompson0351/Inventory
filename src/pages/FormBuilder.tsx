@@ -171,7 +171,7 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
     return {
       ...result,
       isValid: false,
-      error: `Referenced fields don\'t exist: ${nonExistentFields.join(', ')}`
+      error: `Referenced fields don't exist: ${nonExistentFields.join(', ')}`
     };
   }
   
@@ -184,7 +184,7 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
     return {
       ...result,
       isValid: false,
-      error: `Referenced mapped fields don\'t exist: ${nonExistentMappedFields.join(', ')}`
+      error: `Referenced mapped fields don't exist: ${nonExistentMappedFields.join(', ')}`
     };
   }
   
@@ -203,7 +203,7 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
     testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
     
     // Eval to see if it throws errors
-    // eslint-disable-next-line no-eval
+     
     eval(testFormula);
     
   } catch (e) {
@@ -656,7 +656,7 @@ const FormBuilder = () => {
         .replace(/\{field_2\}/g, "5")
         .replace(/\{field_3\}/g, "20");
       
-      // eslint-disable-next-line no-eval
+       
       sampleResult = eval(processedFormula).toString();
     } catch (e) {
       // Formula evaluation failed
@@ -745,7 +745,7 @@ const FormBuilder = () => {
       processedFormula = processedFormula.trim().replace(/\s+/g, ' ');
       
       // Validation checks
-      if (/[\+\-\*/]\s*$/.test(processedFormula)) {
+      if (/[+\-*/]\s*$/.test(processedFormula)) {
         return "Incomplete formula";
       }
       
@@ -759,7 +759,7 @@ const FormBuilder = () => {
         return "Empty formula";
       }
   
-      // eslint-disable-next-line no-eval
+       
       const result = eval(processedFormula);
       
       if (typeof result !== 'number' || isNaN(result)) {

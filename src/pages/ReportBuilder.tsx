@@ -740,7 +740,7 @@ const ReportBuilder = () => {
       
       const data = results.map(item => selectedColumns.map(colId => {
         // Simplified data access: relies on backend providing correct keys
-        let value = item[colId];
+        const value = item[colId];
         
         const field = formFields.find(f => f.id === colId);
         if (field?.field_type === 'date' && value) {
@@ -821,7 +821,7 @@ const ReportBuilder = () => {
       
       const data = results.map(item => selectedColumns.map(colId => {
         // Simplified data access: relies on backend providing correct keys
-        let value = item[colId];
+        const value = item[colId];
         
         // For CSV, all values should be strings. Dates can be formatted.
         const field = formFields.find(f => f.id === colId);

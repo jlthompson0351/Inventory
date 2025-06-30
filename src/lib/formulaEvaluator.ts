@@ -147,10 +147,15 @@ export function validateFormulaSyntax(formula: string): {
   referencedFields: string[];
   referencedMappedFields: string[];
 } {
-  const result = {
+  const result: {
+    isValid: boolean;
+    error?: string;
+    referencedFields: string[];
+    referencedMappedFields: string[];
+  } = {
     isValid: true,
-    referencedFields: [] as string[],
-    referencedMappedFields: [] as string[],
+    referencedFields: [],
+    referencedMappedFields: [],
   };
 
   try {
@@ -271,7 +276,7 @@ function tokenize(expression: string): string[] {
   // - Negative numbers: -123.45
   // - Function calls: function_name(
   // - Basic operators and parentheses
-  const regex = /((?:\-)?[0-9]*\.?[0-9]+|\+|\-|\*|\/|\^|\%|\(|\)|,|[a-zA-Z_][a-zA-Z0-9_]*|\{[^}]+\})/g;
+  const regex = /((?:-)?[0-9]*\.?[0-9]+|\+|-|\*|\/|\^|%|\(|\)|,|[a-zA-Z_][a-zA-Z0-9_]*|\{[^}]+\})/g;
   return expression.match(regex) || [];
 }
 
@@ -284,7 +289,7 @@ function infixToPostfix(tokens: string[]): string[] {
     const token = tokens[i];
     
     // Numbers and field references go directly to output
-    if (/^(?:\-)?[0-9]*\.?[0-9]+$/.test(token) || token.startsWith('{')) {
+    if (/^(?:-)?[0-9]*\.?[0-9]+$/.test(token) || token.startsWith('{')) {
       output.push(token);
     }
     // Handle functions
@@ -355,7 +360,7 @@ function evaluatePostfix(tokens: string[]): number {
   
   for (const token of tokens) {
     // Numbers (including those that were field references)
-    if (/^(?:\-)?[0-9]*\.?[0-9]+$/.test(token)) {
+    if (/^(?:-)?[0-9]*\.?[0-9]+$/.test(token)) {
       stack.push(parseFloat(token));
     }
     // Functions

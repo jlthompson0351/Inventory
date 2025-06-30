@@ -107,7 +107,7 @@ export default function VisualFormulaBuilder({
 
   const parseFormulaToElements = (formulaStr: string) => {
     const parsed: FormulaElement[] = [];
-    let remaining = formulaStr.trim();
+    const remaining = formulaStr.trim();
     let elementId = 0;
 
     if (!remaining) {

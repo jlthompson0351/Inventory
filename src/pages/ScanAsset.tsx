@@ -35,8 +35,8 @@ export default function ScanAsset() {
       const currentOrganization = asset.organization_id ? { id: asset.organization_id } : null;
       if (currentOrganization?.id) {
         const items = await getInventoryItems(currentOrganization.id, asset.id);
-        let inventoryItem = items && items.length > 0 ? items[0] : null;
-        let monthYear = new Date().toISOString().slice(0, 7);
+        const inventoryItem = items && items.length > 0 ? items[0] : null;
+        const monthYear = new Date().toISOString().slice(0, 7);
         if (inventoryItem) {
           const history = await getInventoryHistoryForMonth(inventoryItem.id, monthYear);
           if (history && history.event_type === 'check') {

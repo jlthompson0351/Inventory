@@ -298,7 +298,7 @@ const SimpleAssetReport: React.FC = () => {
       const formIds = Array.from(new Set(filteredData?.map((asset: any) => asset.asset_types?.inventory_form_id).filter(Boolean)));
       console.log('Form IDs found:', formIds);
       
-      let formSchemas: Record<string, FormField[]> = {};
+      const formSchemas: Record<string, FormField[]> = {};
       if (formIds.length > 0) {
         const { data: forms, error: formError } = await supabase
           .from('forms')

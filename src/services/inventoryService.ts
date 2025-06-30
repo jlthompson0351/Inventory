@@ -82,7 +82,7 @@ export const getInventoryItems = async (
     }
     
     // If no assetId provided, get all inventory items for the org
-    let query = supabase
+    const query = supabase
       .from('inventory_items')
       .select(`*, asset_type:asset_types(id, name, color)`)
       .eq('organization_id', organizationId)

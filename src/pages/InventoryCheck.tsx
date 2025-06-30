@@ -219,11 +219,11 @@ const InventoryCheck = () => {
       setSubmitting(true);
       
       let finalQuantity = 0;
-      let notes = formData.notes; 
-      let location = formData.location; 
-      let condition = formData.condition; 
-      let status = asset.status;
-      let responseData = { ...dynamicFormValues }; // Start with dynamic form values
+      const notes = formData.notes; 
+      const location = formData.location; 
+      const condition = formData.condition; 
+      const status = asset.status;
+      const responseData = { ...dynamicFormValues }; // Start with dynamic form values
 
       if (inventoryFormSchema && Object.keys(dynamicFormValues).length > 0) {
         const { newQuantity, foundAction } = computeNewInventoryQuantity(

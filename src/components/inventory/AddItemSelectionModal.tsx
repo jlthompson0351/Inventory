@@ -188,8 +188,8 @@ const AddItemSelectionModal: React.FC<AddItemSelectionModalProps> = ({ isOpen, o
       
       // Continue with existing logic for inventory check
       const items = await getInventoryItems(currentOrganization.id, assetId);
-      let inventoryItem = items && items.length > 0 ? items[0] : null;
-      let monthYear = new Date().toISOString().slice(0, 7);
+      const inventoryItem = items && items.length > 0 ? items[0] : null;
+      const monthYear = new Date().toISOString().slice(0, 7);
       if (inventoryItem) {
         const history = await getInventoryHistoryForMonth(inventoryItem.id, monthYear);
         if (history && history.event_type === 'check') {

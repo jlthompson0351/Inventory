@@ -36,7 +36,7 @@ export function testInventoryActions(
 } {
   let newQuantity = currentQuantity;
   let foundInventoryAction = false;
-  let inventoryChanges: InventoryChange[] = [];
+  const inventoryChanges: InventoryChange[] = [];
 
   if (!formSchema || !formSchema.fields || !formData) {
     return { newQuantity: currentQuantity, foundAction: false, changes: [] };

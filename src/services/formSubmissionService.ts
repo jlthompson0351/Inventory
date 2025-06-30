@@ -212,7 +212,7 @@ export async function submitForm(
       // Process inventory actions from the FORM FIELDS (supports calculated fields)
       let newQuantity = inventoryItem.quantity;
       let foundInventoryAction = false;
-      let inventoryChanges: Array<{action: string, field: string, value: number, description: string}> = [];
+      const inventoryChanges: Array<{action: string, field: string, value: number, description: string}> = [];
       
       // Get the form schema to find fields with inventory actions
       const formSchema = typeof form.form_data === 'string' ? JSON.parse(form.form_data) : form.form_data;

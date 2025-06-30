@@ -276,7 +276,7 @@ class QueryBuilder {
     const limitClause = this.buildLimitClause();
     
     // Combine everything
-    let sql = `
+    const sql = `
       SELECT ${selectColumns}
       FROM ${fromClause}
       ${whereClause ? `WHERE ${whereClause}` : ''}
@@ -821,7 +821,7 @@ class ParallelDataProcessor {
   }
 
   private static async processInventoryHistoryDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('inventory_history')
       .select('*')
       .eq('organization_id', organizationId);
@@ -848,7 +848,7 @@ class ParallelDataProcessor {
   }
 
   private static async processPriceHistoryDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('inventory_price_history')
       .select('*')
       .eq('organization_id', organizationId);
@@ -868,7 +868,7 @@ class ParallelDataProcessor {
   }
 
   private static async processFormsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('forms')
       .select('*')
       .eq('organization_id', organizationId);
@@ -951,7 +951,7 @@ class ParallelDataProcessor {
   }
 
   private static async processFormResponsesDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('form_responses')
       .select('*')
       .eq('organization_id', organizationId);
@@ -972,7 +972,7 @@ class ParallelDataProcessor {
 
   private static async processOrganizationsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
     // Organizations can only see their own org data
-    let query = supabase
+    const query = supabase
       .from('organizations')
       .select('*')
       .eq('id', organizationId);
@@ -992,7 +992,7 @@ class ParallelDataProcessor {
   }
 
   private static async processOrgMembersDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('organization_members')
       .select('*')
       .eq('organization_id', organizationId);
@@ -1012,7 +1012,7 @@ class ParallelDataProcessor {
 
   private static async processUsersDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
     // Get organization members with user details from users_view
-    let query = supabase
+    const query = supabase
       .from('organization_members')
       .select(`
         *,
@@ -1039,7 +1039,7 @@ class ParallelDataProcessor {
   }
 
   private static async processLocationsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('locations')
       .select('*')
       .eq('organization_id', organizationId);
@@ -1058,7 +1058,7 @@ class ParallelDataProcessor {
   }
 
   private static async processSystemLogsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('system_logs')
       .select('*')
       .eq('organization_id', organizationId)
@@ -1078,7 +1078,7 @@ class ParallelDataProcessor {
   }
 
   private static async processAssetFormulasDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('asset_formulas')
       .select('*')
       .eq('organization_id', organizationId);
@@ -1100,7 +1100,7 @@ class ParallelDataProcessor {
   }
 
   private static async processAssetTypeFormsDataSource(config: ReportConfig, organizationId: string): Promise<any[]> {
-    let query = supabase
+    const query = supabase
       .from('asset_type_forms')
       .select('*, asset_types!inner(name), forms!inner(name)')
       .eq('organization_id', organizationId);
