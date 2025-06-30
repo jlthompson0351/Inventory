@@ -19,51 +19,51 @@ export const useOrganizationMembers = () => {
 
     setIsLoading(true);
     try {
-      // First, get organization members
+      // Use the new RPC function to get members with activity data
       const { data: memberData, error: memberError } = await supabase
-        .from('organization_members')
-        .select('id, role, created_at, user_id')
-        .eq('organization_id', organization.id);
+        .rpc('get_organization_members_with_activity' as any, {
+          org_id: organization.id
+        });
 
-      if (memberError) throw memberError;
-      
-      if (!memberData || memberData.length === 0) {
-        setMembers([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Get user IDs to fetch profiles
-      const userIds = memberData.map(member => member.user_id);
-      
-      // Fetch profiles for all members
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .in('id', userIds);
-
-      if (profileError) {
-        console.warn('Error fetching profiles:', profileError);
-        // Continue without profile data
-      }
-
-      // Get user emails from auth.users (if needed)
-      // For now, we'll use placeholder emails since we can't directly query auth.users
-      
-      // Combine member and profile data
-      const formattedMembers: OrganizationMember[] = memberData.map((member: any, index: number) => {
-        const profile = profileData?.find(p => p.id === member.user_id);
+      if (memberError) {
+        // Fallback to the basic function if the activity one fails
+        console.warn('Activity function failed, falling back to basic:', memberError);
+        const { data: basicData, error: basicError } = await supabase
+          .rpc('get_organization_members_with_emails' as any, {
+            org_id: organization.id
+          });
         
-        return {
-          id: member.id,
+        if (basicError) throw basicError;
+        
+        // Format the basic data for the UI
+        const formattedMembers: OrganizationMember[] = basicData?.map((member: any) => ({
+          id: member.member_id,
           user_id: member.user_id,
           role: member.role,
-          email: `member${index + 1}@organization.com`, // Placeholder - would need RPC to get real email
-          full_name: profile?.full_name || `Member ${index + 1}`,
-          avatar_url: profile?.avatar_url || null,
-          joined_at: member.created_at || new Date().toISOString(),
-        };
-      });
+          email: member.email,
+          full_name: member.full_name,
+          avatar_url: member.avatar_url,
+          joined_at: member.joined_at,
+        })) || [];
+        
+        setMembers(formattedMembers);
+        return;
+      }
+      
+      // Format the activity-enhanced data for the UI
+      const formattedMembers: OrganizationMember[] = memberData?.map((member: any) => ({
+        id: member.member_id,
+        user_id: member.user_id,
+        role: member.role,
+        email: member.email,
+        full_name: member.full_name,
+        avatar_url: member.avatar_url,
+        joined_at: member.joined_at,
+        last_sign_in_at: member.last_sign_in_at,
+        created_at: member.created_at,
+        recent_activity_count: member.recent_activity_count || 0,
+        session_count: member.session_count || 0,
+      })) || [];
       
       setMembers(formattedMembers);
     } catch (error) {

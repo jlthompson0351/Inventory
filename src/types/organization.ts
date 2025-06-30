@@ -6,6 +6,11 @@ export interface OrganizationMember {
   role: string; // e.g., 'admin', 'member', 'viewer'
   avatar_url?: string | null;
   joined_at: string; // ISO date string
+  // Activity tracking fields
+  last_sign_in_at?: string | null; // Last login timestamp from auth.users
+  created_at?: string | null; // Account creation timestamp
+  recent_activity_count?: number; // Count of activities in last 30 days
+  session_count?: number; // Number of active/recent sessions
   // Add any other relevant fields, e.g., status, last_active_at
 }
 
