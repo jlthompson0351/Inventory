@@ -281,8 +281,6 @@ export function InventoryItemForm({
           notes: isAdmin ? `Admin edit by ${userId} at ${new Date().toISOString()}` : "",
           status: "active",
           check_date: checkDate,
-          user_id: userId,
-          event_type: eventType,
         });
       }
       

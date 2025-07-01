@@ -288,7 +288,6 @@ export const createInventoryItem = async (
         notes: assetExists ? 'Initial intake quantity' : 'Initial intake quantity (asset missing, orphaned item)',
         status: 'active',
         check_date: now,
-        user_id: userId,
       });
     }
     if (!assetExists) {
@@ -816,7 +815,6 @@ export const createInventoryCheck = async (
         notes: 'Initial intake quantity',
         status: 'active',
         check_date: new Date(),
-        user_id: userId,
       });
     }
     return inventoryItem;
@@ -838,7 +836,6 @@ export const upsertMonthlyInventoryHistory = async ({
   notes = '',
   status = 'active',
   check_date = new Date(),
-  user_id,
 }: {
   organization_id: string;
   inventory_item_id: string;
@@ -848,12 +845,15 @@ export const upsertMonthlyInventoryHistory = async ({
   notes?: string;
   status?: string;
   check_date?: Date;
-  user_id: string;
 }) => {
   const month_year = check_date
     ? check_date.toISOString().slice(0, 7)
     : new Date().toISOString().slice(0, 7);
   const event_type = mapCheckTypeToEventType(check_type);
+  
+  // Get current user
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
   // Try to find an existing record for this item/location/month and event_type
   const { data: existing, error: findError } = await supabase
     .from('inventory_history')
@@ -869,15 +869,21 @@ export const upsertMonthlyInventoryHistory = async ({
   }
   if (existing) {
     // Update the quantity (add to existing)
+    const updateData = {
+      quantity: existing.quantity + quantity,
+      notes,
+      status,
+      created_by: userId,
+      check_date: check_date.toISOString(),
+    };
+    
+    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - updating:', updateData);
+    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - update keys:', Object.keys(updateData));
+    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - checking for user_id in update:', Object.keys(updateData).includes('user_id'));
+    
     const { data, error } = await supabase
       .from('inventory_history')
-      .update({
-        quantity: existing.quantity + quantity,
-        notes,
-        status,
-        created_by: user_id,
-        check_date: check_date.toISOString(),
-      })
+      .update(updateData)
       .eq('id', existing.id)
       .select();
     if (error) {
@@ -886,24 +892,23 @@ export const upsertMonthlyInventoryHistory = async ({
     }
     return data;
   } else {
-    // Insert a new record
-    const { data, error } = await supabase
-      .from('inventory_history')
-      .insert({
-        organization_id,
-        inventory_item_id,
-        location,
-        quantity,
-        check_type, // for backward compatibility
-        event_type,
-        notes,
-        status,
-        created_by: user_id,
-        check_date: check_date.toISOString(),
-        created_at: new Date().toISOString(),
-        month_year,
-      })
-      .select();
+    // Use database function to bypass Supabase client schema issues
+    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - using database function for insert');
+    
+    const { data, error } = await (supabase as any).rpc('insert_inventory_history_simple', {
+      organization_id: organization_id,
+      inventory_item_id: inventory_item_id,
+      check_type: check_type,
+      quantity: quantity,
+      created_by: userId,
+      condition: null,
+      notes: notes,
+      status: status,
+      location: location,
+      event_type: event_type,
+      response_data: null
+    });
+    
     if (error) {
       console.error('Error inserting inventory history:', error);
       throw error;
@@ -984,27 +989,21 @@ export const createMonthlyInventoryCheck = async (
     
     // Create history record for this month
     const checkDate = checkData.check_date || new Date();
-    const month_year = checkDate.toISOString().slice(0, 7);
     
-    // Create a new history record (don't upsert, always create a new record for periodic checks)
-    const { data: historyRecord, error: historyError } = await supabase
-      .from('inventory_history')
-      .insert({
-        organization_id: inventoryItem.organization_id,
-        inventory_item_id: inventoryItemId,
-        location: checkData.location || '',
-        quantity: checkData.quantity,
-        check_type: 'periodic',
-        event_type: 'audit',
-        notes: checkData.notes || 'Monthly inventory check',
-        status: checkData.status || 'active',
-        check_date: checkDate.toISOString(),
-        month_year,
-        created_by: userId,
-        created_at: new Date().toISOString(),
-        response_data: checkData.response_data || null
-      })
-      .select();
+    // Use database function to bypass Supabase client schema issues
+    const { data: historyRecord, error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+      organization_id: inventoryItem.organization_id,
+      inventory_item_id: inventoryItemId,
+      check_type: 'periodic',
+      quantity: checkData.quantity,
+      created_by: userId,
+      condition: null,
+      notes: checkData.notes || 'Monthly inventory check',
+      status: checkData.status || 'active',
+      location: checkData.location || '',
+      event_type: 'audit',
+      response_data: checkData.response_data || null
+    });
       
     if (historyError) {
       console.error('Error creating inventory history record:', historyError);
@@ -1051,6 +1050,15 @@ export const createAssetAndInitialInventory = async (
   },
   intakeFormSchema?: any // The schema of the intake form used { fields: [{id, inventory_action,...}] }
 ): Promise<any> => {
+  console.log('🚀🚀🚀 ENTRY POINT: createAssetAndInitialInventory called - MAIN FUNCTION IDENTIFIED');
+  console.log('🚀 DEBUG: createAssetAndInitialInventory called with:', {
+    assetData,
+    assetTypeId,
+    organizationId,
+    intakeFormData,
+    intakeFormSchema
+  });
+  
   try {
     // Get the current user's ID
     const { data: userData } = await supabase.auth.getUser();
@@ -1127,27 +1135,47 @@ export const createAssetAndInitialInventory = async (
     
     // 3. Create the initial inventory_history record with full form response data
     const now = new Date();
-    const { data: historyRecord, error: historyError } = await supabase
-      .from('inventory_history')
-      .insert({
-        organization_id: organizationId,
-        inventory_item_id: inventoryItem.id,
-        location: inventoryItem.location || '', // Use location from created inventory item
-        quantity: initialQuantity, // Use the calculated quantity
-        check_type: 'initial',
-        event_type: 'intake',
-        notes: intakeFormData.notes || 'Initial intake via dynamic form',
-        status: inventoryItem.status || 'active',
-        check_date: now.toISOString(),
-        month_year: now.toISOString().slice(0, 7),
-        created_by: userId,
-        created_at: now.toISOString(),
-        response_data: intakeFormData.response_data || null // Store all submitted dynamic form values
-      })
-      .select();
+    
+    // DEBUG: Log the exact data being inserted
+    const historyInsertData = {
+      organization_id: organizationId,
+      inventory_item_id: inventoryItem.id,
+      location: inventoryItem.location || '', // Use location from created inventory item
+      quantity: initialQuantity, // Use the calculated quantity
+      check_type: 'initial',
+      event_type: 'intake',
+      notes: intakeFormData.notes || 'Initial intake via dynamic form',
+      status: inventoryItem.status || 'active',
+      check_date: now.toISOString(),
+      month_year: now.toISOString().slice(0, 7),
+      created_by: userId,
+      created_at: now.toISOString(),
+      response_data: intakeFormData.response_data || null // Store all submitted dynamic form values
+    };
+    
+    console.log('🔍 DEBUG: About to insert inventory_history record with data:', historyInsertData);
+    console.log('🔍 DEBUG: Keys being inserted:', Object.keys(historyInsertData));
+    console.log('🔍 DEBUG: Checking for user_id in keys:', Object.keys(historyInsertData).includes('user_id'));
+    
+    // Use database function to bypass Supabase client schema issues
+    const { data: historyRecord, error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+      organization_id: historyInsertData.organization_id,
+      inventory_item_id: historyInsertData.inventory_item_id,
+      check_type: historyInsertData.check_type,
+      quantity: historyInsertData.quantity,
+      created_by: historyInsertData.created_by,
+      condition: null,
+      notes: historyInsertData.notes,
+      status: historyInsertData.status,
+      location: historyInsertData.location,
+      event_type: historyInsertData.event_type,
+      response_data: historyInsertData.response_data
+    });
       
     if (historyError) {
-      console.error('Error creating inventory history record:', historyError);
+      console.error('❌ ERROR creating inventory history record:', historyError);
+      console.error('❌ ERROR data that caused this:', historyInsertData);
+      console.error('❌ ERROR stack trace:', new Error().stack);
       // Consider if asset/inventory_item should be rolled back or marked
       throw historyError;
     }
@@ -1310,25 +1338,19 @@ export const recordNewInventoryCheck = async (
     }
 
     // Create a new history record for this check
-    const { data: historyRecord, error: historyError } = await supabase
-      .from('inventory_history')
-      .insert({
-        organization_id: inventoryItem.organization_id,
-        inventory_item_id: inventoryItemId,
-        location: checkData.location || inventoryItem.location || '', // Now safe
-        quantity: finalQuantity, 
-        check_type: 'periodic', 
-        event_type: 'audit',    
-        notes: checkData.notes || 'Periodic inventory check',
-        status: checkData.status || inventoryItem.status || 'active', // Now safe
-        check_date: checkDate.toISOString(),
-        month_year,
-        created_by: userId,
-        created_at: new Date().toISOString(),
-        response_data: checkData.response_data || null
-      })
-      .select()
-      .single();
+    const { data: historyRecord, error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+      organization_id: inventoryItem.organization_id,
+      inventory_item_id: inventoryItemId,
+      check_type: 'periodic',
+      quantity: finalQuantity,
+      created_by: userId,
+      condition: null,
+      notes: checkData.notes || 'Periodic inventory check',
+      status: checkData.status || inventoryItem.status || 'active',
+      location: checkData.location || inventoryItem.location || '',
+      event_type: 'audit',
+      response_data: checkData.response_data || null
+    });
 
     if (historyError) {
       console.error('Error creating inventory history record for check:', historyError);
