@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ The AI may only execute commands that push code to Git or Firebase if and only if explicitly instructed to do so by the user. This includes git push, firebase deploy, or any other related deployment command.
+
+
+Do not initiate, suggest, or simulate any such push or deploy actions unless directly prompted by the user with a clear command (e.g., "push to git now", "deploy to firebase now").
