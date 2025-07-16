@@ -77,19 +77,39 @@ export const updateOrganization = async (orgId: string, updates: any): Promise<b
 
 // Delete a user completely from the system
 export const deleteUser = async (userId: string): Promise<boolean> => {
+  if (!userId) {
+    toast.error('User ID is required for deletion');
+    return false;
+  }
+
+  console.log('🗑️ Calling admin-delete-user edge function for user:', userId);
+  
+  const payload = { userId: userId };
+  console.log('📤 Sending payload to edge function:', payload);
+
   try {
-    // Call the delete_user_completely function
-    const { error } = await supabase.rpc('delete_user_completely', {
-      target_user_id: userId
+    const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+      body: payload,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Edge function error:', error);
+      console.error('Response data:', data);
+      toast.error(`Failed to delete user: ${error.message}`);
+      return false;
+    }
 
-    toast.success('User deleted successfully');
-    return true;
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    toast.error('Failed to delete user');
+    if (data.success) {
+      toast.success(data.message || 'User deleted successfully');
+      return true;
+    } else {
+      toast.error(data.error || 'Failed to delete user');
+      return false;
+    }
+  } catch (err: any) {
+    const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+    console.error('Error deleting user:', errorMessage);
+    toast.error(`Failed to delete user: ${errorMessage}`);
     return false;
   }
 };

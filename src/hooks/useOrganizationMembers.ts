@@ -142,6 +142,7 @@ export const useOrganizationMembers = () => {
     members,
     isLoading,
     fetchMembers,
+    refreshMembers: fetchMembers, // Alias for convenience
     updateMemberRole,
     removeMember,
     deleteUserCompletely

@@ -1,33 +1,16 @@
 import React, { useState } from 'react';
 import { useOrganization } from '@/hooks/useOrganization';
 import { useOrganizationMembers } from '@/hooks/useOrganizationMembers';
-import { useOrganizationInvitations } from '@/hooks/useOrganizationInvitations';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import MembersList from '@/components/organization/MembersList';
-import InviteForm from '@/components/organization/InviteForm';
-import PendingInvitationsList from '@/components/organization/PendingInvitationsList';
+import { MembersList } from '@/components/organization/MembersList';
+import DirectUserAddForm from '@/components/organization/DirectUserAddForm';
 
 // This component will render the main content for member management.
 // It can be used directly in a tab or wrapped by a page component if needed.
 const OrganizationMembersContent: React.FC = () => {
   const { currentOrganization } = useOrganization();
-  const [activeTab, setActiveTab] = useState<string>("invite");
   
-  const { members, isLoading, updateMemberRole, removeMember, deleteUserCompletely } = useOrganizationMembers();
-  const { 
-    invitations, 
-    newInviteEmail, 
-    setNewInviteEmail, 
-    newInviteRole, 
-    setNewInviteRole, 
-    newInviteCustomMessage,
-    setNewInviteCustomMessage,
-    isSubmitting, 
-    sendInvitation, 
-    resendInvitation,
-    deleteInvitation,
-    fetchInvitations 
-  } = useOrganizationInvitations();
+  const { members, isLoading, updateMemberRole, removeMember, deleteUserCompletely, refreshMembers } = useOrganizationMembers();
 
   if (!currentOrganization) {
     return (
@@ -52,7 +35,7 @@ const OrganizationMembersContent: React.FC = () => {
           </div>
         </div>
         <p className="text-muted-foreground">
-          View current members and invite new ones to join your organization.
+          View current members and add new ones directly to your organization.
         </p>
       </div>
 
@@ -68,13 +51,7 @@ const OrganizationMembersContent: React.FC = () => {
               </p>
             </div>
             <div className="p-6">
-              <MembersList 
-                members={members || []} 
-                isLoading={isLoading}
-                onRoleChange={updateMemberRole}
-                onRemoveMember={removeMember}
-                onDeleteUser={deleteUserCompletely}
-              />
+              <MembersList />
             </div>
           </div>
         </div>
@@ -82,40 +59,21 @@ const OrganizationMembersContent: React.FC = () => {
         {/* Right Sidebar */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-card border rounded-xl shadow-sm">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div className="p-6 border-b">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="invite" className="text-xs">Invite Members</TabsTrigger>
-                  <TabsTrigger value="pending" className="text-xs">
-                    Pending ({invitations?.length || 0})
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              
-              <div className="p-6">
-                <TabsContent value="invite" className="mt-0 space-y-0">
-                  <InviteForm
-                    email={newInviteEmail}
-                    setEmail={setNewInviteEmail}
-                    role={newInviteRole}
-                    setRole={setNewInviteRole}
-                    customMessage={newInviteCustomMessage}
-                    setCustomMessage={setNewInviteCustomMessage}
-                    onSubmit={sendInvitation}
-                    isSubmitting={isSubmitting}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="pending" className="mt-0 space-y-0">
-                  <PendingInvitationsList
-                    invitations={invitations || []}
-                    onDelete={deleteInvitation}
-                    onResend={resendInvitation}
-                    onRefresh={fetchInvitations}
-                  />
-                </TabsContent>
-              </div>
-            </Tabs>
+            <div className="p-6 border-b">
+              <h3 className="text-lg font-semibold">Add New Member</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Create user accounts directly
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <DirectUserAddForm
+                organizationId={currentOrganization.id}
+                onUserAdded={() => {
+                  refreshMembers();
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -136,7 +94,7 @@ const OrganizationMembersPage = () => {
         {/* Button to settings could be here if this is a standalone page */}
       </div>
       <p className="text-muted-foreground mb-6">
-        Manage the members of your organization. Invite new users or manage existing ones.
+        Manage the members of your organization. Create new users directly or manage existing ones.
       </p>
       <OrganizationMembersContent />
     </div>

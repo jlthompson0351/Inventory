@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -14,12 +14,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,35 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Mail, Phone, User } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 
-// Schema for email user creation
-const emailUserSchema = z.object({
+// Schema for user creation
+const userSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  full_name: z.string().min(2, { message: "Full name must be at least 2 characters" }),
   role: z.enum(['admin', 'member', 'viewer']),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
 });
 
-// Schema for phone user creation
-const phoneUserSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid phone number" }),
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  role: z.enum(['admin', 'member', 'viewer']),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-});
-
-// Schema for username user creation
-const usernameUserSchema = z.object({
-  username: z.string().min(4, { message: "Username must be at least 4 characters" }),
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  role: z.enum(['admin', 'member', 'viewer']),
-  password: z.string().min(8, { message: "Password must be at least 8 characters" }),
-});
-
-type EmailUserFormValues = z.infer<typeof emailUserSchema>;
-type PhoneUserFormValues = z.infer<typeof phoneUserSchema>;
-type UsernameUserFormValues = z.infer<typeof usernameUserSchema>;
+type UserFormValues = z.infer<typeof userSchema>;
 
 interface DirectUserAddFormProps {
   organizationId: string;
@@ -65,394 +41,153 @@ interface DirectUserAddFormProps {
 }
 
 const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, onUserAdded }) => {
-  const [activeTab, setActiveTab] = useState<string>('email');
   const [loading, setLoading] = useState(false);
-
-  // Email form
-  const emailForm = useForm<EmailUserFormValues>({
-    resolver: zodResolver(emailUserSchema),
+  
+  const form = useForm<z.infer<typeof userSchema>>({
+    resolver: zodResolver(userSchema),
     defaultValues: {
       email: '',
-      name: '',
-      role: 'member',
+      full_name: '',
       password: '',
+      role: 'member',
     },
   });
 
-  // Phone form
-  const phoneForm = useForm<PhoneUserFormValues>({
-    resolver: zodResolver(phoneUserSchema),
-    defaultValues: {
-      phone: '',
-      name: '',
-      role: 'member',
-      password: '',
-    },
-  });
-
-  // Username form
-  const usernameForm = useForm<UsernameUserFormValues>({
-    resolver: zodResolver(usernameUserSchema),
-    defaultValues: {
-      username: '',
-      name: '',
-      role: 'member',
-      password: '',
-    },
-  });
-
-  const createUserWithEmail = async (data: EmailUserFormValues) => {
+  const onSubmit = async (values: z.infer<typeof userSchema>) => {
     setLoading(true);
     try {
-      // First create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: data.password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: { full_name: data.name }
+      const payload = {
+        email: values.email,
+        password: values.password,
+        fullName: values.full_name,
+        role: values.role,
+        organizationId: organizationId,
+      };
+
+      console.log('🚀 Calling admin-create-user edge function with payload:', payload);
+
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: payload,
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Failed to create user");
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Edge Function returned a non-2xx status code: ${error.message}`);
+      }
 
-      // Then add the user to the organization
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          user_id: authData.user.id,
-          organization_id: organizationId,
-          role: data.role,
-          is_primary: false
-        });
-
-      if (memberError) throw memberError;
-
-      toast.success(`User ${data.email} created and added to organization`);
-      emailForm.reset();
+      console.log('User created successfully:', data);
+      toast.success('User created successfully!');
+      form.reset();
       onUserAdded();
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      toast.error(`Failed to create user: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Note: Phone authentication requires additional setup with a third-party SMS provider
-  const createUserWithPhone = async (data: PhoneUserFormValues) => {
-    setLoading(true);
-    try {
-      toast.error("Phone authentication requires additional setup with a third-party SMS provider");
-      // Implementation would go here once SMS provider is set up
-    } catch (error: any) {
-      console.error('Error creating user with phone:', error);
-      toast.error(`Failed to create user: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createUserWithUsername = async (data: UsernameUserFormValues) => {
-    setLoading(true);
-    try {
-      // Generate a random email since Supabase requires an email
-      const randomEmail = `${data.username}_${Math.random().toString(36).substring(2)}@example.com`;
-      
-      // Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: randomEmail,
-        password: data.password,
-        email_confirm: true,
-        user_metadata: { 
-          full_name: data.name,
-          username: data.username,
-          auth_method: 'username'
-        }
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Failed to create user");
-
-      // Add the user to the organization
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          user_id: authData.user.id,
-          organization_id: organizationId,
-          role: data.role,
-          is_primary: false
-        });
-
-      if (memberError) throw memberError;
-
-      toast.success(`User ${data.username} created and added to organization`);
-      usernameForm.reset();
-      onUserAdded();
-    } catch (error: any) {
-      console.error('Error creating user with username:', error);
-      toast.error(`Failed to create user: ${error.message}`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      console.error('Error creating user:', errorMessage);
+      toast.error(`Failed to create user: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
-        <CardTitle>Add User Directly</CardTitle>
-        <CardDescription>Create and add a user to your organization without sending an invitation.</CardDescription>
+        <CardTitle>Add New User Directly</CardTitle>
+        <CardDescription>
+          Create a new user and add them to the organization instantly.
+          They will be required to change their password on first login.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="email">
-              <Mail className="h-4 w-4 mr-2" />
-              Email
-            </TabsTrigger>
-            <TabsTrigger value="phone">
-              <Phone className="h-4 w-4 mr-2" />
-              Phone
-            </TabsTrigger>
-            <TabsTrigger value="username">
-              <User className="h-4 w-4 mr-2" />
-              Username
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Email Tab */}
-          <TabsContent value="email">
-            <Form {...emailForm}>
-              <form onSubmit={emailForm.handleSubmit(createUserWithEmail)} className="space-y-4">
-                <FormField
-                  control={emailForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="user@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={emailForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={emailForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={emailForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="********" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        User will use this to log in
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Add User
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-
-          {/* Phone Tab */}
-          <TabsContent value="phone">
-            <Form {...phoneForm}>
-              <form onSubmit={phoneForm.handleSubmit(createUserWithPhone)} className="space-y-4">
-                <FormField
-                  control={phoneForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 (555) 123-4567" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={phoneForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={phoneForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={phoneForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="********" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        User will use this to log in
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Add User
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-
-          {/* Username Tab */}
-          <TabsContent value="username">
-            <Form {...usernameForm}>
-              <form onSubmit={usernameForm.handleSubmit(createUserWithUsername)} className="space-y-4">
-                <FormField
-                  control={usernameForm.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="johndoe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={usernameForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={usernameForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="viewer">Viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={usernameForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="********" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        User will use this to log in
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Add User
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-        </Tabs>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email Address</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="user@example.com" 
+                      type="email"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="full_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Admin: Full access, Member: Standard access, Viewer: Read-only access
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Temporary Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    User will be required to change this password on first login
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add User
+            </Button>
+          </form>
+        </Form>
+        
+        <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <p className="text-sm text-blue-700">
+            <strong>Note:</strong> The new user will receive immediate access and must change their password on first login.
+          </p>
+        </div>
       </CardContent>
-      <CardFooter className="flex justify-center">
-        <p className="text-sm text-muted-foreground">
-          Added users will receive automatic access to the organization
-        </p>
-      </CardFooter>
     </Card>
   );
 };
