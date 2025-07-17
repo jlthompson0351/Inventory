@@ -10,7 +10,7 @@
  * 
  * For complete documentation, see README-FORM-BUILDER.md
  */
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -226,6 +226,206 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
   return result;
 };
 
+// Memoized FieldRow component for rendering each field
+const FieldRow = memo(function FieldRow({
+  field,
+  selectedField,
+  fieldBeingDragged,
+  fieldRefs,
+  setSelectedField,
+  handleDragStart,
+  handleDragOver,
+  handleDrop,
+  removeField,
+  moveField,
+  updateField,
+  formData,
+  mappedFields,
+  resetFormulaToTextMode,
+  previewCalculationWithMocks,
+  mockMappedValues
+}) {
+  return (
+    <div
+      key={field.id}
+      ref={el => fieldRefs.current[field.id] = el}
+      className={`border rounded-md p-4 relative ${
+        selectedField === field.id ? "border-primary" : ""
+      } ${
+        fieldBeingDragged === field.id ? "opacity-50" : ""
+      }`}
+      onClick={() => setSelectedField(field.id)}
+      draggable
+      onDragStart={(e) => handleDragStart(e, field.id)}
+      onDragOver={handleDragOver}
+      onDrop={(e) => handleDrop(e, field.id)}
+    >
+      <div className="flex items-start mb-3">
+        <div className="cursor-move p-1 text-muted-foreground mt-1">
+          <GripVertical className="h-4 w-4" />
+        </div>
+        <div className="flex-1 ml-2 min-w-0">
+          <p className="font-medium text-sm leading-tight break-words">{field.label || "Untitled Field"}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-muted-foreground">
+              {fieldTypes.find(t => t.value === field.type)?.label || field.type}
+            </span>
+            {field.required && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
+                Required
+              </Badge>
+            )}
+            {field.mappable && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
+                Mappable
+              </Badge>
+            )}
+            {field.inventory_action && field.inventory_action !== 'none' && (
+              <Badge 
+                variant="outline" 
+                className={`text-[10px] px-1.5 py-0.5 font-medium ${
+                  field.inventory_action === 'set' ? 'border-blue-500 text-blue-700 bg-blue-50' :
+                  field.inventory_action === 'add' ? 'border-green-500 text-green-700 bg-green-50' :
+                  field.inventory_action === 'subtract' ? 'border-orange-500 text-orange-700 bg-orange-50' :
+                  'border-gray-500 text-gray-700 bg-gray-50'
+                }`}
+              >
+                {field.inventory_action === 'set' ? '📋 SET' :
+                 field.inventory_action === 'add' ? '🔼 ADD' :
+                 field.inventory_action === 'subtract' ? '🔽 SUB' :
+                 (field.inventory_action as string).toUpperCase()}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex space-x-1 ml-2 shrink-0">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    moveField(field.id, 'up');
+                  }}
+                >
+                  <MoveUp className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Move Up</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    moveField(field.id, 'down');
+                  }}
+                >
+                  <MoveDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Move Down</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeField(field.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete Field</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+
+      {/* Preview of field based on type */}
+      <div className="pl-8 pr-2">
+        {field.type === "text" && (
+          <Input disabled placeholder={field.placeholder} />
+        )}
+        
+        {field.type === "number" && (
+          <Input type="number" disabled placeholder={field.placeholder} />
+        )}
+        
+        {field.type === "current_inventory" && (
+          <div>
+            <Input 
+              type="number" 
+              disabled 
+              placeholder={field.placeholder || "Enter initial quantity"} 
+              className="border-amber-300"
+            />
+            <p className="text-xs text-amber-600 mt-1">Initial inventory value</p>
+          </div>
+        )}
+        
+        {field.type === "textarea" && (
+          <Textarea disabled placeholder={field.placeholder} />
+        )}
+        
+        {field.type === "select" && (
+          <Select disabled>
+            <SelectTrigger>
+              <SelectValue placeholder={field.placeholder} />
+            </SelectTrigger>
+          </Select>
+        )}
+        
+        {field.type === "date" && (
+          <Input type="date" disabled />
+        )}
+        
+        {field.type === "checkbox" && (
+          <div className="flex items-center space-x-2">
+            <input type="checkbox" disabled className="form-checkbox" />
+            <span className="text-sm text-muted-foreground">{field.label}</span>
+          </div>
+        )}
+        
+        {field.type === "calculated" && (
+          <div>
+            <div className="space-y-4">
+              <VisualFormulaBuilder
+                formula={field.formula || ''}
+                onChange={(formula) => updateField(field.id, 'formula', formula)}
+                currentFields={formData.fields.filter(f => f.id !== field.id)}
+                mappedFields={mappedFields}
+                onPreview={(formula) => previewCalculationWithMocks(
+                  formula, 
+                  formData.fields.filter(f => f.id !== selectedField), 
+                  mockMappedValues
+                )}
+                resetToTextMode={resetFormulaToTextMode}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 const FormBuilder = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -394,118 +594,26 @@ const FormBuilder = () => {
     return `field_${maxId + 1}`;
   };
 
-  // Add a new field
-  const addField = () => {
-    const newField: FormField = {
-      id: generateFieldId(),
-      label: "New Field",
-      type: "text",
-      required: false,
-      placeholder: "Enter value",
-      options: [],
-      formula: "",
-      description: "",
-      mappable: false,
-      inventory_action: 'none'
-    };
-    
-    setFormData({
-      ...formData,
-      fields: [...formData.fields, newField],
-    });
-    
-    setSelectedField(newField.id);
-    
-    // Scroll to the new field after render
-    setTimeout(() => {
-      fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  };
-
-  // Add a field of specific type
-  const addFieldOfType = (type: string) => {
-    const newField: FormField = {
-      id: generateFieldId(),
-      label: type === "current_inventory" ? "Current Inventory" : 
-             type === "calculated" ? "Calculated Field" : "New Field",
-      type: type,
-      required: type === "current_inventory",
-      placeholder: type === "current_inventory" ? "Enter current inventory count" : 
-                   type === "number" ? "Enter number" : 
-                   type === "calculated" ? "Will be calculated automatically" : "Enter value",
-      options: [],
-      formula: "",
-      description: "",
-      mappable: type === "current_inventory" || type === "calculated",
-      inventory_action: 'none'
-    };
-    
-    setFormData({
-      ...formData,
-      fields: [...formData.fields, newField],
-    });
-    
-    setSelectedField(newField.id);
-    
-    // Scroll to the new field after render
-    setTimeout(() => {
-      fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
-  };
-
-  // Remove a field
-  const removeField = (id: string) => {
-    setFormData({
-      ...formData,
-      fields: formData.fields.filter(field => field.id !== id),
-    });
+  // Memoize all field update/remove/move/add functions
+  const updateField = useCallback((id: string, key: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      fields: prev.fields.map(field => 
+        field.id === id ? { ...field, [key]: value } : field
+      ),
+    }));
+  }, []);
+  const removeField = useCallback((id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      fields: prev.fields.filter(field => field.id !== id),
+    }));
     
     if (selectedField === id) {
       setSelectedField(null);
     }
-  };
-
-  // Update form title or description
-  const updateFormMeta = (key: string, value: string) => {
-    setFormData({
-      ...formData,
-      [key]: value,
-    });
-  };
-
-  // Update field properties
-  const updateField = (id: string, key: string, value: any) => {
-    setFormData({
-      ...formData,
-      fields: formData.fields.map(field => 
-        field.id === id ? { ...field, [key]: value } : field
-      ),
-    });
-  };
-
-  // Add option to a select field
-  const addOption = (fieldId: string) => {
-    if (!newOptionText.trim()) return;
-    
-    const field = formData.fields.find(f => f.id === fieldId);
-    if (field) {
-      const updatedOptions = [...field.options, newOptionText];
-      updateField(fieldId, 'options', updatedOptions);
-      setNewOptionText("");
-    }
-  };
-
-  // Remove option from a select field
-  const removeOption = (fieldId: string, optionIndex: number) => {
-    const field = formData.fields.find(f => f.id === fieldId);
-    if (field) {
-      const updatedOptions = field.options.filter((_, i) => i !== optionIndex);
-      updateField(fieldId, 'options', updatedOptions);
-    }
-  };
-
-  // Move field up or down
-  const moveField = (id: string, direction: 'up' | 'down') => {
+  }, [selectedField]);
+  const moveField = useCallback((id: string, direction: 'up' | 'down') => {
     const index = formData.fields.findIndex(field => field.id === id);
     if (
       (direction === 'up' && index === 0) || 
@@ -523,40 +631,68 @@ const FormBuilder = () => {
       ...formData,
       fields: reorderedFields,
     });
-  };
-
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    setFieldBeingDragged(id);
-  };
-
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  // Handle drop
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain');
+  }, []);
+  const addField = useCallback(() => {
+    const newField: FormField = {
+      id: generateFieldId(),
+      label: "New Field",
+      type: "text",
+      required: false,
+      placeholder: "Enter value",
+      options: [],
+      formula: "",
+      description: "",
+      mappable: false,
+      inventory_action: 'none'
+    };
     
-    if (sourceId !== targetId) {
-      const sourceIndex = formData.fields.findIndex(field => field.id === sourceId);
-      const targetIndex = formData.fields.findIndex(field => field.id === targetId);
-      
-      const reorderedFields = [...formData.fields];
-      const [movedField] = reorderedFields.splice(sourceIndex, 1);
-      reorderedFields.splice(targetIndex, 0, movedField);
-      
-      setFormData({
-        ...formData,
-        fields: reorderedFields,
-      });
-    }
+    setFormData(prev => ({
+      ...prev,
+      fields: [...prev.fields, newField],
+    }));
     
-    setFieldBeingDragged(null);
-  };
+    setSelectedField(newField.id);
+    
+    // Scroll to the new field after render
+    setTimeout(() => {
+      fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, []);
+  const addFieldOfType = useCallback((type: string) => {
+    const newField: FormField = {
+      id: generateFieldId(),
+      label: type === "current_inventory" ? "Current Inventory" : 
+             type === "calculated" ? "Calculated Field" : "New Field",
+      type: type,
+      required: type === "current_inventory",
+      placeholder: type === "current_inventory" ? "Enter current inventory count" : 
+                   type === "number" ? "Enter number" : 
+                   type === "calculated" ? "Will be calculated automatically" : "Enter value",
+      options: [],
+      formula: "",
+      description: "",
+      mappable: type === "current_inventory" || type === "calculated",
+      inventory_action: 'none'
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      fields: [...prev.fields, newField],
+    }));
+    
+    setSelectedField(newField.id);
+    
+    // Scroll to the new field after render
+    setTimeout(() => {
+      fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  }, []);
+  const updateFormMeta = useCallback((key: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  }, []);
 
   // Save form (now with asset type linking)
   const saveForm = async () => {
@@ -1236,183 +1372,25 @@ const FormBuilder = () => {
 
               <div className="space-y-4">
                 {formData.fields.map((field) => (
-                  <div
+                  <FieldRow
                     key={field.id}
-                    ref={el => fieldRefs.current[field.id] = el}
-                    className={`border rounded-md p-4 relative ${
-                      selectedField === field.id ? "border-primary" : ""
-                    } ${
-                      fieldBeingDragged === field.id ? "opacity-50" : ""
-                    }`}
-                    onClick={() => setSelectedField(field.id)}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, field.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, field.id)}
-                  >
-                    <div className="flex items-start mb-3">
-                      <div className="cursor-move p-1 text-muted-foreground mt-1">
-                        <GripVertical className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 ml-2 min-w-0">
-                        <p className="font-medium text-sm leading-tight break-words">{field.label || "Untitled Field"}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-muted-foreground">
-                            {fieldTypes.find(t => t.value === field.type)?.label || field.type}
-                          </span>
-                          {field.required && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5">
-                              Required
-                            </Badge>
-                          )}
-                          {field.mappable && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">
-                              Mappable
-                            </Badge>
-                          )}
-                          {field.inventory_action && field.inventory_action !== 'none' && (
-                            <Badge 
-                              variant="outline" 
-                              className={`text-[10px] px-1.5 py-0.5 font-medium ${
-                                field.inventory_action === 'set' ? 'border-blue-500 text-blue-700 bg-blue-50' :
-                                field.inventory_action === 'add' ? 'border-green-500 text-green-700 bg-green-50' :
-                                field.inventory_action === 'subtract' ? 'border-orange-500 text-orange-700 bg-orange-50' :
-                                'border-gray-500 text-gray-700 bg-gray-50'
-                              }`}
-                            >
-                              {field.inventory_action === 'set' ? '📋 SET' :
-                               field.inventory_action === 'add' ? '🔼 ADD' :
-                               field.inventory_action === 'subtract' ? '🔽 SUB' :
-                               (field.inventory_action as string).toUpperCase()}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex space-x-1 ml-2 shrink-0">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveField(field.id, 'up');
-                                }}
-                              >
-                                <MoveUp className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Move Up</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveField(field.id, 'down');
-                                }}
-                              >
-                                <MoveDown className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Move Down</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0 text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeField(field.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete Field</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
-
-                    {/* Preview of field based on type */}
-                    <div className="pl-8 pr-2">
-                      {field.type === "text" && (
-                        <Input disabled placeholder={field.placeholder} />
-                      )}
-                      
-                      {field.type === "number" && (
-                        <Input type="number" disabled placeholder={field.placeholder} />
-                      )}
-                      
-                      {field.type === "current_inventory" && (
-                        <div>
-                          <Input 
-                            type="number" 
-                            disabled 
-                            placeholder={field.placeholder || "Enter initial quantity"} 
-                            className="border-amber-300"
-                          />
-                          <p className="text-xs text-amber-600 mt-1">Initial inventory value</p>
-                        </div>
-                      )}
-                      
-                      {field.type === "textarea" && (
-                        <Textarea disabled placeholder={field.placeholder} />
-                      )}
-                      
-                      {field.type === "select" && (
-                        <Select disabled>
-                          <SelectTrigger>
-                            <SelectValue placeholder={field.placeholder} />
-                          </SelectTrigger>
-                        </Select>
-                      )}
-                      
-                      {field.type === "date" && (
-                        <Input type="date" disabled />
-                      )}
-                      
-                      {field.type === "checkbox" && (
-                        <div className="flex items-center space-x-2">
-                          <input type="checkbox" disabled className="form-checkbox" />
-                          <span className="text-sm text-muted-foreground">{field.label}</span>
-                        </div>
-                      )}
-                      
-                      {field.type === "calculated" && (
-                        <div>
-                          <div className="space-y-4">
-                            <VisualFormulaBuilder
-                              formula={field.formula || ''}
-                              onChange={(formula) => updateField(field.id, 'formula', formula)}
-                              currentFields={formData.fields.filter(f => f.id !== field.id)}
-                              mappedFields={mappedFields}
-                              onPreview={(formula) => previewCalculationWithMocks(
-                                formula, 
-                                formData.fields.filter(f => f.id !== selectedField), 
-                                mockMappedValues
-                              )}
-                              resetToTextMode={resetFormulaToTextMode}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    field={field}
+                    selectedField={selectedField}
+                    fieldBeingDragged={fieldBeingDragged}
+                    fieldRefs={fieldRefs}
+                    setSelectedField={setSelectedField}
+                    handleDragStart={handleDragStart}
+                    handleDragOver={handleDragOver}
+                    handleDrop={handleDrop}
+                    removeField={removeField}
+                    moveField={moveField}
+                    updateField={updateField}
+                    formData={formData}
+                    mappedFields={mappedFields}
+                    resetFormulaToTextMode={resetFormulaToTextMode}
+                    previewCalculationWithMocks={previewCalculationWithMocks}
+                    mockMappedValues={mockMappedValues}
+                  />
                 ))}
 
                 {formData.fields.length === 0 && (
@@ -1672,7 +1650,7 @@ const FormBuilder = () => {
                                     variant="ghost"
                                     size="sm"
                                     className="ml-2 text-destructive"
-                                    onClick={() => removeOption(field.id, index)}
+                                    onClick={() => removeField(field.id, index)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
