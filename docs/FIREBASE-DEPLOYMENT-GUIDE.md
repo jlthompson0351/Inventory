@@ -372,9 +372,9 @@ lighthouse https://your-app.web.app --output=html
 - All Supabase connections use secure transport
 
 **Environment Variable Security:**
-- Sensitive keys stored in GitHub Secrets for CI/CD
-- Local development uses `.env` files (not committed)
-- Build-time variable injection prevents runtime exposure
+- Anon keys safely included as fallbacks (designed for client-side use)
+- Optional `.env` files for environment-specific configurations
+- Build-time variable injection with secure fallback patterns
 
 **Anonymous Access Control:**
 - RLS policies limit anonymous access to specific operations

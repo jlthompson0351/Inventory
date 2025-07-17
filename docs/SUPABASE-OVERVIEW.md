@@ -22,9 +22,10 @@ BarcodEx uses Supabase as its backend service, providing:
 ### Connection Details
 
 ```typescript
-// Production configuration (with fallbacks)
+// Production configuration (with secure anon key fallbacks)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxcubbibhofdvporfarj.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+// Note: Anon keys are safe for client-side use and protected by RLS policies
 ```
 
 ## Architecture Overview

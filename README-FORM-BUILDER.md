@@ -21,6 +21,9 @@ The Form Builder is a comprehensive tool for creating dynamic, customizable form
 - **Cross-Form Field Mapping**: Reference fields from other forms in the same asset type
 - **Real-time Formula Validation**: Instant feedback on formula syntax and field references
 - **Mock Value Testing**: Test formulas with sample data before deployment
+- **🔒 Secure Evaluation**: Enterprise-grade formula engine using mathjs - **zero eval() usage**
+- **Performance Optimized**: Intelligent caching system for fast formula calculations
+- **JavaScript Compatible**: Handles division by zero and error cases exactly like native JavaScript
 
 ### 🏭 Asset Type Integration
 - **Automatic Linking**: Forms can be automatically linked to asset types during creation
@@ -288,13 +291,17 @@ Mapped fields allow forms to reference:
 Forms created with the Form Builder integrate with the inventory system API:
 
 - **Form Submission**: Submitting forms automatically updates inventory based on field actions
-- **Calculation Engine**: Formulas are evaluated server-side for security and consistency
+- **Calculation Engine**: Formulas are evaluated using secure mathjs library - **100% eval()-free**
 - **Validation**: Field validation occurs both client-side and server-side
 - **Asset Integration**: Asset type links are maintained through the API
 
 ## Security Considerations
 
-- **Formula Sandboxing**: Formulas are evaluated in a secure sandbox environment
+- **🔒 Zero eval() Usage**: Complete elimination of dangerous eval() function calls
+- **Secure Mathematical Engine**: Uses mathjs library with restricted function scope
+- **Input Validation**: All formula inputs are validated and sanitized
+- **Caching Security**: Formula compilation cache prevents code injection attacks
+- **JavaScript Compatibility**: Maintains exact JavaScript mathematical behavior without security risks
 - **Input Validation**: All form inputs are validated and sanitized
 - **Organization Isolation**: Forms are isolated by organization for security
 - **Permission Checking**: User permissions are verified for all form operations

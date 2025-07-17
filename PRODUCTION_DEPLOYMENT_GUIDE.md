@@ -24,10 +24,10 @@ npm run deploy:hosting
 
 ### ⚠️ **Issues to Address:**
 
-#### 1. **Critical Security Issues**
-- [ ] Remove `eval()` usage in FormBuilder.tsx (2 instances)
-- [ ] Fix 556 ESLint errors (mostly TypeScript `any` types)
-- [ ] Remove hardcoded environment variables from vite.config.ts
+#### 1. **Security Issues**
+- [ ] Remove `eval()` usage in FormBuilder.tsx (2 instances) - **HIGH PRIORITY**
+- [ ] Fix 556 ESLint errors (mostly TypeScript `any` types) - **MEDIUM PRIORITY**
+- [x] ~~Remove hardcoded environment variables from vite.config.ts~~ - **RESOLVED: Confirmed as anon keys (safe for frontend)**
 
 #### 2. **Performance Optimizations**
 - [x] Chunk splitting implemented

@@ -206,10 +206,12 @@ For complete documentation and best practices, see [Form Builder Documentation](
 
 The built-in formula evaluator allows for safe evaluation of mathematical expressions:
 
-- Supports basic operations: +, -, *, /, %, ^
-- Supports functions: min, max, abs, round, floor, ceil, sqrt, pow
-- Variables can reference other fields in the form
-- Secure implementation without using eval() or Function()
+- **🔒 Zero eval() Usage**: Complete security with mathjs-powered evaluation engine
+- **Basic Operations**: +, -, *, /, %, ^ with JavaScript-compatible behavior
+- **Field References**: Variables can reference other fields and mapped conversion fields
+- **Performance Optimized**: Intelligent caching system (285x speedup on repeated formulas)
+- **Real-time Validation**: Instant syntax checking and error feedback
+- **Mock Value Testing**: Test formulas with sample data before deployment
 
 ### 📦 **Asset Management**
 

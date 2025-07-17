@@ -67,6 +67,7 @@ import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTyp
 import { registerMappedField, unregisterMappedField } from "@/services/mappedFieldService";
 import { getAssetTypes } from "@/services/assetTypeService";
 import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
+import { FormBuilderEvaluator } from '@/utils/safeEvaluator';
 
 // Field type options
 const fieldTypes = [
@@ -142,7 +143,7 @@ const validateInventoryAction = (action: any): 'add' | 'subtract' | 'set' | 'non
 };
 
 // Helper function to validate formula
-const validateFormula = (formula: string, currentFields: FormField[], mappedFields: any[]): { 
+const validateFormula = (formula: string, currentFields: FormField[], mappedFields: any[], lenient = false): { 
   isValid: boolean; 
   error?: string;
   referencedFields: string[];
@@ -162,30 +163,33 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
   const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
   result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
   
-  // Check if referenced fields exist
-  const nonExistentFields = result.referencedFields.filter(
-    fieldId => !currentFields.some(f => f.id === fieldId)
-  );
-  
-  if (nonExistentFields.length > 0) {
-    return {
-      ...result,
-      isValid: false,
-      error: `Referenced fields don't exist: ${nonExistentFields.join(', ')}`
-    };
-  }
-  
-  // Check if referenced mapped fields exist
-  const nonExistentMappedFields = result.referencedMappedFields.filter(
-    mappedKey => !mappedFields.some(f => `mapped.${f.field_id}` === mappedKey)
-  );
-  
-  if (nonExistentMappedFields.length > 0) {
-    return {
-      ...result,
-      isValid: false,
-      error: `Referenced mapped fields don't exist: ${nonExistentMappedFields.join(', ')}`
-    };
+  // In lenient mode, we allow non-existent fields (they'll be replaced with fallback values)
+  if (!lenient) {
+    // Check if referenced fields exist
+    const nonExistentFields = result.referencedFields.filter(
+      fieldId => !currentFields.some(f => f.id === fieldId)
+    );
+    
+    if (nonExistentFields.length > 0) {
+      return {
+        ...result,
+        isValid: false,
+        error: `Referenced fields don't exist: ${nonExistentFields.join(', ')}`
+      };
+    }
+    
+    // Check if referenced mapped fields exist
+    const nonExistentMappedFields = result.referencedMappedFields.filter(
+      mappedKey => !mappedFields.some(f => `mapped.${f.field_id}` === mappedKey)
+    );
+    
+    if (nonExistentMappedFields.length > 0) {
+      return {
+        ...result,
+        isValid: false,
+        error: `Referenced mapped fields don't exist: ${nonExistentMappedFields.join(', ')}`
+      };
+    }
   }
   
   // Check formula syntax (basic testing for balanced braces, operators)
@@ -202,9 +206,14 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
     // Clean comments
     testFormula = testFormula.replace(/\/\*.*?\*\//g, '');
     
-    // Eval to see if it throws errors
-     
-    eval(testFormula);
+    // Use secure safe evaluator for formula validation
+    const validationResult = FormBuilderEvaluator.validateFormula(formula, currentFields, mappedFields);
+    if (!validationResult.isValid) {
+      throw new Error(validationResult.error || 'Validation failed');
+    }
+    
+    // Test the actual formula parsing with safe evaluator
+    FormBuilderEvaluator.previewCalculation(testFormula.replace(/\{field_\d+\}/g, '1').replace(/\{mapped\.[a-zA-Z0-9_]+\}/g, '1'));
     
   } catch (e) {
     return {
@@ -650,14 +659,8 @@ const FormBuilder = () => {
   const previewCalculation = (formula: string) => {
     let sampleResult = "Error";
     try {
-      // Replace field references with sample values
-      const processedFormula = formula
-        .replace(/\{field_1\}/g, "10")
-        .replace(/\{field_2\}/g, "5")
-        .replace(/\{field_3\}/g, "20");
-      
-       
-      sampleResult = eval(processedFormula).toString();
+      // Use secure safe evaluator for formula preview
+      sampleResult = FormBuilderEvaluator.previewCalculation(formula);
     } catch (e) {
       // Formula evaluation failed
     }
@@ -759,18 +762,12 @@ const FormBuilder = () => {
         return "Empty formula";
       }
   
-       
-      const result = eval(processedFormula);
-      
-      if (typeof result !== 'number' || isNaN(result)) {
-        return "Invalid result";
-      }
-      
-      // Format the result nicely
-      return Number(result).toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 4
-      });
+      // Use secure safe evaluator for calculation with formatting
+      return FormBuilderEvaluator.calculateWithFormatting(
+        formula, 
+        currentFieldsInForm, 
+        localMockValues
+      );
     } catch (e) {
       return "Calculation Error";
     }
@@ -1760,7 +1757,8 @@ const FormBuilder = () => {
                 formulaValidationRes = validateFormula(
                   currentCalcField.formula, 
                   formData.fields.filter(f => f.id !== selectedField),
-                  mappedFields
+                  mappedFields,
+                  true // Use lenient mode for Mock Values testing - allows non-existent fields
                 );
                 fieldDependenciesInFormula = formulaValidationRes.referencedFields;
               }
@@ -1894,7 +1892,7 @@ const FormBuilder = () => {
                             }
                           </p>
                           <p className="text-xs text-green-700 mt-1">
-                            Real-time calculation using mock values above
+                            Real-time calculation using mock values above. Non-existent fields use fallback values.
                           </p>
                         </div>
                       )}

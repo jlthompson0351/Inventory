@@ -1,5 +1,8 @@
 # FormBuilder Glitching Debug Summary
 
+## ⚠️ Security Note (Updated)
+**Previous security concerns about hardcoded Supabase credentials have been resolved.** Investigation confirmed these are **anon keys** which are specifically designed for client-side use and protected by Row-Level Security (RLS) policies. Hardcoded fallbacks ensure reliable production operation and are a recommended Supabase pattern for anon keys.
+
 ## Problem
 The FormBuilder was experiencing infinite re-renders/glitching when editing forms with many mapped fields (6+ calculated fields).
 

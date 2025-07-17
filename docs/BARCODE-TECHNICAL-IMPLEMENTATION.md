@@ -345,7 +345,7 @@ define: {
   'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
 }
 
-// Add hardcoded fallbacks in client
+// Add secure anon key fallbacks in client (safe for frontend)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kxcubbibhofdvporfarj.supabase.co';
 ```
 
