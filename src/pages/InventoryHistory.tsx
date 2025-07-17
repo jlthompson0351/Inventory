@@ -477,7 +477,7 @@ export default function InventoryHistory() {
         reason,
         fixType: reason.includes('Auto-fix') ? 'auto' : 'manual',
         confidence: reason.includes('confidence') ? 
-          parseInt(reason.match(/(\d+)% confidence/)?.[1] || '0') : undefined
+          parseInt(reason.match(/(\d+)% confidence/)?.[1] || '0', 10) : undefined
       });
       
       if (result.success) {

@@ -17,8 +17,7 @@ export default function Assets() {
   const [assetTypeFilter, setAssetTypeFilter] = useState<string>("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // Debug logging - only on initial render
-  console.log("Assets.tsx rendering");
+
   
   // Memoize the organization ID to prevent unnecessary re-renders
   const organizationId = useMemo(() => 

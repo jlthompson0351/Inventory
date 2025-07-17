@@ -99,7 +99,7 @@ export function DynamicInventoryForm() {
         asset_type_id: assetType.id,
         name: asset.name,
         description: asset.description || "",
-        quantity: formData.quantity ? parseInt(formData.quantity) : 0,
+        quantity: formData.quantity ? parseInt(formData.quantity, 10) : 0,
         metadata: formData,
       };
       

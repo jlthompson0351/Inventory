@@ -49,7 +49,7 @@ export function FormulaTestPanel({ formula, availableFields = [] }: FormulaTestP
   
   // Update a test value for a specific field
   const updateTestValue = (field: string, value: string) => {
-    const numValue = value === '' ? 0 : parseFloat(value);
+    const numValue = value === '' ? 0 : (isNaN(parseFloat(value)) ? 0 : parseFloat(value));
     
     setTestValues(prev => ({
       ...prev,

@@ -113,7 +113,7 @@ export default function SystemSettings() {
                   onChange={(e) =>
                     setConfig((prev) => ({
                       ...prev,
-                      maxOrganizationsPerUser: parseInt(e.target.value) || 0
+                      maxOrganizationsPerUser: parseInt(e.target.value, 10) || 0
                     }))
                   }
                 />
@@ -127,7 +127,7 @@ export default function SystemSettings() {
                   onChange={(e) =>
                     setConfig((prev) => ({
                       ...prev,
-                      maxMembersPerOrganization: parseInt(e.target.value) || 0
+                      maxMembersPerOrganization: parseInt(e.target.value, 10) || 0
                     }))
                   }
                 />

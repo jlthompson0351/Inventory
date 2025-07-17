@@ -691,7 +691,7 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
                         <Label className="text-sm">Auto Preview</Label>
                       </div>
                       
-                      <Select value={previewLimit.toString()} onValueChange={(v) => setPreviewLimit(parseInt(v))}>
+                      <Select value={previewLimit.toString()} onValueChange={(v) => setPreviewLimit(parseInt(v, 10))}>
                         <SelectTrigger className="w-20 h-8">
                           <SelectValue />
                         </SelectTrigger>
@@ -807,7 +807,7 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
                   className="h-8"
                   value={config.caching?.ttl || 300}
                   onChange={(e) => updateConfig({
-                    caching: { ...config.caching!, ttl: parseInt(e.target.value) || 300 }
+                    caching: { ...config.caching!, ttl: parseInt(e.target.value, 10) || 300 }
                   })}
                 />
               </div>

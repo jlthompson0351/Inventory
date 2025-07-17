@@ -362,15 +362,9 @@ export default function SubmitForm() {
         // For now, let's assume formData is primary.
         setMergedFormData(finalMergedData); 
         
-        console.log('SubmitForm - Final assetMetadata for FormRenderer:', currentAssetMetadata);
-        console.log('SubmitForm - Final formData for FormRenderer:', finalMergedData);
+
         
-        // Debug: Show what will be passed as mappedFields
-        console.log('SubmitForm - Mapped fields for calculations:', currentAssetMetadata);
-        console.log('SubmitForm - Available conversion fields in mappedFields:');
-        Object.entries(currentAssetMetadata).forEach(([key, value]) => {
-          console.log(`  - ${key}: ${value} (type: ${typeof value})`);
-        });
+
         
         // Additional debugging to ensure conversion fields are numbers
         console.log('SubmitForm - Conversion fields as numbers:');

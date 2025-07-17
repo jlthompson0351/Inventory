@@ -100,7 +100,7 @@ const NewItem = () => {
         barcode: formData.barcode || null,
         sku: formData.sku || null,
         asset_type_id: formData.asset_type_id || null,
-        quantity: parseInt(formData.quantity),
+        quantity: parseInt(formData.quantity, 10),
         description: formData.description || null,
         location: formData.location || null,
         status: formData.status,

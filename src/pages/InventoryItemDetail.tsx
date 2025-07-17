@@ -481,7 +481,7 @@ export function InventoryItemDetail() {
                     min="0"
                     className="w-full p-2 border rounded-md"
                     value={checkData.quantity}
-                    onChange={(e) => setCheckData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => setCheckData(prev => ({ ...prev, quantity: parseInt(e.target.value, 10) || 0 }))}
                   />
                 </div>
                 

@@ -19,7 +19,7 @@ const OrganizationAdvancedSettings = () => {
   };
 
   const handleMaxMembersChange = (value: string) => {
-    const numValue = parseInt(value) || 50;
+    const numValue = parseInt(value, 10) || 50;
     updateSetting('maxMembers', numValue);
     toast.success(`Maximum members set to ${numValue}`);
   };

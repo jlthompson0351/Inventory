@@ -71,7 +71,7 @@ const detectTypingError = (current: number, previous: number): { isError: boolea
     
     // Likely extra digit at beginning (e.g., 64 → 164)
     if (current > 100 && String(current).startsWith('1') && String(previous).length === String(current).length - 1) {
-      const withoutFirstDigit = parseInt(String(current).substring(1));
+      const withoutFirstDigit = parseInt(String(current).substring(1), 10);
       if (Math.abs(withoutFirstDigit - previous) <= 5) {
         return { isError: true, suggestedFix: withoutFirstDigit };
       }

@@ -196,7 +196,7 @@ export function InventoryAggregationReport({ className }: InventoryAggregationRe
               <label className="text-sm font-medium mb-1 block">Year</label>
               <Select
                 value={selectedYear.toString()}
-                onValueChange={(value) => setSelectedYear(parseInt(value))}
+                onValueChange={(value) => setSelectedYear(parseInt(value, 10))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select year" />
@@ -215,7 +215,7 @@ export function InventoryAggregationReport({ className }: InventoryAggregationRe
               <label className="text-sm font-medium mb-1 block">Month</label>
               <Select
                 value={selectedMonth.toString()}
-                onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                onValueChange={(value) => setSelectedMonth(parseInt(value, 10))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select month" />

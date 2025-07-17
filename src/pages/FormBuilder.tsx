@@ -379,7 +379,7 @@ const FormBuilder = () => {
   const generateFieldId = () => {
     const ids = formData.fields.map(field => {
       const match = field.id.match(/field_(\d+)/);
-      return match ? parseInt(match[1]) : 0;
+      return match ? parseInt(match[1], 10) : 0;
     });
     const maxId = Math.max(...ids, 0);
     return `field_${maxId + 1}`;
