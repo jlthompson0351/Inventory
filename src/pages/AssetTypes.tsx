@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Plus, Edit, Trash2, Loader2, ArrowUp, ArrowDown, Filter, Copy, RefreshCw, Search, FileText, ListCheck, Package, FileStack, Archive, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,12 +67,13 @@ import {
   removeAssetTypeFormLink,
   addAssetTypeFormLink,
   getAssetTypeForms,
+  batchGetAssetTypeForms,
   checkAssetTypeNameExists
 } from "@/services/assetTypeService";
 import { supabase } from "@/integrations/supabase/client"; // Import the supabase client directly
 import { useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
-import { getFormsByAssetType, getForms } from '@/services/formService';
+// Removed unused form imports since Forms are managed in AssetTypeDetail page
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 // Color options for asset types
@@ -110,14 +111,18 @@ const AssetTypes = () => {
     prefix: "",
   });
   const navigate = useNavigate();
-  const [formsModalOpen, setFormsModalOpen] = useState(false);
-  const [formsForAssetType, setFormsForAssetType] = useState<any[]>([]);
-  const [selectedAssetType, setSelectedAssetType] = useState<AssetTypeWithCount | null>(null);
-  const [allForms, setAllForms] = useState<any[]>([]);
   const [assetTypeForms, setAssetTypeForms] = useState<{ [assetTypeId: string]: any[] }>({});
   const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("active");
   const [archivedAssetTypes, setArchivedAssetTypes] = useState<AssetTypeWithCount[]>([]);
+  
+  // 🚀 Debounced validation state (2024 best practices - 300ms delay)
+  const [nameValidation, setNameValidation] = useState<{
+    isChecking: boolean;
+    isValid: boolean | null;
+    error: string | null;
+  }>({ isChecking: false, isValid: null, error: null });
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Memoize the current organization ID to stabilize dependencies
   const currentOrgId = useMemo(() => currentOrganization?.id, [currentOrganization?.id]);
@@ -248,9 +253,62 @@ const AssetTypes = () => {
     return filtered;
   }, [displayList, filterOptions.hasAssets, searchTerm, sortField, sortDirection, viewMode]);
 
+  // 🚀 Debounced name validation (2024 best practice: 300ms delay)
+  const validateNameDebounced = useCallback(async (name: string) => {
+    if (!name.trim() || !currentOrganization?.id) {
+      setNameValidation({ isChecking: false, isValid: null, error: null });
+      return;
+    }
+
+    setNameValidation({ isChecking: true, isValid: null, error: null });
+
+    try {
+      const nameExists = await checkAssetTypeNameExists(
+        supabase,
+        name.trim(),
+        currentOrganization.id,
+        editingAssetType?.id // Exclude current asset type when editing
+      );
+
+      if (nameExists) {
+        setNameValidation({
+          isChecking: false,
+          isValid: false,
+          error: `An asset type named "${name}" already exists`
+        });
+      } else {
+        setNameValidation({
+          isChecking: false,
+          isValid: true,
+          error: null
+        });
+      }
+    } catch (error) {
+      console.error('Name validation error:', error);
+      setNameValidation({
+        isChecking: false,
+        isValid: null,
+        error: 'Validation failed'
+      });
+    }
+  }, [currentOrganization?.id, editingAssetType?.id]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+
+    // Apply debounced validation for name field
+    if (name === 'name') {
+      // Clear previous timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+
+      // Set new timeout for 300ms (industry standard)
+      debounceTimeoutRef.current = setTimeout(() => {
+        validateNameDebounced(value);
+      }, 300);
+    }
   };
 
   const handleColorChange = (color: string) => {
@@ -288,25 +346,47 @@ const AssetTypes = () => {
       return;
     }
 
+    // Prevent submission if name validation failed
+    if (nameValidation.isValid === false) {
+      toast({
+        title: "Validation Error",
+        description: nameValidation.error || "Please fix the name validation error before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Wait for any pending validation to complete
+    if (nameValidation.isChecking) {
+      toast({
+        title: "Please Wait",
+        description: "Name validation is in progress. Please wait a moment.",
+        variant: "default"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (editingAssetType) {
-        // Check for duplicate name when editing
-        const nameExists = await checkAssetTypeNameExists(
-          supabase,
-          formData.name,
-          currentOrganization.id,
-          editingAssetType.id
-        );
-        
-        if (nameExists) {
-          toast({
-            title: "Validation Error", 
-            description: `An asset type named "${formData.name}" already exists in this organization.`,
-            variant: "destructive"
-          });
-          setIsSubmitting(false);
-          return;
+        // Final check for duplicate name when editing (fallback for edge cases)
+        if (nameValidation.isValid !== true) {
+          const nameExists = await checkAssetTypeNameExists(
+            supabase,
+            formData.name,
+            currentOrganization.id,
+            editingAssetType.id
+          );
+          
+          if (nameExists) {
+            toast({
+              title: "Validation Error", 
+              description: `An asset type named "${formData.name}" already exists in this organization.`,
+              variant: "destructive"
+            });
+            setIsSubmitting(false);
+            return;
+          }
         }
         
         // Update existing asset type
@@ -438,82 +518,53 @@ const AssetTypes = () => {
     }));
   };
 
-  const openFormsModal = async (assetType: AssetTypeWithCount) => {
-    setSelectedAssetType(assetType);
-    setFormsModalOpen(true);
-    if (currentOrganization?.id && assetType.id) {
-      const forms = await getAssetTypeForms(assetType.id, currentOrganization.id);
-      setFormsForAssetType(forms);
-    }
-  };
-
-  useEffect(() => {
-    if (!formsModalOpen && editingAssetType && currentOrganization?.id) {
-      getAssetTypeForms(editingAssetType.id, currentOrganization.id).then(setFormsForAssetType);
-    }
-  }, [formsModalOpen, editingAssetType, currentOrganization]);
-
-  useEffect(() => {
-    if (isFormOpen && currentOrganization?.id) {
-      (async () => {
-        try {
-          const forms = await getForms(currentOrganization.id);
-          setAllForms(forms || []);
-        } catch (e) {
-          console.error("Error fetching all forms:", e);
-          setAllForms([]);
-        }
-      })();
-    }
-  }, [isFormOpen, currentOrganization]);
-
-  const suggestFormPurpose = (formName: string): string => {
-    const name = formName.toLowerCase();
-    
-    if (name.includes('intake') || name.includes('add') || name.includes('new') || name.includes('create')) {
-      return 'intake';
-    }
-    
-    if (name.includes('inventory') || name.includes('check') || name.includes('list') || name.includes('manage')) {
-      return 'inventory';
-    }
-    
-    if (name.includes('adjust') || name.includes('update') || name.includes('modify') || name.includes('change')) {
-      return 'adjustment';
-    }
-    
-    if (name.includes('transfer') || name.includes('move') || name.includes('relocate') || name.includes('transport')) {
-      return 'transfer';
-    }
-    
-    return 'intake';
-  };
+  // Removed unused form-related functions since Forms are managed in AssetTypeDetail page
 
   useEffect(() => {
     const loadFormsForAllAssetTypes = async () => {
       if (!currentOrganization?.id || assetTypes.length === 0) return;
       
-      const formsMap: { [assetTypeId: string]: any[] } = {};
-      
-      assetTypes.forEach(assetType => {
-        formsMap[assetType.id] = [];
-      });
-      
-      await Promise.all(assetTypes.map(async (assetType) => {
-        try {
-          const forms = await getAssetTypeForms(assetType.id, currentOrganization.id);
-          formsMap[assetType.id] = forms || [];
-        } catch (e) {
-          console.error(`Error fetching forms for asset type ${assetType.id}:`, e);
-          formsMap[assetType.id] = [];
-        }
-      }));
-      
-      setAssetTypeForms(formsMap);
+      try {
+        // 🚀 OPTIMIZED: Single batch query instead of N+1 individual queries
+        // This implements 2024 DataLoader best practices for bulk operations
+        const assetTypeIds = assetTypes.map(assetType => assetType.id);
+        const formsMap = await batchGetAssetTypeForms(assetTypeIds, currentOrganization.id);
+        
+        setAssetTypeForms(formsMap);
+        
+        console.log(`✅ Performance improvement: Loaded forms for ${assetTypeIds.length} asset types with 1 query instead of ${assetTypeIds.length} queries`);
+      } catch (e) {
+        console.error('Error batch fetching forms for asset types:', e);
+        // Fallback to empty forms map
+        const fallbackMap: { [assetTypeId: string]: any[] } = {};
+        assetTypes.forEach(assetType => {
+          fallbackMap[assetType.id] = [];
+        });
+        setAssetTypeForms(fallbackMap);
+      }
     };
     
     loadFormsForAllAssetTypes();
   }, [assetTypes, currentOrganization]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Reset validation state when form opens/closes
+  useEffect(() => {
+    if (!isFormOpen) {
+      setNameValidation({ isChecking: false, isValid: null, error: null });
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    }
+  }, [isFormOpen]);
 
   if (!currentOrganization) {
     return (
@@ -563,7 +614,7 @@ const AssetTypes = () => {
               <div className="flex items-center gap-4 text-xs text-blue-600">
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                  <span>Use the <strong>"Forms"</strong> button to link forms</span>
+                  <span>Click <strong>"Details"</strong> to access the Forms tab</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-blue-400"></div>
@@ -767,37 +818,13 @@ const AssetTypes = () => {
                                         variant="outline" 
                                         size="sm" 
                                         className="h-8 px-2 text-xs"
-                                        onClick={() => openFormsModal(assetType)}
-                                      >
-                                        <FileText className="h-3 w-3 mr-1" />
-                                        Forms
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="text-center">
-                                        <div className="font-medium">Manage Forms</div>
-                                        <div className="text-xs text-muted-foreground mt-1">
-                                          Link forms to enable conversion fields
-                                        </div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-8 px-2 text-xs"
                                         onClick={() => navigate(`/asset-types/${assetType.id}`)}
                                       >
                                         <Package className="h-3 w-3 mr-1" />
                                         Details
                                       </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>View asset type details & settings</TooltipContent>
+                                    <TooltipContent>View asset type details & settings (includes Forms tab)</TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               </div>
@@ -901,13 +928,44 @@ const AssetTypes = () => {
           <div className="space-y-4 py-2 pb-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="e.g., Laptops, Chairs, Tools"
-              />
+              <div className="relative">
+                <Input
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Laptops, Chairs, Tools"
+                  className={`pr-10 ${
+                    nameValidation.isValid === false ? 'border-red-500 focus:ring-red-500' :
+                    nameValidation.isValid === true ? 'border-green-500 focus:ring-green-500' : ''
+                  }`}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  {nameValidation.isChecking && (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                  {nameValidation.isValid === true && (
+                    <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
+                      <div className="h-2 w-2 bg-white rounded-full" />
+                    </div>
+                  )}
+                  {nameValidation.isValid === false && (
+                    <div className="h-4 w-4 rounded-full bg-red-500 flex items-center justify-center">
+                      <div className="h-1 w-2 bg-white rounded-full" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              {nameValidation.error && (
+                <p className="text-sm text-red-600 mt-1">
+                  {nameValidation.error}
+                </p>
+              )}
+              {nameValidation.isValid === true && formData.name.trim() && (
+                <p className="text-sm text-green-600 mt-1">
+                  ✓ Name is available
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

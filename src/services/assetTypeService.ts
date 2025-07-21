@@ -178,6 +178,7 @@ export const deleteAssetType = async (
   }
 };
 
+// Get a single asset type by ID with supabase client parameter
 export async function getAssetType(
   supabase: ReturnType<typeof createClient<Database>>,
   id: string
@@ -436,4 +437,95 @@ export const getArchivedAssetTypesWithCounts = async (
   );
       // Fetched archived asset types with counts
   return typesWithCounts;
+};
+
+/**
+ * Batch fetch forms for multiple asset types in a single query
+ * Implements 2024 best practices for N+1 problem resolution
+ * @param assetTypeIds Array of asset type IDs to fetch forms for
+ * @param organizationId Organization ID for filtering
+ * @returns Promise<Record<string, any[]>> - Map of asset type ID to forms array
+ */
+export const batchGetAssetTypeForms = async (
+  assetTypeIds: string[],
+  organizationId: string
+): Promise<Record<string, any[]>> => {
+  try {
+    if (assetTypeIds.length === 0) {
+      return {};
+    }
+
+    // Step 1: Fetch asset type form relationships
+    const { data: relationships, error: relationError } = await supabase
+      .from('asset_type_forms')
+      .select('asset_type_id, form_id')
+      .in('asset_type_id', assetTypeIds)
+      .eq('organization_id', organizationId)
+      .eq('is_deleted', false);
+
+    if (relationError) {
+      console.error('[batchGetAssetTypeForms] Error fetching relationships:', relationError);
+      throw relationError;
+    }
+
+    if (!relationships || relationships.length === 0) {
+      // Return empty arrays for each asset type
+      const emptyMap: Record<string, any[]> = {};
+      assetTypeIds.forEach(id => {
+        emptyMap[id] = [];
+      });
+      return emptyMap;
+    }
+
+    // Step 2: Get unique form IDs and fetch forms
+    const formIds: string[] = Array.from(new Set(relationships.map((r: any) => r.form_id)));
+    
+    const { data: forms, error: formsError } = await supabase
+      .from('forms')
+      .select('id, name, description, form_type, organization_id')
+      .in('id', formIds)
+      .eq('organization_id', organizationId)
+      .eq('is_deleted', false);
+
+    if (formsError) {
+      console.error('[batchGetAssetTypeForms] Error fetching forms:', formsError);
+      throw formsError;
+    }
+
+    // Step 3: Create forms lookup and build result map
+    const formsLookup = new Map<string, any>();
+    (forms || []).forEach((form: any) => {
+      formsLookup.set(form.id, form);
+    });
+
+    const formsMap: Record<string, any[]> = {};
+    
+    // Initialize empty arrays for all requested asset types
+    assetTypeIds.forEach(id => {
+      formsMap[id] = [];
+    });
+
+    // Group forms by asset type ID
+    relationships.forEach((rel: any) => {
+      const form = formsLookup.get(rel.form_id);
+      if (form) {
+        if (!formsMap[rel.asset_type_id]) {
+          formsMap[rel.asset_type_id] = [];
+        }
+        formsMap[rel.asset_type_id].push(form);
+      }
+    });
+
+    console.log(`[batchGetAssetTypeForms] Batched ${assetTypeIds.length} asset types with 2 queries vs ${assetTypeIds.length} individual queries`);
+    
+    return formsMap;
+  } catch (error) {
+    console.error('[batchGetAssetTypeForms] Failed to batch fetch forms:', error);
+    // Fallback to empty arrays for all asset types to prevent crashes
+    const fallbackMap: Record<string, any[]> = {};
+    assetTypeIds.forEach(id => {
+      fallbackMap[id] = [];
+    });
+    return fallbackMap;
+  }
 }; 
