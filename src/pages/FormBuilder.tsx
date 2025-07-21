@@ -612,14 +612,14 @@ const FormBuilder = () => {
   }, [id, currentOrganization?.id, assetTypeIdFromQuery]);
 
   // Generate unique ID for new fields
-  const generateFieldId = () => {
+  const generateFieldId = useCallback(() => {
     const ids = formData.fields.map(field => {
       const match = field.id.match(/field_(\d+)/);
       return match ? parseInt(match[1]) : 0;
     });
     const maxId = Math.max(...ids, 0);
     return `field_${maxId + 1}`;
-  };
+  }, [formData.fields]);
 
   // Memoize all field update/remove/move/add functions
   const updateField = useCallback((id: string, key: string, value: any) => {
@@ -641,22 +641,24 @@ const FormBuilder = () => {
     }
   }, [selectedField]);
   const moveField = useCallback((id: string, direction: 'up' | 'down') => {
-    const index = formData.fields.findIndex(field => field.id === id);
-    if (
-      (direction === 'up' && index === 0) || 
-      (direction === 'down' && index === formData.fields.length - 1)
-    ) {
-      return;
-    }
-    
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    const reorderedFields = [...formData.fields];
-    const [movedField] = reorderedFields.splice(index, 1);
-    reorderedFields.splice(newIndex, 0, movedField);
-    
-    setFormData({
-      ...formData,
-      fields: reorderedFields,
+    setFormData(prev => {
+      const index = prev.fields.findIndex(field => field.id === id);
+      if (
+        (direction === 'up' && index === 0) || 
+        (direction === 'down' && index === prev.fields.length - 1)
+      ) {
+        return prev;
+      }
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      const reorderedFields = [...prev.fields];
+      const [movedField] = reorderedFields.splice(index, 1);
+      reorderedFields.splice(newIndex, 0, movedField);
+      
+      return {
+        ...prev,
+        fields: reorderedFields,
+      };
     });
   }, []);
   const addField = useCallback(() => {
@@ -684,7 +686,7 @@ const FormBuilder = () => {
     setTimeout(() => {
       fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
     }, 100);
-  }, []);
+  }, [generateFieldId]);
   const addFieldOfType = useCallback((type: string) => {
     const newField: FormField = {
       id: generateFieldId(),
@@ -713,7 +715,7 @@ const FormBuilder = () => {
     setTimeout(() => {
       fieldRefs.current[newField.id]?.scrollIntoView({ behavior: "smooth" });
     }, 100);
-  }, []);
+  }, [generateFieldId]);
   const updateFormMeta = useCallback((key: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -758,22 +760,38 @@ const FormBuilder = () => {
   const addOption = useCallback((fieldId: string) => {
     if (!newOptionText.trim()) return;
     
-    const field = formData.fields.find(f => f.id === fieldId);
-    if (field) {
-      const updatedOptions = [...field.options, newOptionText];
-      updateField(fieldId, 'options', updatedOptions);
-      setNewOptionText("");
-    }
-  }, [newOptionText, formData.fields, updateField]);
+    setFormData(prev => {
+      const field = prev.fields.find(f => f.id === fieldId);
+      if (field) {
+        const updatedOptions = [...field.options, newOptionText];
+        return {
+          ...prev,
+          fields: prev.fields.map(f => 
+            f.id === fieldId ? { ...f, options: updatedOptions } : f
+          )
+        };
+      }
+      return prev;
+    });
+    setNewOptionText("");
+  }, [newOptionText]);
 
   // Remove option from a select field
   const removeOption = useCallback((fieldId: string, optionIndex: number) => {
-    const field = formData.fields.find(f => f.id === fieldId);
-    if (field) {
-      const updatedOptions = field.options.filter((_, i) => i !== optionIndex);
-      updateField(fieldId, 'options', updatedOptions);
-    }
-  }, [formData.fields, updateField]);
+    setFormData(prev => {
+      const field = prev.fields.find(f => f.id === fieldId);
+      if (field) {
+        const updatedOptions = field.options.filter((_, i) => i !== optionIndex);
+        return {
+          ...prev,
+          fields: prev.fields.map(f => 
+            f.id === fieldId ? { ...f, options: updatedOptions } : f
+          )
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   // Save form (now with asset type linking)
   const saveForm = async () => {
