@@ -705,7 +705,7 @@ const AssetTypes = () => {
                             <span className="font-medium">{assetType.name}</span>
                             {viewMode === 'active' && (
                               <div className="flex items-center gap-1">
-                                {formsForAssetTypeMap[assetType.id]?.length > 0 ? (
+                                {assetTypeForms[assetType.id]?.length > 0 ? (
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -713,7 +713,7 @@ const AssetTypes = () => {
                                       </TooltipTrigger>
                                       <TooltipContent>
                                         <div className="text-xs">
-                                          ✓ Forms linked ({formsForAssetTypeMap[assetType.id]?.length} forms)
+                                          ✓ Forms linked ({assetTypeForms[assetType.id]?.length} forms)
                                         </div>
                                       </TooltipContent>
                                     </Tooltip>
