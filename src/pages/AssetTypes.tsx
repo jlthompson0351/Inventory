@@ -545,6 +545,36 @@ const AssetTypes = () => {
         </Button>
       </div>
 
+      {/* Helpful guidance section */}
+      <Card className="mb-6 border-blue-200 bg-blue-50/50">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-blue-900 mb-1">Forms & Asset Types Work Together</h3>
+              <p className="text-sm text-blue-700 mb-3">
+                When you create an asset type, <strong>blank forms are automatically created</strong> for common inventory tasks. 
+                To unlock advanced features like conversion fields (gallons, liters, etc.), you need to link these forms to your asset type.
+              </p>
+              <div className="flex items-center gap-4 text-xs text-blue-600">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                  <span>Use the <strong>"Forms"</strong> button to link forms</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                  <span>Linked forms enable conversion fields in formulas</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)} className="mb-4">
         <TabsList>
           <TabsTrigger value="active">Active</TabsTrigger>
@@ -639,12 +669,14 @@ const AssetTypes = () => {
           <div className="rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">{viewMode === 'active' ? 'Active Items' : 'Total Items (Historically)'}</TableHead>
-                  {viewMode === 'archived' && <TableHead>Archived At</TableHead>}
-                  <TableHead className="w-[100px]"></TableHead>
+                <TableRow className="bg-muted/20">
+                  <TableHead className="font-semibold">Asset Type</TableHead>
+                  <TableHead className="font-semibold">Description</TableHead>
+                  <TableHead className="text-right font-semibold">
+                    {viewMode === 'active' ? 'Items in Inventory' : 'Total Items (Historical)'}
+                  </TableHead>
+                  {viewMode === 'archived' && <TableHead className="font-semibold">Archived Date</TableHead>}
+                  <TableHead className="w-[200px] text-center font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -669,7 +701,40 @@ const AssetTypes = () => {
                             className="w-5 h-5 rounded-full mr-2"
                             style={{ backgroundColor: assetType.color || '#6E56CF', opacity: viewMode === 'archived' ? 0.5 : 1 }}
                           />
-                          <span className="font-medium">{assetType.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{assetType.name}</span>
+                            {viewMode === 'active' && (
+                              <div className="flex items-center gap-1">
+                                {formsForAssetTypeMap[assetType.id]?.length > 0 ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <div className="text-xs">
+                                          ✓ Forms linked ({formsForAssetTypeMap[assetType.id]?.length} forms)
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <div className="text-xs">
+                                          ⚠️ No forms linked - click "Forms" to link
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           {viewMode === 'archived' && <Archive className="h-4 w-4 ml-2 text-muted-foreground" />}
                         </div>
                       </TableCell>
@@ -690,31 +755,79 @@ const AssetTypes = () => {
                         </TableCell>
                       )}
                       <TableCell>
-                        <div className="flex space-x-1 justify-end" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 justify-end" onClick={e => e.stopPropagation()}>
                           {viewMode === 'active' ? (
                             <>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => navigate(`/asset-types/${assetType.id}`)}><Package className="h-4 w-4" /></Button>
-                                  </TooltipTrigger><TooltipContent>View Details</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => openFormsModal(assetType)}><FileStack className="h-4 w-4" /></Button>
-                                  </TooltipTrigger><TooltipContent>Manage Forms</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => handleEdit(assetType)}><Edit className="h-4 w-4" /></Button>
-                                  </TooltipTrigger><TooltipContent>Edit</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleSoftDelete(assetType.id, assetType.name)}><Trash2 className="h-4 w-4" /></Button>
-                                  </TooltipTrigger><TooltipContent>Archive</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              {/* Primary Actions Group */}
+                              <div className="flex items-center gap-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="h-8 px-2 text-xs"
+                                        onClick={() => openFormsModal(assetType)}
+                                      >
+                                        <FileText className="h-3 w-3 mr-1" />
+                                        Forms
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-center">
+                                        <div className="font-medium">Manage Forms</div>
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          Link forms to enable conversion fields
+                                        </div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-8 px-2 text-xs"
+                                        onClick={() => navigate(`/asset-types/${assetType.id}`)}
+                                      >
+                                        <Package className="h-3 w-3 mr-1" />
+                                        Details
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>View asset type details & settings</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+
+                              {/* Secondary Actions Group */}
+                              <div className="flex items-center gap-1 border-l pl-2 ml-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(assetType)}>
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Edit asset type</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-destructive hover:text-destructive" 
+                                        onClick={() => handleSoftDelete(assetType.id, assetType.name)}
+                                      >
+                                        <Archive className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Archive asset type</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             </>
                           ) : (
                             <TooltipProvider>
