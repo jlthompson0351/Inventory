@@ -10,7 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form } from '@/services/formService';
 import { FormValidationRule, FormFieldDependency } from '@/services/formService';
 import { z } from 'zod';
-import { evaluateFormula, FormulaContext } from '@/lib/formulaEvaluator';
+import { FormBuilderEvaluator } from '@/utils/safeEvaluator';
+
+// FormulaContext interface for compatibility
+interface FormulaContext {
+  fields: Record<string, number>;
+  mappedFields: Record<string, number>;
+}
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
@@ -283,15 +289,15 @@ export function FormRenderer({
         console.log(`FormRenderer - Current field values:`, context.fields);
       }
       
-      // Use secure formula evaluator
-      const result = evaluateFormula(field.formula, context);
-      if (result.success) {
-        // Format to 2 decimal places for display
-        return Number(result.result).toFixed(2);
-      } else {
-        console.error('Formula evaluation error:', (result as { success: false; error: string }).error);
-        return '0.00';
-      }
+                  // Use cached formula evaluator for performance
+            const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+            if (result !== 'Error' && result !== 'Calculation Error') {
+                      // Return the result (already formatted)
+          return String(result);
+              } else {
+          console.error('Formula evaluation error:', result);
+          return '0.00';
+        }
     } catch (e) {
       console.error('Formula evaluation error:', e);
       return '0.00';
@@ -411,10 +417,10 @@ export function FormRenderer({
               console.log(`FormRenderer - Current field values:`, context.fields);
             }
             
-            // Use secure formula evaluator
-            const result = evaluateFormula(field.formula, context);
-            if (result.success) {
-              const newValue = Number(result.result).toFixed(2);
+            // Use cached formula evaluator for performance
+            const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+            if (result !== 'Error' && result !== 'Calculation Error') {
+              const newValue = String(result); // Already formatted
               
               // Check if value changed
               if (updatedData[field.id] !== newValue) {
@@ -422,10 +428,10 @@ export function FormRenderer({
                 updatedData[field.id] = newValue;
                 hasChanges = true; // Mark that we need another iteration
               }
-            } else {
-              console.error('Formula evaluation error:', (result as { success: false; error: string }).error);
-              updatedData[field.id] = '0.00';
-            }
+                    } else {
+          console.error('Formula evaluation error:', result);
+          updatedData[field.id] = '0.00';
+        }
           } catch (e) {
             console.error('Formula evaluation error:', e);
             updatedData[field.id] = '0.00';
@@ -569,10 +575,10 @@ export function FormRenderer({
                   });
                 }
                 
-                // Use secure formula evaluator
-                const result = evaluateFormula(field.formula, context);
-                if (result.success) {
-                  const newValue = Number(result.result).toFixed(2);
+                // Use cached formula evaluator for performance  
+                const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+                if (result !== 'Error' && result !== 'Calculation Error') {
+                  const newValue = String(result); // Already formatted
                   
                   // Check if value changed
                   if (finalFormData[field.id] !== newValue) {

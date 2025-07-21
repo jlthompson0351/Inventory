@@ -22,8 +22,14 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Upload, File, X } from "lucide-react";
-// Import formula evaluator functions
-import { evaluateFormula, extractFieldReferences } from "@/lib/formulaEvaluator";
+// Import formula evaluator functions - using cached version for performance
+import { FormBuilderEvaluator } from "@/utils/safeEvaluator";
+
+// Helper function to extract field references from formula
+const extractFieldReferences = (formula: string): string[] => {
+  const matches = formula.match(/\{([a-zA-Z0-9_]+)\}/g) || [];
+  return [...new Set(matches.map(m => m.slice(1, -1)))];
+};
 
 // Field types that could be in a dynamic form
 type FieldType = 
@@ -160,8 +166,12 @@ export default function DynamicForm({
             variables[fieldId] = values[fieldId] || 0;
           });
           
-          // Evaluate the formula using our secure evaluator
-          const result = evaluateFormula(field.formula, variables);
+          // Evaluate the formula using our cached evaluator for performance
+          const result = FormBuilderEvaluator.calculateWithFormatting(
+            field.formula, 
+            formSchema.fields || [], 
+            variables
+          );
           newCalculatedValues[field.id] = result;
         } catch (error) {
           console.error(`Error calculating formula for ${field.id}:`, error);

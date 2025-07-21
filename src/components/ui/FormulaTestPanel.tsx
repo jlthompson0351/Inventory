@@ -4,7 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { extractFieldReferences, evaluateFormula } from "@/lib/formulaEvaluator";
+import { FormBuilderEvaluator } from "@/utils/safeEvaluator";
+
+// Helper function to extract field references from formula
+const extractFieldReferences = (formula: string): string[] => {
+  const matches = formula.match(/\{([a-zA-Z0-9_]+)\}/g) || [];
+  return [...new Set(matches.map(m => m.slice(1, -1)))];
+};
 
 interface FormulaTestPanelProps {
   formula: string;
@@ -65,10 +71,10 @@ export function FormulaTestPanel({ formula, availableFields = [] }: FormulaTestP
       return;
     }
     
-    try {
-      const calcResult = evaluateFormula(formula, testValues);
-      setResult(calcResult);
-      setError(null);
+          try {
+        const calcResult = FormBuilderEvaluator.calculateWithFormatting(formula, [], testValues);
+        setResult(calcResult);
+        setError(null);
     } catch (err) {
       setResult(null);
       setError((err as Error).message);
