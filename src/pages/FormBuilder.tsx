@@ -227,6 +227,29 @@ const validateFormula = (formula: string, currentFields: FormField[], mappedFiel
 };
 
 // Memoized FieldRow component for rendering each field
+interface FieldRowProps {
+  field: FormField;
+  selectedField: string | null;
+  fieldBeingDragged: string | null;
+  fieldRefs: React.MutableRefObject<{ [key: string]: HTMLDivElement | null }>;
+  setSelectedField: (id: string) => void;
+  handleDragStart: (e: React.DragEvent, id: string) => void;
+  handleDragOver: (e: React.DragEvent) => void;
+  handleDrop: (e: React.DragEvent, targetId: string) => void;
+  removeField: (id: string) => void;
+  moveField: (id: string, direction: 'up' | 'down') => void;
+  updateField: (id: string, key: string, value: any) => void;
+  formData: { title: string; description: string; fields: FormField[] };
+  mappedFields: any[];
+  resetFormulaToTextMode: boolean;
+  previewCalculationWithMocks: (formula: string, fields: FormField[], mockValues: any) => string;
+  mockMappedValues: { [key: string]: string | number };
+  addOption: (fieldId: string) => void;
+  removeOption: (fieldId: string, optionIndex: number) => void;
+  newOptionText: string;
+  setNewOptionText: (text: string) => void;
+}
+
 const FieldRow = memo(function FieldRow({
   field,
   selectedField,
@@ -243,8 +266,12 @@ const FieldRow = memo(function FieldRow({
   mappedFields,
   resetFormulaToTextMode,
   previewCalculationWithMocks,
-  mockMappedValues
-}) {
+  mockMappedValues,
+  addOption,
+  removeOption,
+  newOptionText,
+  setNewOptionText
+}: FieldRowProps) {
   return (
     <div
       key={field.id}
@@ -693,6 +720,60 @@ const FormBuilder = () => {
       [key]: value,
     }));
   }, []);
+
+  // Handle drag start
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('text/plain', id);
+    setFieldBeingDragged(id);
+  }, []);
+
+  // Handle drag over
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  // Handle drop
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain');
+    
+    if (sourceId !== targetId) {
+      const sourceIndex = formData.fields.findIndex(field => field.id === sourceId);
+      const targetIndex = formData.fields.findIndex(field => field.id === targetId);
+      
+      const reorderedFields = [...formData.fields];
+      const [movedField] = reorderedFields.splice(sourceIndex, 1);
+      reorderedFields.splice(targetIndex, 0, movedField);
+      
+      setFormData(prev => ({
+        ...prev,
+        fields: reorderedFields,
+      }));
+    }
+    
+    setFieldBeingDragged(null);
+  }, [formData.fields]);
+
+  // Add option to a select field
+  const addOption = useCallback((fieldId: string) => {
+    if (!newOptionText.trim()) return;
+    
+    const field = formData.fields.find(f => f.id === fieldId);
+    if (field) {
+      const updatedOptions = [...field.options, newOptionText];
+      updateField(fieldId, 'options', updatedOptions);
+      setNewOptionText("");
+    }
+  }, [newOptionText, formData.fields, updateField]);
+
+  // Remove option from a select field
+  const removeOption = useCallback((fieldId: string, optionIndex: number) => {
+    const field = formData.fields.find(f => f.id === fieldId);
+    if (field) {
+      const updatedOptions = field.options.filter((_, i) => i !== optionIndex);
+      updateField(fieldId, 'options', updatedOptions);
+    }
+  }, [formData.fields, updateField]);
 
   // Save form (now with asset type linking)
   const saveForm = async () => {
@@ -1387,10 +1468,14 @@ const FormBuilder = () => {
                     updateField={updateField}
                     formData={formData}
                     mappedFields={mappedFields}
-                    resetFormulaToTextMode={resetFormulaToTextMode}
-                    previewCalculationWithMocks={previewCalculationWithMocks}
-                    mockMappedValues={mockMappedValues}
-                  />
+                                         resetFormulaToTextMode={resetFormulaToTextMode}
+                     previewCalculationWithMocks={previewCalculationWithMocks}
+                     mockMappedValues={mockMappedValues}
+                     addOption={addOption}
+                     removeOption={removeOption}
+                     newOptionText={newOptionText}
+                     setNewOptionText={setNewOptionText}
+                   />
                 ))}
 
                 {formData.fields.length === 0 && (
@@ -1650,7 +1735,7 @@ const FormBuilder = () => {
                                     variant="ghost"
                                     size="sm"
                                     className="ml-2 text-destructive"
-                                    onClick={() => removeField(field.id, index)}
+                                    onClick={() => removeOption(field.id, index)}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
