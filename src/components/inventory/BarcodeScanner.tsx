@@ -125,7 +125,7 @@ export function BarcodeScanner({
       
       if (code) {
         // Found a QR code!
-        console.log('Detected QR code:', code.data);
+        // Detected QR code
         
         // Draw box around QR code
         drawBox(context, code.location);

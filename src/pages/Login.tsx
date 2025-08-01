@@ -23,7 +23,7 @@ const Login = () => {
     const checkAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        console.log("Auth check on Login page:", data?.session ? "LOGGED_IN" : "LOGGED_OUT");
+        // Auth check on Login page
         setAuthStatus(data?.session ? "LOGGED_IN" : "LOGGED_OUT");
         
         // If already logged in, redirect to dashboard
@@ -42,7 +42,7 @@ const Login = () => {
   // Listen for auth state changes
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, !!session);
+      // Auth state changed
       setAuthStatus(session ? "LOGGED_IN" : "LOGGED_OUT");
       
       if (event === 'SIGNED_IN' && session) {
@@ -65,7 +65,7 @@ const Login = () => {
     setError(null);
 
     try {
-      console.log("Attempting login with:", email);
+      // Attempting login
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -77,7 +77,7 @@ const Login = () => {
         throw error;
       }
 
-      console.log("Login successful, user:", data?.user?.id);
+              // Login successful
       
       if (data?.user) {
         toast({

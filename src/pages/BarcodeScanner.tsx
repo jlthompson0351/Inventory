@@ -256,7 +256,7 @@ const BarcodeScanner = () => {
   useEffect(() => {
     const checkCameraSupport = () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        console.log("Camera API not available in this environment");
+        // Camera API not available in this environment
         toast({
           variant: "default",
           title: "Camera Not Available",

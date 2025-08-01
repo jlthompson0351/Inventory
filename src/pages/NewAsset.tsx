@@ -260,7 +260,7 @@ export default function NewAsset() {
         throw error;
       }
       
-      console.log("Form data loaded:", data);
+                // Form data loaded
       if (data.form_data && typeof data.form_data === 'string') {
         try {
           data.form_data = JSON.parse(data.form_data);
@@ -482,7 +482,7 @@ export default function NewAsset() {
                 .update({ barcode })
                 .eq('id', data.id);
                 
-              console.log(`Barcode generated for asset: ${barcode}`);
+              // Barcode generated for asset
             }
           } catch (barcodeError) {
             console.error("Error generating barcode:", barcodeError);

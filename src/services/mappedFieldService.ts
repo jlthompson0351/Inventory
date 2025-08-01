@@ -154,7 +154,7 @@ export const syncMappedFieldsForAssetType = async (
           .single();
           
         if (formError || !form) {
-          console.warn(`Could not fetch form ${formId}:`, formError);
+          // Could not fetch form
           continue;
         }
         
@@ -178,7 +178,7 @@ export const syncMappedFieldsForAssetType = async (
             }
           } catch (fieldError) {
             // Log field-level errors but continue processing
-            console.warn(`Error processing field ${field.id} in form ${formId}:`, fieldError);
+            // Error processing field
             errors.push({ formId, fieldId: field.id, error: fieldError });
           }
         }
@@ -191,7 +191,7 @@ export const syncMappedFieldsForAssetType = async (
     
     // If we had errors, log them but still return success if some fields were processed
     if (errors.length > 0) {
-      console.warn(`Sync completed with ${errors.length} errors:`, errors);
+      // Sync completed with errors
     }
     
     return true;

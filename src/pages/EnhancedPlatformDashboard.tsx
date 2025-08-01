@@ -364,28 +364,19 @@ Tell them: Email: ${newOrgAdminEmail.trim()} / Password: ${tempPassword}`, {
     
     setIsCreatingUser(true);
     try {
-      // Call the new automated Edge Function
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-user-automated-fixed`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-          'apikey': supabase.supabaseKey,
-        },
-        body: JSON.stringify({
+      // Call the admin-create-user Edge Function
+      const { data: result, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
           email: createUserEmail.trim(),
           password: createUserPassword.trim(),
+          fullName: createUserName.trim() || createUserEmail.trim().split('@')[0],
           organizationId: selectedOrg.id,
           role: createUserRole
-        })
+        }
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'User creation failed');
+      if (error) {
+        throw new Error(error.message || 'User creation failed');
       }
 
       if (result.success) {
@@ -442,7 +433,7 @@ They can now login and will be prompted to change their password.`);
       
       toast.success(`Batch operation completed: ${data.success_count} success, ${data.error_count} errors`);
       if (data.errors.length > 0) {
-        console.log('Batch errors:', data.errors);
+        // Batch errors occurred
       }
       
       setBatchEmails('');
@@ -907,7 +898,7 @@ They can now login and will be prompted to change their password.`);
                 <SelectContent>
                   <SelectItem value="member">Member</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -965,7 +956,7 @@ They can now login and will be prompted to change their password.`);
                 <SelectContent>
                   <SelectItem value="member">Member</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

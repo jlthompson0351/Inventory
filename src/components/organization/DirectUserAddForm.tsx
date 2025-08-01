@@ -64,7 +64,7 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
         organizationId: organizationId,
       };
 
-      console.log('🚀 Calling admin-create-user edge function with payload:', payload);
+      // Calling admin-create-user edge function
 
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: payload,
@@ -75,7 +75,7 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
         throw new Error(`Edge Function returned a non-2xx status code: ${error.message}`);
       }
 
-      console.log('User created successfully:', data);
+      // User created successfully
       toast.success('User created successfully!');
       form.reset();
       onUserAdded();

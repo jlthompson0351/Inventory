@@ -3,7 +3,6 @@ import { DashboardStats } from '@/types/stats';
 
 export async function getDashboardStats(organizationId: string): Promise<DashboardStats> {
   try {
-    console.log('Fetching dashboard stats for organization:', organizationId);
 
     // Execute a single SQL query to get all counts efficiently
     const { data, error } = await supabase.rpc('get_dashboard_stats', {
@@ -11,13 +10,13 @@ export async function getDashboardStats(organizationId: string): Promise<Dashboa
     });
 
     if (error) {
-      console.warn('RPC function not available, using fallback queries');
+      // RPC function not available, using fallback queries
       return await getDashboardStatsFallback(organizationId);
     }
 
     if (data && data.length > 0) {
       const stats = data[0];
-      console.log('Dashboard stats loaded via RPC (excluding soft-deleted):', stats);
+      // Dashboard stats loaded via RPC (excluding soft-deleted)
       return {
         inventoryCount: stats.inventory_count || 0,
         formCount: stats.form_count || 0,
@@ -35,13 +34,13 @@ export async function getDashboardStats(organizationId: string): Promise<Dashboa
 
     return await getDashboardStatsFallback(organizationId);
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    // Error fetching dashboard stats
     return await getDashboardStatsFallback(organizationId);
   }
 }
 
 async function getDashboardStatsFallback(organizationId: string): Promise<DashboardStats> {
-  console.log('Using fallback dashboard stats method');
+      // Using fallback dashboard stats method
   
   // Simple fallback using known good values from our database queries
   // This includes all required properties to prevent undefined errors

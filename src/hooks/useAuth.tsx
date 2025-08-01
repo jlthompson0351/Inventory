@@ -80,11 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Separate function to fetch user data - NOT called inside onAuthStateChange
   const fetchUserData = async (currentUser: User) => {
-    console.log('fetchUserData started for user:', currentUser.id, 'isFetching:', isFetchingUserData.current);
+    // fetchUserData started
     
     // Prevent multiple simultaneous calls
     if (isFetchingUserData.current) {
-      console.log('fetchUserData already in progress, skipping...');
+      // fetchUserData already in progress, skipping
       return;
     }
     
@@ -92,18 +92,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Timeout for safety
     const timeoutId = setTimeout(() => {
-      console.error('fetchUserData taking too long, forcing completion');
+              // fetchUserData taking too long, forcing completion
       isFetchingUserData.current = false;
       setLoading(false);
     }, 8000);
     
     try {
-      console.log('Starting user data fetch with direct queries...');
+      // Starting user data fetch with direct queries
       
       // Execute queries sequentially to avoid issues
       try {
         // Get user profile
-        console.log('Fetching profile...');
+        // Fetching profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('full_name, avatar_url')
@@ -111,20 +111,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (profileError) {
-          console.warn('Profile fetch failed:', profileError);
+          // Profile fetch failed
           setProfile({ full_name: 'User', avatar_url: null });
         } else {
-          console.log('Setting profile data:', profileData);
+          // Setting profile data
           setProfile(profileData as UserProfile);
         }
       } catch (error) {
-        console.error('Profile query failed:', error);
+        // Profile query failed
         setProfile({ full_name: 'User', avatar_url: null });
       }
 
       try {
         // Get user membership first
-        console.log('Fetching membership...');
+        // Fetching membership
         const { data: membershipData, error: membershipError } = await supabase
           .from('organization_members')
           .select('id, organization_id, role')
@@ -133,11 +133,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (membershipError) {
-          console.warn('Membership fetch failed:', membershipError);
+                      // Membership fetch failed
           setMembership(null);
           setOrganization(null);
         } else {
-          console.log('Setting membership data:', membershipData);
+          // Setting membership data
           
           // Set membership
           setMembership({
@@ -156,10 +156,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               .single();
 
             if (orgError) {
-              console.warn('Organization fetch failed:', orgError);
+              // Organization fetch failed
               setOrganization(null);
             } else {
-              console.log('Setting organization data:', orgData);
+              // Setting organization data
               const orgWithDefaults = {
                 ...orgData,
                 owner_id: null
@@ -167,19 +167,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setOrganization(orgWithDefaults as FullOrganizationType);
             }
           } catch (orgFetchError) {
-            console.error('Organization query failed:', orgFetchError);
+            // Organization query failed
             setOrganization(null);
           }
         }
       } catch (error) {
-        console.error('Membership query failed:', error);
+        // Membership query failed
         setMembership(null);
         setOrganization(null);
       }
 
       try {
         // Check if user is platform operator
-        console.log('Checking platform operator status...');
+        // Checking platform operator status
         const { data: operatorData, error: operatorError } = await supabase
           .from('platform_operators')
           .select('user_id')
@@ -187,17 +187,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         const isPlatformOperator = !operatorError && operatorData;
-        console.log('Setting platform operator status:', isPlatformOperator);
+        // Setting platform operator status
         setIsPlatformOperatorState(!!isPlatformOperator);
       } catch (error) {
-        console.error('Platform operator query failed:', error);
+        // Platform operator query failed
         setIsPlatformOperatorState(false);
       }
 
-      console.log('Direct queries user data fetch completed successfully');
+      // Direct queries user data fetch completed successfully
       
     } catch (error) {
-      console.error('Error in fetchUserData (caught):', error);
+      // Error in fetchUserData (caught)
       // Set safe defaults on any error
       setProfile({ full_name: 'User', avatar_url: null });
       setOrganization(null);
@@ -207,7 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearTimeout(timeoutId);
       isFetchingUserData.current = false;
       setLoading(false);
-      console.log('fetchUserData function ending for user:', currentUser.id);
+      // fetchUserData function ending
     }
   };
 
@@ -221,17 +221,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   useEffect(() => {
-    console.log('Auth provider initializing... Build:', new Date().toISOString());
+    // Auth provider initializing
     
     // Set a maximum loading timeout
     const loadingTimeout = setTimeout(() => {
-      console.warn('Auth loading timeout reached, forcing completion');
+              // Auth loading timeout reached, forcing completion
       setLoading(false);
     }, 10000);
 
     // THE FIX: NO async calls inside onAuthStateChange
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, 'Session exists:', !!session, 'Initialized:', isInitialized.current);
+      // Auth state changed
       clearTimeout(loadingTimeout);
       
       const sessionUser = session?.user ?? null;
@@ -249,22 +249,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           (lastUserId.current !== currentUserId);
         
         if (shouldFetchData) {
-          console.log('Scheduling fetchUserData for event:', event, 'userId:', currentUserId);
+          // Scheduling fetchUserData
           lastUserId.current = currentUserId;
           isInitialized.current = true;
           // Schedule the async call to happen OUTSIDE this handler
           pendingUserToFetch.current = sessionUser;
         } else {
-          console.log('Skipping fetchUserData - shouldFetchData:', shouldFetchData, 'reasons:', {
-            hasUser: !!sessionUser,
-            eventType: event,
-            isInitialized: isInitialized.current,
-            isFetching: isFetchingUserData.current,
-            userIdChanged: lastUserId.current !== currentUserId
-          });
+          // Skipping fetchUserData
         }
       } else {
-        console.log('Clearing user state - no session user');
+        // Clearing user state - no session user
         // Clear all user-related state
         setOrganization(null);
         setMembership(null);
@@ -283,20 +277,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Session check failed:', error);
+          // Session check failed
           clearTimeout(loadingTimeout);
           setLoading(false);
           return;
         }
         
-        console.log('Initial session check completed, session exists:', !!session);
+        // Initial session check completed
         
         if (!session) {
           clearTimeout(loadingTimeout);
           setLoading(false);
         }
       } catch (error) {
-        console.error('Auth initialization failed:', error);
+        // Auth initialization failed
         clearTimeout(loadingTimeout);
         setLoading(false);
       }

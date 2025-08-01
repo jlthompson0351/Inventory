@@ -23,7 +23,7 @@ export const uploadOrgAvatar = async (orgId: string, file: File): Promise<string
       
     return urlData.publicUrl;
   } catch (error) {
-    console.error('Error uploading organization avatar:', error);
+          // Error uploading organization avatar
     toast.error("Could not upload organization logo");
     return null;
   }
@@ -52,7 +52,7 @@ export const getUserOrganization = async (): Promise<any> => {
     
     return org;
   } catch (error) {
-    console.error('Error getting user organization:', error);
+          // Error getting user organization
     return null;
   }
 };
@@ -69,7 +69,7 @@ export const updateOrganization = async (orgId: string, updates: any): Promise<b
     
     return true;
   } catch (error) {
-    console.error('Error updating organization:', error);
+          // Error updating organization
     toast.error('Failed to update organization');
     return false;
   }
@@ -82,10 +82,10 @@ export const deleteUser = async (userId: string): Promise<boolean> => {
     return false;
   }
 
-  console.log('🗑️ Calling admin-delete-user edge function for user:', userId);
+        // Calling admin-delete-user edge function
   
   const payload = { userId: userId };
-  console.log('📤 Sending payload to edge function:', payload);
+        // Sending payload to edge function
 
   try {
     const { data, error } = await supabase.functions.invoke('admin-delete-user', {
@@ -93,8 +93,7 @@ export const deleteUser = async (userId: string): Promise<boolean> => {
     });
 
     if (error) {
-      console.error('Edge function error:', error);
-      console.error('Response data:', data);
+      // Edge function error
       toast.error(`Failed to delete user: ${error.message}`);
       return false;
     }
@@ -108,7 +107,7 @@ export const deleteUser = async (userId: string): Promise<boolean> => {
     }
   } catch (err: any) {
     const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
-    console.error('Error deleting user:', errorMessage);
+          // Error deleting user
     toast.error(`Failed to delete user: ${errorMessage}`);
     return false;
   }
@@ -127,7 +126,7 @@ export const deleteOrganization = async (orgId: string): Promise<boolean> => {
     toast.success('Organization deleted successfully');
     return true;
   } catch (error) {
-    console.error('Error deleting organization:', error);
+          // Error deleting organization
     toast.error('Failed to delete organization');
     return false;
   }
@@ -144,7 +143,7 @@ export const getOrganizationDeletionPreview = async (orgId: string): Promise<any
 
     return data;
   } catch (error) {
-    console.error('Error getting deletion preview:', error);
+          // Error getting deletion preview
     return null;
   }
 };

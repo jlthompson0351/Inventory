@@ -97,7 +97,7 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
 
   const handleDownloadQR = () => {
     // Logic to download QR code
-    console.log("Download QR for:", asset.name);
+    // Download QR
   };
 
   const getStatusColor = (status?: string) => {

@@ -47,15 +47,15 @@ const AddInventoryPage = () => {
       setIsAssetNotInventory(false);
       
       try {
-        console.log(`Loading data for assetId: ${assetId}`);
+        // Loading data for asset
         
         // First, check if this is a valid asset
         const actualAsset = await getAssetById(assetId);
         
         if (!actualAsset) {
-          console.warn(`No asset found with ID ${assetId}. This might be an inventory item ID instead.`);
+          // No asset found with ID. This might be an inventory item ID instead.
         } else {
-          console.log(`Found asset ${actualAsset.name} with ID ${actualAsset.id}`);
+          // Found asset
         }
         
         // 1. Fetch the inventory item for this asset
@@ -63,7 +63,7 @@ const AddInventoryPage = () => {
         const items = await getInventoryItems(currentOrganization.id, assetId);
         if (items && items.length > 0) {
           inventoryItem = items[0];
-          console.log(`Found inventory item ${inventoryItem.name} with ID ${inventoryItem.id} for asset ID ${inventoryItem.asset_id}`);
+          // Found inventory item
           setAsset(inventoryItem);
           if (inventoryItem.id) {
             navigate(`/inventory/item/${inventoryItem.id}`);
@@ -72,7 +72,7 @@ const AddInventoryPage = () => {
         } else if (actualAsset) {
           // This is an asset without an inventory item
           // Create a skeleton inventory item based on the asset
-          console.log(`Creating skeleton inventory item from asset ${actualAsset.name}`);
+          // Creating skeleton inventory item from asset
           inventoryItem = {
             id: null, // This will be generated when saved
             name: actualAsset.name,
@@ -108,7 +108,7 @@ const AddInventoryPage = () => {
           throw new Error("Could not determine asset type for this item.");
         }
         
-        console.log(`Using asset type ID: ${assetTypeId}`);
+        // Using asset type ID
         const assetTypeData = await getAssetTypeById(assetTypeId);
         if (!assetTypeData?.inventory_form_id) {
           throw new Error("Selected asset type does not have an inventory form assigned.");

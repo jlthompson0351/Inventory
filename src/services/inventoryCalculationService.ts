@@ -366,7 +366,7 @@ export class InventoryCalculationService {
         .eq('id', currentHistory.inventory_item_id);
 
       if (inventoryUpdateError) {
-        console.warn('Failed to update main inventory quantity:', inventoryUpdateError);
+        // Failed to update main inventory quantity
         // Don't fail the whole operation, just warn
         return { 
           success: true, 

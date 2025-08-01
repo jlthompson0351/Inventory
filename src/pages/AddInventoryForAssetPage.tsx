@@ -66,7 +66,7 @@ const AddInventoryForAssetPage = () => {
         
         // Handle edge case: no inventory form assigned
         if (!assetTypeData?.inventory_form_id) {
-          console.warn(`Asset type ${assetTypeData?.name} has no inventory form. Using fallback basic form.`);
+          // Asset type has no inventory form. Using fallback basic form.
           
           // Create a fallback basic inventory form schema
           const fallbackSchema = {

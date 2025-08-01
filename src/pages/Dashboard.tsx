@@ -23,7 +23,7 @@ const Dashboard = memo(() => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    console.log("Dashboard component mounted");
+    // Dashboard component mounted
     if (currentOrganization?.id) {
       loadStats();
     }
@@ -45,18 +45,7 @@ const Dashboard = memo(() => {
   
   return (
     <div>
-      {/* Debug information - collapsible */}
-      <details className="mb-4 bg-blue-50 border border-blue-100 rounded-md text-sm">
-        <summary className="p-2 text-blue-700 font-medium cursor-pointer">
-          Dashboard Component Debug Info
-        </summary>
-        <div className="p-3 border-t border-blue-100 text-blue-800">
-          <p className="mb-2">If you can see this, Dashboard page component is rendering correctly!</p>
-          <p>Active Organization: {currentOrganization?.name || 'No organization selected'}</p>
-          <p>Organization ID: {currentOrganization?.id || 'None'}</p>
-          <p>Stats loaded: {isLoading ? 'Loading...' : 'Loaded'}</p>
-        </div>
-      </details>
+
       
       {/* Actual dashboard content */}
       <div className="space-y-6">

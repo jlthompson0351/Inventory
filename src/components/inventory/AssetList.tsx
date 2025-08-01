@@ -56,13 +56,13 @@ const assetsCache = new Map<string, { assets: Asset[]; timestamp: number }>();
 
 // Function to clear cache for all organizations/asset types (for inventory updates)
 export const clearAssetCache = () => {
-  console.log("[AssetList] Clearing all asset cache");
+      // Clearing all asset cache
   assetsCache.clear();
 };
 
 // Function to clear cache for specific organization (more targeted)
 export const clearAssetCacheForOrg = (organizationId: string) => {
-  console.log(`[AssetList] Clearing asset cache for org: ${organizationId}`);
+      // Clearing asset cache for org
   for (const [key] of assetsCache) {
     if (key.includes(`org:${organizationId}`)) {
       assetsCache.delete(key);
@@ -145,7 +145,7 @@ export default function AssetList({
   const fetchAssets = useCallback(async (force = false) => {
     // Skip if missing required parameters
     if (!organizationId) {
-      console.log("[AssetList] No organizationId provided, skipping fetch");
+      // No organizationId provided, skipping fetch
       setAssets([]);
       hasFetched.current = true;
       return;
@@ -156,7 +156,7 @@ export default function AssetList({
       const cached = assetsCache.get(cacheKey);
       // Use cache if it's less than 10 seconds old (reduced from 2 minutes for real-time inventory)
       if (cached && (Date.now() - cached.timestamp < 10000)) {
-        console.log("[AssetList] Using cached assets data");
+        // Using cached assets data
         setAssets(cached.assets);
         hasFetched.current = true;
         return;
@@ -171,7 +171,7 @@ export default function AssetList({
       setLoading(true);
     }
     
-    console.log(`[AssetList] Fetching assets with organizationId: ${organizationId}`);
+    // Fetching assets
     
     try {
       let query = supabase
@@ -197,7 +197,7 @@ export default function AssetList({
       
       // If another fetch was started after this one, discard these results
       if (fetchId !== currentFetchId.current) {
-        console.log(`[AssetList] Fetch ${fetchId} was superseded, discarding results`);
+        // Fetch was superseded, discarding results
         return;
       }
       
@@ -208,7 +208,7 @@ export default function AssetList({
       
       // Make sure component is still mounted before updating state
       if (isMounted.current) {
-        console.log(`[AssetList] Fetched ${data?.length || 0} assets`);
+        // Fetched assets
         
         // Process the raw data into the proper Asset format
         const processedData = processAssetData(data || []);
@@ -304,9 +304,9 @@ export default function AssetList({
         // Use Dialog component to confirm deletion
         // This is an example, you might need a more robust confirmation
         if (window.confirm(`Are you sure you want to delete ${asset.name}?`)) {
-          console.log(`[AssetList] Attempting to delete asset: ${asset.id}`);
+          // Attempting to delete asset
           softDeleteAsset(asset.id).then(success => {
-            console.log(`[AssetList] softDeleteAsset success: ${success} for asset: ${asset.id}`);
+            // softDeleteAsset success
             if (success) {
               // Clear the cache for this specific key before refreshing
               assetsCache.delete(cacheKey);

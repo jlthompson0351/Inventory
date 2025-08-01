@@ -69,7 +69,6 @@ const Forms = () => {
         setArchivedForms(data || []);
         setActiveForms([]);
       }
-      console.log(`Fetched ${viewMode} forms:`, data);
     } catch (error) {
       console.error(`Error fetching ${viewMode} forms:`, error);
       toast({
@@ -169,7 +168,6 @@ const Forms = () => {
         results.forEach(({ formId, links }) => {
           linksMap[formId] = links || [];
         });
-        console.log('Loaded asset type links:', linksMap);
         setFormAssetTypeLinks(linksMap);
       }).catch(error => {
         console.error("Error fetching asset type links:", error);

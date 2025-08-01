@@ -18,7 +18,7 @@ export default function Assets() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Debug logging - only on initial render
-  console.log("Assets.tsx rendering");
+  // Assets component rendering
   
   // Memoize the organization ID to prevent unnecessary re-renders
   const organizationId = useMemo(() => 
@@ -54,7 +54,7 @@ export default function Assets() {
   const handleAssetDelete = useCallback((asset: any) => {
     // Handle asset deletion with confirmation
     if (window.confirm(`Are you sure you want to delete "${asset.name}"?`)) {
-      console.log("Delete asset:", asset.id);
+      // Delete asset
       // Implement actual deletion logic here
     }
   }, []);

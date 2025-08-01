@@ -689,7 +689,7 @@ class ParallelDataProcessor {
         return this.processAssetTypeFormsDataSource(config, organizationId);
       
       default:
-        console.warn(`Unknown data source: ${dataSource}`);
+        // Unknown data source
         return [];
     }
   }
@@ -1507,7 +1507,7 @@ async function logReportExecution(report: Report, stats: ExecutionStats): Promis
 
 export async function getReportRuns(reportId: string, limit: number = 10): Promise<ReportRun[]> {
   // TODO: Implement when report_runs table is created
-  console.warn('Report runs tracking not yet implemented');
+      // Report runs tracking not yet implemented
   return [];
 }
 
@@ -2209,7 +2209,7 @@ export async function buildMonthlyInventoryReport(config: any, dateRange: { star
         lastMonthData = await getLastMonthTotal(item.id, currentMonth);
         startingQuantity = lastMonthData.amount;
       } catch (error) {
-        console.warn(`Failed to get last month total for ${item.name}, falling back to history:`, error);
+                    // Failed to get last month total, falling back to history
         // Fallback to original logic
         startingQuantity = preReportHistory.length > 0 
           ? preReportHistory[preReportHistory.length - 1].quantity || 0

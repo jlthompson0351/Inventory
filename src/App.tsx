@@ -26,7 +26,7 @@ import Profile from "./pages/Profile";
 import AppSettings from "./pages/AppSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import InvitationAccept from "./pages/InvitationAccept";
-import AdminDebugPanel from "./pages/AdminDebugPanel";
+// AdminDebugPanel removed
 import EnhancedPlatformDashboard from "./pages/EnhancedPlatformDashboard";
 import DataQualityDashboard from "./pages/DataQualityDashboard";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
@@ -72,9 +72,9 @@ const AppRoutes = () => {
   
   useEffect(() => {
     if (loading) {
-      console.log("Auth: Loading user data");
+              // Auth: Loading user data
     } else if (user) {
-      console.log("Auth: User logged in");
+              // Auth: User logged in
     }
     // Only log significant changes, not every render
   }, [user, loading]);
@@ -166,7 +166,7 @@ const AppRoutes = () => {
         <Route path="/organization/members" element={user ? <PageLayout><OrganizationMembers /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Utilities and Tools */}
-        <Route path="/admin/debug" element={user ? <PageLayout><AdminDebugPanel /></PageLayout> : <Navigate to="/login" />} />
+                        {/* AdminDebugPanel route removed */}
         <Route path="/barcode-tools" element={user ? <PageLayout><QRCodePrintManager /></PageLayout> : <Navigate to="/login" />} />
         
         {/* Catch-all route */}

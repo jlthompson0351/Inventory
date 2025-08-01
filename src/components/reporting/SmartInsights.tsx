@@ -100,7 +100,7 @@ export function SmartInsights({
             quality_data: qualityData
           };
         } catch (error) {
-          console.warn(`Could not get quality data for item ${item.id}:`, error);
+                      // Could not get quality data for item
           return {
             ...item,
             quality_data: null

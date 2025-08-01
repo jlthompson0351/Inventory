@@ -15,8 +15,7 @@ if (!SUPABASE_PUBLISHABLE_KEY) {
 
 // Log configuration on startup (only in development)
 if (import.meta.env.DEV) {
-  console.log('Supabase client initializing with URL:', SUPABASE_URL);
-  console.log('Supabase anon key configured:', SUPABASE_PUBLISHABLE_KEY ? 'Yes' : 'No');
+  // Supabase client initializing
 }
 
 // Import the supabase client like this:

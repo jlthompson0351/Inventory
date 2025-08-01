@@ -46,12 +46,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('🔐 Validating admin authentication...');
+    // Validating admin authentication
     
     // Validate admin authentication
     const auth = await validateAdminAuth(req);
     if (!auth.isValid || !auth.isAdmin) {
-      console.log('❌ Auth failed:', auth.error);
+      // Auth failed
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -64,7 +64,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('✅ Admin authenticated:', auth.user.email);
+    // Admin authenticated
 
     // Parse request body
     const body: CreateUserRequest = await req.json();
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`📝 Creating user: ${email} with role: ${role}`);
+    // Creating user
 
     // Create service client with full permissions
     const serviceSupabase = createServiceClient();
@@ -122,7 +122,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Create user in auth
-    console.log('👤 Creating user in auth...');
+    // Creating user in auth
     const { data: authData, error: authError } = await serviceSupabase.auth.admin.createUser({
       email,
       password,
@@ -134,7 +134,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
 
     if (authError) {
-      console.error('❌ Auth creation failed:', authError);
+      // Auth creation failed
       throw authError;
     }
     
@@ -142,10 +142,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error('Failed to create user - no user data returned');
     }
 
-    console.log('✅ User created in auth:', authData.user.id);
+          // User created in auth
 
     // Add user to organization
-    console.log('🏢 Adding user to organization...');
+    // Adding user to organization
     const { error: memberError } = await serviceSupabase
       .from('organization_members')
       .insert({
@@ -156,13 +156,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
 
     if (memberError) {
-      console.error('❌ Organization membership failed:', memberError);
+              // Organization membership failed
       // Try to clean up - delete the auth user if org membership failed
       await serviceSupabase.auth.admin.deleteUser(authData.user.id);
       throw memberError;
     }
 
-    console.log('✅ User added to organization');
+          // User added to organization
 
     // Return success response
     const response: CreateUserResponse = {
@@ -175,7 +175,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     };
 
-    console.log('🎉 User creation completed successfully');
+    // User creation completed successfully
 
     return new Response(
       JSON.stringify(response),
@@ -186,7 +186,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
 
   } catch (error) {
-    console.error('💥 Error creating user:', error);
+    // Error creating user
     
     const response: CreateUserResponse = {
       success: false,

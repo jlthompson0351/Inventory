@@ -412,13 +412,13 @@ const ReportBuilder = () => {
         
         // If any data source that relates to asset types is selected, load ALL asset type fields
         if (selectedDataSources.some(ds => ['assets', 'asset_types', 'inventory_items', 'form_submissions', 'intake_forms', 'inventory_forms', 'mapping_forms'].includes(ds))) {
-          console.log('🔍 Auto-discovering ALL asset type fields...');
+          // Auto-discovering ALL asset type fields
           
           // Get ALL asset types for this organization
           const allAssetTypesData = await getAssetTypes(currentOrganization.id);
           
           for (const assetType of allAssetTypesData || []) {
-            console.log(`🔍 Processing asset type: ${assetType.name} (${assetType.id})`);
+            // Processing asset type
             
             // Add conversion fields from asset type configuration
             if (assetType.conversion_fields && Array.isArray(assetType.conversion_fields)) {
@@ -432,7 +432,7 @@ const ReportBuilder = () => {
                   source: 'conversion',
                   asset_type_id: assetType.id
                 });
-                console.log(`✅ Added conversion field: ${field.field_name} for ${assetType.name}`);
+                // Added conversion field
               });
             }
             
@@ -452,10 +452,10 @@ const ReportBuilder = () => {
                   form_id: field.form_id,
                   asset_type_id: assetType.id
                 });
-                console.log(`✅ Added form field: ${field.field_label} for ${assetType.name}`);
+                // Added form field
               });
             } catch (error) {
-              console.warn(`⚠️ Could not get mapped fields for asset type ${assetType.name}:`, error);
+              // Could not get mapped fields for asset type
             }
           }
         }
@@ -511,7 +511,7 @@ const ReportBuilder = () => {
           index === self.findIndex(f => f.id === field.id)
         );
         
-        console.log(`🎉 Discovered ${uniqueFields.length} total fields (${staticColumns.length} static, ${formFieldsData.length} form mapped, ${allAssetTypeFields.length} auto asset type, ${manualAssetTypeFields.length} manual asset type)`);
+        // Discovered fields summary
         
         setFormFields(uniqueFields);
 
@@ -650,14 +650,7 @@ const ReportBuilder = () => {
         updated_at: new Date().toISOString()
       };
 
-      // 🐛 DEBUG: Log the report config and organization info
-      console.log('🔍 DEBUG - Generating preview with:', {
-        organization_id: currentOrganization.id,
-        organization_name: currentOrganization.name,
-        dataSources: selectedDataSources,
-        columns: selectedColumns,
-        tempReport
-      });
+      // DEBUG - Generating preview
 
       const results = await executeReport(tempReport, 10);
       const endTime = performance.now();
@@ -665,14 +658,7 @@ const ReportBuilder = () => {
       
       setLastPreviewTime(executionTime);
       
-      // 🐛 DEBUG: Log the results
-      console.log('🔍 DEBUG - Preview results:', {
-        resultsCount: results.data.length,
-        firstResult: results.data[0],
-        allResults: results.data,
-        executionTimeMs: executionTime,
-        stats: results.stats
-      });
+      // DEBUG - Preview results generated
 
       setPreviewData(results.data);
       
@@ -1269,8 +1255,8 @@ const ReportBuilder = () => {
                     formFields={formFields}
                     reportName={reportName}
                     onExportChart={(chartType, chartData) => {
-                      // TODO: Implement chart export
-                      console.log('Export chart:', chartType, chartData);
+                              // TODO: Implement chart export
+        // Export chart functionality
                       toast({
                         title: "Chart Export",
                         description: `${chartType} chart exported successfully!`,

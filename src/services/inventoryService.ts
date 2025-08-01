@@ -54,7 +54,7 @@ export const getInventoryItems = async (
       const { data: assetData, error: assetError } = await assetQuery;
       
       if (assetError) {
-        console.error('Error fetching inventory items by asset_id:', assetError);
+        // Error fetching inventory items by asset_id
       } else if (assetData && assetData.length > 0) {
         return assetData;
       } else {
@@ -70,7 +70,7 @@ export const getInventoryItems = async (
       const { data: directData, error: directError } = await directQuery;
       
       if (directError) {
-        console.error('Error fetching inventory item by direct ID:', directError);
+        // Error fetching inventory item by direct ID
       } else if (directData && directData.length > 0) {
         return directData;
       } else {
@@ -91,13 +91,13 @@ export const getInventoryItems = async (
     const { data, error: fetchError } = await query;
     
     if (fetchError) {
-      console.error('Error fetching all inventory items:', fetchError);
+      // Error fetching all inventory items
       throw fetchError;
     }
     
     return data;
   } catch (error) {
-    console.error('Error in getInventoryItems:', error);
+    // Error in getInventoryItems
     return null;
   }
 };
@@ -114,7 +114,7 @@ export const getInventoryItemsLegacy = async (
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching inventory items:', error);
+    // Error fetching inventory items
     throw error;
   }
 
@@ -134,14 +134,14 @@ export async function getInventoryItem(id: string) {
     if (error) {
       if (error.code === 'PGRST116' || error.message?.includes('multiple') || error.message?.includes('no rows')) {
         // Not found or multiple rows, return null
-        console.warn('No inventory item found or multiple rows for id:', id);
+        // No inventory item found or multiple rows
         return null;
       }
       throw error;
     }
     return data;
   } catch (error) {
-    console.error('Error getting inventory item:', error);
+    // Error getting inventory item
     return null;
   }
 }
@@ -158,7 +158,7 @@ export async function getInventoryItemLegacy(supabase: any, id: string) {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error getting inventory item:', error);
+    // Error getting inventory item
     throw error;
   }
 }
@@ -203,7 +203,7 @@ export const createInventoryItem = async (
       if (!asset) {
         assetExists = false;
         assetIdToUse = null;
-        console.warn(`Asset with ID ${itemData.asset_id} not found. Creating orphaned inventory item.`);
+        // Asset not found. Creating orphaned inventory item.
       } else {
         // Check if inventory already exists for this asset
         const { data: existingInventory, error: checkError } = await supabase
@@ -213,11 +213,11 @@ export const createInventoryItem = async (
           .maybeSingle();
           
         if (checkError) {
-          console.error('Error checking for existing inventory:', checkError);
+          // Error checking for existing inventory
         }
           
         if (existingInventory) {
-          console.warn(`Inventory item already exists for asset ID ${itemData.asset_id}: ${existingInventory.name} (${existingInventory.id})`);
+          // Inventory item already exists for this asset
           throw new Error(`An inventory item already exists for this asset. Please edit the existing inventory item instead of creating a new one.`);
         }
       }
@@ -273,7 +273,7 @@ export const createInventoryItem = async (
       if (error.code === '23503' && error.message.includes('inventory_items_asset_id_fkey')) {
         throw new Error(`The asset ID ${itemData.asset_id} does not exist in the system. Please select a valid asset.`);
       }
-      console.error('Error creating inventory item:', error);
+      // Error creating inventory item
       throw error;
     }
     // Immediately create an initial inventory_history entry for the intake month
@@ -291,11 +291,11 @@ export const createInventoryItem = async (
       });
     }
     if (!assetExists) {
-      console.warn('Asset not found for asset_id:', itemData.asset_id, '. Created orphaned inventory item.');
+      // Asset not found. Created orphaned inventory item.
     }
     return data;
   } catch (error) {
-    console.error('Error creating inventory item:', error);
+    // Error creating inventory item
     throw error;
   }
 };
@@ -321,7 +321,7 @@ export const createInventoryItemLegacy = async (
     .single();
 
   if (error) {
-    console.error('Error creating inventory item:', error);
+    // Error creating inventory item
     throw error;
   }
 
@@ -338,7 +338,7 @@ export async function updateInventoryItem(id: string, itemData: any) {
       const asset = await getAssetById(itemData.asset_id);
       if (!asset) {
         assetIdToUse = null;
-        console.warn(`Asset with ID ${itemData.asset_id} not found. Setting asset_id to null.`);
+        // Asset not found. Setting asset_id to null.
       }
     }
     const { data, error } = await supabase
@@ -366,7 +366,7 @@ export async function updateInventoryItem(id: string, itemData: any) {
     }
     return data;
   } catch (error) {
-    console.error('Error updating inventory item:', error);
+    // Error updating inventory item
     throw error;
   }
 }
@@ -392,7 +392,7 @@ export async function updateInventoryItemLegacy(supabase: any, id: string, itemD
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error updating inventory item:', error);
+    // Error updating inventory item
     throw error;
   }
 }
@@ -409,7 +409,7 @@ export async function softDeleteInventoryItem(id: string) {
     if (error) throw error;
     return true;
   } catch (error) {
-    console.error('Error soft deleting inventory item:', error);
+    // Error soft deleting inventory item
     throw error;
   }
 }
@@ -435,7 +435,7 @@ export const searchInventoryItems = async (
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error searching inventory items:', error);
+    // Error searching inventory items
     throw error;
   }
 
@@ -458,7 +458,7 @@ export const filterInventoryItemsByCategory = async (
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error filtering inventory items by category:', error);
+    // Error filtering inventory items by category
     throw error;
   }
 
@@ -479,7 +479,7 @@ export const getInventoryCategories = async (
     .not('category', 'is', null);
 
   if (error) {
-    console.error('Error fetching inventory categories:', error);
+    // Error fetching inventory categories
     throw error;
   }
 
@@ -527,7 +527,7 @@ export const updateInventoryItemPrice = async (
     .eq('id', id);
 
   if (updateError) {
-    console.error('Error updating inventory item price:', updateError);
+          // Error updating inventory item price
     throw updateError;
   }
 
@@ -539,7 +539,7 @@ export const updateInventoryItemPrice = async (
     .single();
 
   if (itemError) {
-    console.error('Error fetching inventory item organization:', itemError);
+            // Error fetching inventory item organization
     throw itemError;
   }
 
@@ -556,7 +556,7 @@ export const updateInventoryItemPrice = async (
     });
 
   if (historyError) {
-    console.error('Error creating price history record:', historyError);
+          // Error creating price history record
     throw historyError;
   }
 };
@@ -572,7 +572,7 @@ export const getInventoryItemPriceHistory = async (
     .order('effective_date', { ascending: false });
 
   if (error) {
-    console.error('Error fetching price history:', error);
+    // Error fetching price history
     throw error;
   }
 
@@ -590,13 +590,13 @@ export const validateBarcode = async (
     );
 
     if (error) {
-      console.error('Error validating barcode:', error);
+      // Error validating barcode
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('Failed to validate barcode:', error);
+    // Failed to validate barcode
     // Fallback validation in case the RPC fails
     return /^[A-Za-z0-9]+-[A-Za-z0-9]{8}$/.test(barcode);
   }
@@ -617,13 +617,13 @@ export async function getInventoryItemByBarcode(organizationId: string, barcode:
       .single();
 
     if (error) {
-      console.error('Error fetching inventory item by barcode:', error);
+      // Error fetching inventory item by barcode
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('Failed to fetch inventory item by barcode:', error);
+    // Failed to fetch inventory item by barcode
     return null;
   }
 }
@@ -642,7 +642,7 @@ export async function generateAssetBarcode(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error generating asset barcode:', error);
+    // Error generating asset barcode
     throw error;
   }
 }
@@ -659,7 +659,7 @@ export async function scanAssetBarcode(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error scanning asset barcode:', error);
+    // Error scanning asset barcode
     throw error;
   }
 }
@@ -679,7 +679,7 @@ export async function getAssetFormsByBarcode(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error getting asset forms by barcode:', error);
+    // Error getting asset forms by barcode
     return null;
   }
 }
@@ -699,7 +699,7 @@ export async function getAssetWithFormulasByBarcode(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error getting asset with formulas by barcode:', error);
+    // Error getting asset with formulas by barcode
     return null;
   }
 }
@@ -723,7 +723,7 @@ export async function applyAssetCalculationFormulas(
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Error applying calculation formulas:', error);
+    // Error applying calculation formulas
     // Return original form data if there's an error
     return formData;
   }
@@ -758,7 +758,7 @@ export const createInventoryCheck = async (
       .eq('id', assetId)
       .single();
     if (assetError) {
-      console.error('Error fetching asset data:', assetError);
+      // Error fetching asset data
       throw assetError;
     }
     // For periodic checks, see if a periodic inventory already exists for this asset this month
@@ -801,7 +801,7 @@ export const createInventoryCheck = async (
       .select()
       .single();
     if (error) {
-      console.error('Error creating inventory check:', error);
+      // Error creating inventory check
       throw error;
     }
     // For initial check, create an initial inventory_history entry
@@ -819,7 +819,7 @@ export const createInventoryCheck = async (
     }
     return inventoryItem;
   } catch (error) {
-    console.error('Error in createInventoryCheck:', error);
+    // Error in createInventoryCheck
     throw error;
   }
 };
@@ -864,7 +864,7 @@ export const upsertMonthlyInventoryHistory = async ({
     .eq('event_type', event_type)
     .maybeSingle();
   if (findError) {
-    console.error('Error finding inventory history:', findError);
+          // Error finding inventory history
     throw findError;
   }
   if (existing) {
@@ -877,9 +877,7 @@ export const upsertMonthlyInventoryHistory = async ({
       check_date: check_date.toISOString(),
     };
     
-    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - updating:', updateData);
-    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - update keys:', Object.keys(updateData));
-    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - checking for user_id in update:', Object.keys(updateData).includes('user_id'));
+    // DEBUG: updating inventory history
     
     const { data, error } = await supabase
       .from('inventory_history')
@@ -887,13 +885,13 @@ export const upsertMonthlyInventoryHistory = async ({
       .eq('id', existing.id)
       .select();
     if (error) {
-      console.error('Error updating inventory history:', error);
+      // Error updating inventory history
       throw error;
     }
     return data;
   } else {
     // Use database function to bypass Supabase client schema issues
-    console.log('🔍 DEBUG upsertMonthlyInventoryHistory - using database function for insert');
+    // Using database function for insert
     
     const { data, error } = await (supabase as any).rpc('insert_inventory_history_simple', {
       organization_id: organization_id,
@@ -910,7 +908,7 @@ export const upsertMonthlyInventoryHistory = async ({
     });
     
     if (error) {
-      console.error('Error inserting inventory history:', error);
+      // Error inserting inventory history
       throw error;
     }
     return data;
@@ -928,7 +926,7 @@ export async function getInventoryHistoryForMonth(inventory_item_id: string, mon
     .eq('month_year', month_year)
     .single();
   if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching inventory history for month:', error);
+    // Error fetching inventory history for month
     throw error;
   }
   return data;
@@ -979,7 +977,7 @@ export const createMonthlyInventoryCheck = async (
       .single();
       
     if (itemError) {
-      console.error('Error fetching inventory item:', itemError);
+      // Error fetching inventory item
       throw new Error(`Inventory item with ID ${inventoryItemId} not found.`);
     }
     
@@ -1006,7 +1004,7 @@ export const createMonthlyInventoryCheck = async (
     });
       
     if (historyError) {
-      console.error('Error creating inventory history record:', historyError);
+      // Error creating inventory history record
       throw historyError;
     }
     
@@ -1022,12 +1020,12 @@ export const createMonthlyInventoryCheck = async (
       .eq('id', inventoryItemId);
       
     if (quantityError) {
-      console.error('Error updating inventory quantity:', quantityError);
+      // Error updating inventory quantity
     }
     
     return historyRecord;
   } catch (error) {
-    console.error('Error creating monthly inventory check:', error);
+    // Error creating monthly inventory check
     throw error;
   }
 };
@@ -1050,14 +1048,7 @@ export const createAssetAndInitialInventory = async (
   },
   intakeFormSchema?: any // The schema of the intake form used { fields: [{id, inventory_action,...}] }
 ): Promise<any> => {
-  console.log('🚀🚀🚀 ENTRY POINT: createAssetAndInitialInventory called - MAIN FUNCTION IDENTIFIED');
-  console.log('🚀 DEBUG: createAssetAndInitialInventory called with:', {
-    assetData,
-    assetTypeId,
-    organizationId,
-    intakeFormData,
-    intakeFormSchema
-  });
+  // ENTRY POINT: createAssetAndInitialInventory called
   
   try {
     // Get the current user's ID
@@ -1080,7 +1071,7 @@ export const createAssetAndInitialInventory = async (
       .single();
 
     if (assetError) {
-      console.error('Error creating asset:', assetError);
+      // Error creating asset
       throw assetError;
     }
 
@@ -1128,7 +1119,7 @@ export const createAssetAndInitialInventory = async (
       .single();
 
     if (inventoryError) {
-      console.error('Error creating inventory item:', inventoryError);
+      // Error creating inventory item
       // Consider if asset should be rolled back or marked as needing attention
       throw inventoryError;
     }
@@ -1153,9 +1144,7 @@ export const createAssetAndInitialInventory = async (
       response_data: intakeFormData.response_data || null // Store all submitted dynamic form values
     };
     
-    console.log('🔍 DEBUG: About to insert inventory_history record with data:', historyInsertData);
-    console.log('🔍 DEBUG: Keys being inserted:', Object.keys(historyInsertData));
-    console.log('🔍 DEBUG: Checking for user_id in keys:', Object.keys(historyInsertData).includes('user_id'));
+    // DEBUG: About to insert inventory_history record
     
     // Use database function to bypass Supabase client schema issues
     const { data: historyRecord, error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
@@ -1173,9 +1162,7 @@ export const createAssetAndInitialInventory = async (
     });
       
     if (historyError) {
-      console.error('❌ ERROR creating inventory history record:', historyError);
-      console.error('❌ ERROR data that caused this:', historyInsertData);
-      console.error('❌ ERROR stack trace:', new Error().stack);
+      // ERROR creating inventory history record
       // Consider if asset/inventory_item should be rolled back or marked
       throw historyError;
     }
@@ -1195,7 +1182,7 @@ export const createAssetAndInitialInventory = async (
             notes: 'Initial purchase price from asset creation'
           });
       } catch (priceHistoryError) {
-        console.error('Error creating initial inventory price history record:', priceHistoryError);
+        // Error creating initial inventory price history record
         // Non-fatal, allow asset creation to succeed but log the error
       }
     }
@@ -1206,7 +1193,7 @@ export const createAssetAndInitialInventory = async (
       historyRecord: historyRecord
     };
   } catch (error) {
-    console.error('Error in createAssetAndInitialInventory:', error);
+    // Error in createAssetAndInitialInventory
     throw error;
   }
 };
@@ -1223,13 +1210,13 @@ export async function getAllInventoryHistory(inventory_item_id: string) {
       .order('month_year', { ascending: true });
       
     if (error) {
-      console.error('Error fetching all inventory history:', error);
+      // Error fetching all inventory history
       throw error;
     }
     
     return data || [];
   } catch (error) {
-    console.error('Error in getAllInventoryHistory:', error);
+    // Error in getAllInventoryHistory
     return [];
   }
 }
@@ -1276,7 +1263,7 @@ function computeNewInventoryQuantity(
          }
         foundAction = true;
       } else if (action === 'set' && field.id !== setActionField?.id) {
-        console.warn(`Multiple 'set' inventory_actions found. Using value from field '${setActionField?.label || 'first set field'}'. Field '${field.label}' also has a 'set' action.`);
+        // Multiple 'set' inventory_actions found
       }
     }
   }
@@ -1353,7 +1340,7 @@ export const recordNewInventoryCheck = async (
     });
 
     if (historyError) {
-      console.error('Error creating inventory history record for check:', historyError);
+      // Error creating inventory history record for check
       throw historyError;
     }
 
@@ -1369,13 +1356,13 @@ export const recordNewInventoryCheck = async (
       .eq('id', inventoryItemId);
 
     if (updateError) {
-      console.error('Error updating inventory_items record after check:', updateError);
+      // Error updating inventory_items record after check
       // Non-fatal for the history record, but log it.
     }
 
     return historyRecord;
   } catch (error) {
-    console.error('Error in recordNewInventoryCheck:', error);
+    // Error in recordNewInventoryCheck
     throw error;
   }
 };
@@ -1405,7 +1392,7 @@ export const updateHistoricalInventoryCheck = async (
       .single();
 
     if (fetchError || !originalHistory) {
-      console.error('Error fetching original history record:', fetchError);
+      // Error fetching original history record
       throw new Error('Original history record not found.');
     }
 
@@ -1450,7 +1437,7 @@ export const updateHistoricalInventoryCheck = async (
       .single();
 
     if (updateHistoryError) {
-      console.error('Error updating inventory history record:', updateHistoryError);
+      // Error updating inventory history record
       throw updateHistoryError;
     }
 
@@ -1465,7 +1452,7 @@ export const updateHistoricalInventoryCheck = async (
       .single();
 
     if (latestHistoryError) {
-      console.error('Error fetching latest history record for recalculation:', latestHistoryError);
+              // Error fetching latest history record for recalculation
       // Continue, but log that main item quantity might be stale.
     } else if (latestHistory) {
       const { error: updateItemError } = await supabase
@@ -1479,13 +1466,13 @@ export const updateHistoricalInventoryCheck = async (
         .eq('id', originalHistory.inventory_item_id);
 
       if (updateItemError) {
-        console.error('Error updating inventory_items after historical edit:', updateItemError);
+        // Error updating inventory_items after historical edit
       }
     }
 
     return updatedHistory;
   } catch (error) {
-    console.error('Error in updateHistoricalInventoryCheck:', error);
+    // Error in updateHistoricalInventoryCheck
     throw error;
   }
 }; 

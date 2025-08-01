@@ -28,11 +28,11 @@ export default function FormPreview() {
       
       try {
         setLoading(true);
-        console.log(`Loading form with ID: ${id}`);
+        // Loading form
         const { form, validationRules, fieldDependencies } = await getFormWithRelatedData(id);
         
         if (form) {
-          console.log('Form loaded successfully:', form);
+          // Form loaded successfully
           setForm(form);
           setValidationRules(validationRules || []);
           setFieldDependencies(fieldDependencies || []);
@@ -69,7 +69,7 @@ export default function FormPreview() {
   }, [id, currentOrganization, toast]);
   
   const handleFormSubmit = async (data: any) => {
-    console.log('Form submitted with data:', data);
+    // Form submitted
     setFormData(data);
     
     toast({
