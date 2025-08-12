@@ -265,15 +265,13 @@ The system includes advanced database optimizations. For maintenance:
 
 ## 📚 Documentation
 
-- [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) - Complete Firebase hosting and deployment
-- [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features
-- [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation
-- [Form Builder Documentation](./README-FORM-BUILDER.md) - Comprehensive form creation and management guide
-- [Main System Documentation](./LOGISTIQ-README.md) - Comprehensive system overview
-- [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships
-- [Optimized Reporting System](./docs/OPTIMIZED-REPORTING-SYSTEM.md) - Enterprise reporting features
-- [Barcode Integration](./docs/BARCODE-INTEGRATION.md) - Barcode/QR code functionality
-- [Barcode Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md) - Mobile QR workflow and technical reference
+-   **[🚀 New Guided Report Builder](./docs/Features/06_Reporting_and_Analytics.md)** - **(NEW)** Complete guide to the new business-friendly report builder.
+-   [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) - Complete Firebase hosting and deployment.
+-   [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features.
+-   [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation.
+-   [Form Builder Documentation](./README-FORM-builder.md) - Comprehensive form creation and management guide.
+-   [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships.
+-   [Mobile QR + PIN Workflow](./docs/MOBILE-QR-PIN-WORKFLOW.md) - Documented exception, rationale, mitigations, and roadmap.
 
 ## Security Features
 

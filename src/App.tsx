@@ -17,7 +17,7 @@ import NewAsset from "./pages/NewAsset";
 import AssetDetail from "./pages/AssetDetail";
 import AssetQRManager from "./pages/AssetQRManager";
 import Reports from "./pages/Reports";
-import ReportBuilder from "./pages/ReportBuilder";
+import NewReportBuilder from "./pages/NewReportBuilder";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 // import SystemAdmin from "./pages/SystemAdmin"; // Old import
@@ -156,8 +156,8 @@ const AppRoutes = () => {
         
         {/* Reporting Routes */}
         <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/reports/new" element={user ? <PageLayout><NewReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/reports/:id" element={user ? <PageLayout><NewReportBuilder /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/data-quality" element={user ? <PageLayout><DataQualityDashboard /></PageLayout> : <Navigate to="/login" />} />
         
         {/* User and Organization Settings Routes */}

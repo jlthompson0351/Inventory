@@ -49,7 +49,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
-import { getReports, executeReport, deleteReport } from "@/services/reportService";
+import { getReports, executeSchemaReport, deleteReport } from "@/services/reportService";
 import { useToast } from "@/components/ui/use-toast";
 import SimpleAssetReport from '@/components/inventory/SimpleAssetReport';
 
@@ -365,7 +365,15 @@ const Reports = () => {
     try {
       const report = reports.find(r => r.id === reportId);
       if (report) {
-        const results = await executeReport(report);
+        const config = {
+          subject: report.name,
+          dataSources: report.report_config.dataSources,
+          columns: report.report_config.columns,
+          filters: report.report_config.filters || [],
+          sorts: report.report_config.sorts || [],
+          assetTypes: report.report_config.assetTypes || []
+        };
+        const results = await executeSchemaReport(report.organization_id, config);
         toast({
           title: "Report Complete",
           description: `Generated ${results.data?.length || 0} rows of data.`,

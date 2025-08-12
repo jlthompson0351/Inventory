@@ -1,0 +1,247 @@
+{
+  "version": "2.0.0",
+  "description": "Enhanced business-friendly reporting schema with guided discovery",
+  "categories": {
+    "assets": {
+      "label": "Assets & Equipment",
+      "description": "Physical assets, equipment, and tools",
+      "icon": "📦",
+      "color": "blue"
+    },
+    "inventory": {
+      "label": "Inventory & Stock",
+      "description": "Current stock levels and item management",
+      "icon": "📊", 
+      "color": "green"
+    },
+    "activity": {
+      "label": "Activity & History", 
+      "description": "Movement history and audit trails",
+      "icon": "📈",
+      "color": "orange"
+    },
+    "forms": {
+      "label": "Forms & Data Collection",
+      "description": "Form submissions and collected data",
+      "icon": "📝",
+      "color": "purple"
+    }
+  },
+  "quickReports": [
+    {
+      "id": "asset_overview",
+      "label": "Asset Overview",
+      "description": "All assets with key details and status",
+      "icon": "📦",
+      "category": "assets",
+      "entities": ["assets"],
+      "defaultFields": ["assets.name", "assets.status", "assets.serial_number", "asset_types.name"],
+      "suggested": true
+    },
+    {
+      "id": "current_inventory", 
+      "label": "Current Stock Levels",
+      "description": "Current inventory quantities and values",
+      "icon": "📊",
+      "category": "inventory",
+      "entities": ["inventory_items"],
+      "defaultFields": ["inventory_items.name", "inventory_items.sku", "inventory_items.quantity", "inventory_items.current_price"],
+      "suggested": true
+    },
+    {
+      "id": "recent_activity",
+      "label": "Recent Activity",
+      "description": "Latest inventory movements and changes",
+      "icon": "📈", 
+      "category": "activity",
+      "entities": ["inventory_history"],
+      "defaultFields": ["inventory_history.event_type", "inventory_history.quantity", "inventory_history.check_date"],
+      "suggested": true
+    },
+    {
+      "id": "form_submissions",
+      "label": "Form Responses", 
+      "description": "Recent form submissions and data",
+      "icon": "📝",
+      "category": "forms",
+      "entities": ["form_submissions"],
+      "defaultFields": ["form_submissions.created_at", "forms.name", "form_submissions.status"],
+      "suggested": true
+    }
+  ],
+  "entities": {
+    "assets": {
+      "displayName": "Assets",
+      "businessLabel": "Assets & Equipment",
+      "description": "Physical assets, equipment, and tools in your organization",
+      "category": "assets",
+      "icon": "📦",
+      "table": "assets",
+      "primaryKey": "id",
+      "primaryFields": ["name", "status", "serial_number", "barcode"],
+      "defaultSort": [{ "field": "assets.created_at", "direction": "desc" }],
+      "fieldCategories": {
+        "basic": { "label": "Basic Information", "order": 1 },
+        "identification": { "label": "Identification", "order": 2 },
+        "status": { "label": "Status & Condition", "order": 3 },
+        "dates": { "label": "Dates", "order": 4 },
+        "classification": { "label": "Classification", "order": 5 }
+      },
+      "fields": [
+        { "id": "assets.name", "label": "Asset Name", "businessLabel": "Asset Name", "column": "name", "type": "text", "category": "basic", "sortable": true, "aggregatable": false, "searchable": true, "filterOperators": ["equals", "not_equals", "contains", "starts_with", "ends_with", "in", "is_null", "is_not_null"] },
+        { "id": "assets.description", "label": "Description", "businessLabel": "Asset Description", "column": "description", "type": "text", "category": "basic", "sortable": false, "aggregatable": false, "searchable": true, "filterOperators": ["contains", "starts_with", "ends_with", "is_null", "is_not_null"] },
+        { "id": "assets.status", "label": "Status", "businessLabel": "Asset Status", "column": "status", "type": "text", "category": "status", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "in", "is_null", "is_not_null"], "values": ["active", "inactive", "maintenance", "retired"] },
+        { "id": "assets.serial_number", "label": "Serial Number", "businessLabel": "Serial Number", "column": "serial_number", "type": "text", "category": "identification", "sortable": true, "aggregatable": false, "searchable": true, "filterOperators": ["equals", "contains", "starts_with", "ends_with", "is_null", "is_not_null"] },
+        { "id": "assets.barcode", "label": "Barcode", "businessLabel": "Barcode/QR Code", "column": "barcode", "type": "text", "category": "identification", "sortable": false, "aggregatable": false, "searchable": true, "filterOperators": ["equals", "contains", "starts_with", "ends_with", "is_null", "is_not_null"] },
+        { "id": "assets.acquisition_date", "label": "Acquisition Date", "businessLabel": "Date Acquired", "column": "acquisition_date", "type": "date", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"] },
+        { "id": "assets.created_at", "label": "Created At", "businessLabel": "Date Added to System", "column": "created_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] },
+        { "id": "assets.updated_at", "label": "Updated At", "businessLabel": "Last Modified", "column": "updated_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] },
+        { "id": "asset_types.name", "label": "Asset Type Name", "businessLabel": "Asset Type", "column": "name", "type": "text", "category": "classification", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "contains", "starts_with", "in"], "requiresJoin": "asset_types" }
+      ],
+      "joins": [
+        { "to": "asset_types", "type": "left", "on": "assets.asset_type_id = asset_types.id", "label": "Asset Type Information" },
+        { "to": "inventory_items", "type": "left", "on": "assets.id = inventory_items.asset_id", "label": "Inventory Information" }
+      ]
+    },
+
+    "inventory_items": {
+      "displayName": "Inventory Items",
+      "businessLabel": "Inventory & Stock Items",
+      "description": "Current inventory levels, stock counts, and item details",
+      "category": "inventory",
+      "icon": "📊",
+      "table": "inventory_items",
+      "primaryKey": "id",
+      "primaryFields": ["name", "sku", "quantity", "current_price"],
+      "defaultSort": [{ "field": "inventory_items.updated_at", "direction": "desc" }],
+      "fieldCategories": {
+        "basic": { "label": "Basic Information", "order": 1 },
+        "identification": { "label": "SKU & Identification", "order": 2 },
+        "metrics": { "label": "Quantities & Metrics", "order": 3 },
+        "financial": { "label": "Pricing & Value", "order": 4 },
+        "location": { "label": "Location & Storage", "order": 5 },
+        "status": { "label": "Status & Classification", "order": 6 },
+        "dates": { "label": "Dates", "order": 7 }
+      },
+      "fields": [
+        { "id": "inventory_items.name", "label": "Item Name", "businessLabel": "Item Name", "column": "name", "type": "text", "category": "basic", "sortable": true, "aggregatable": false, "searchable": true, "filterOperators": ["equals", "contains", "starts_with", "ends_with"] },
+        { "id": "inventory_items.sku", "label": "SKU", "businessLabel": "SKU/Part Number", "column": "sku", "type": "text", "category": "identification", "sortable": true, "aggregatable": false, "searchable": true, "filterOperators": ["equals", "contains", "starts_with", "ends_with"] },
+        { "id": "inventory_items.quantity", "label": "Quantity", "businessLabel": "Stock Count", "column": "quantity", "type": "number", "category": "metrics", "sortable": true, "aggregatable": true, "filterOperators": ["equals", "greater_than", "less_than", "between", "in", "is_null", "is_not_null"] },
+        { "id": "inventory_items.current_price", "label": "Current Price", "businessLabel": "Unit Price", "column": "current_price", "type": "currency", "category": "financial", "sortable": true, "aggregatable": true, "filterOperators": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"] },
+        { "id": "inventory_items.currency", "label": "Currency", "businessLabel": "Currency", "column": "currency", "type": "text", "category": "financial", "sortable": false, "aggregatable": false, "filterOperators": ["equals", "in"] },
+        { "id": "inventory_items.location", "label": "Location", "businessLabel": "Storage Location", "column": "location", "type": "text", "category": "location", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "in", "contains", "is_null", "is_not_null"] },
+        { "id": "inventory_items.category", "label": "Category", "businessLabel": "Item Category", "column": "category", "type": "text", "category": "status", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "in", "contains"] },
+        { "id": "inventory_items.created_at", "label": "Created At", "businessLabel": "Date Added", "column": "created_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] },
+        { "id": "inventory_items.updated_at", "label": "Updated At", "businessLabel": "Last Updated", "column": "updated_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] }
+      ],
+      "joins": [
+        { "to": "assets", "type": "left", "on": "inventory_items.asset_id = assets.id", "label": "Asset Information" },
+        { "to": "asset_types", "type": "left", "on": "inventory_items.asset_type_id = asset_types.id", "label": "Asset Type Information" }
+      ]
+    },
+
+    "inventory_history": {
+      "displayName": "Inventory History",
+      "businessLabel": "Stock Movement & History",
+      "description": "Historical inventory changes, movements, and audit trail",
+      "category": "activity",
+      "icon": "📈",
+      "table": "inventory_history",
+      "primaryKey": "id",
+      "primaryFields": ["event_type", "quantity", "check_date"],
+      "defaultSort": [{ "field": "inventory_history.created_at", "direction": "desc" }],
+      "fieldCategories": {
+        "transaction": { "label": "Transaction Details", "order": 1 },
+        "quantities": { "label": "Quantities & Changes", "order": 2 },
+        "location": { "label": "Location & Status", "order": 3 },
+        "notes": { "label": "Notes & Comments", "order": 4 },
+        "dates": { "label": "Dates & Timing", "order": 5 }
+      },
+      "fields": [
+        { "id": "inventory_history.event_type", "label": "Event Type", "businessLabel": "Transaction Type", "column": "event_type", "type": "text", "category": "transaction", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "in"], "values": ["intake", "consumption", "adjustment", "audit", "transfer"] },
+        { "id": "inventory_history.check_type", "label": "Check Type", "businessLabel": "Audit Type", "column": "check_type", "type": "text", "category": "transaction", "sortable": false, "aggregatable": false, "filterOperators": ["equals", "in", "is_null", "is_not_null"] },
+        { "id": "inventory_history.quantity", "label": "Quantity", "businessLabel": "Amount Changed", "column": "quantity", "type": "number", "category": "quantities", "sortable": true, "aggregatable": true, "filterOperators": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"] },
+        { "id": "inventory_history.previous_quantity", "label": "Previous Quantity", "businessLabel": "Previous Amount", "column": "previous_quantity", "type": "number", "category": "quantities", "sortable": true, "aggregatable": true, "filterOperators": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"] },
+        { "id": "inventory_history.location", "label": "Location", "businessLabel": "Location at Time", "column": "location", "type": "text", "category": "location", "sortable": false, "aggregatable": false, "filterOperators": ["equals", "contains", "starts_with", "is_null", "is_not_null"] },
+        { "id": "inventory_history.status", "label": "Status", "businessLabel": "Status at Time", "column": "status", "type": "text", "category": "location", "sortable": false, "aggregatable": false, "filterOperators": ["equals", "in", "is_null", "is_not_null"] },
+        { "id": "inventory_history.notes", "label": "Notes", "businessLabel": "Transaction Notes", "column": "notes", "type": "text", "category": "notes", "sortable": false, "aggregatable": false, "searchable": true, "filterOperators": ["contains", "starts_with", "ends_with", "is_null", "is_not_null"] },
+        { "id": "inventory_history.check_date", "label": "Check Date", "businessLabel": "Transaction Date", "column": "check_date", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] },
+        { "id": "inventory_history.month_year", "label": "Month/Year", "businessLabel": "Month/Year", "column": "month_year", "type": "text", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "starts_with"] },
+        { "id": "inventory_history.created_at", "label": "Created At", "businessLabel": "Record Created", "column": "created_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] }
+      ],
+      "joins": [
+        { "to": "inventory_items", "type": "left", "on": "inventory_history.inventory_item_id = inventory_items.id", "label": "Inventory Item Information" }
+      ]
+    },
+
+    "form_submissions": {
+      "displayName": "Form Submissions",
+      "businessLabel": "Form Responses & Data",
+      "description": "Submitted form data, responses, and collected information",
+      "category": "forms",
+      "icon": "📋",
+      "table": "form_submissions",
+      "primaryKey": "id",
+      "primaryFields": ["created_at", "status"],
+      "defaultSort": [{ "field": "form_submissions.created_at", "direction": "desc" }],
+      "fieldCategories": {
+        "submission": { "label": "Submission Details", "order": 1 },
+        "status": { "label": "Status & Processing", "order": 2 },
+        "associations": { "label": "Related Items", "order": 3 },
+        "dates": { "label": "Dates", "order": 4 }
+      },
+      "fields": [
+        { "id": "forms.name", "label": "Form Name", "businessLabel": "Form Used", "column": "name", "type": "text", "category": "submission", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "contains", "starts_with", "in"], "requiresJoin": "forms" },
+        { "id": "form_submissions.status", "label": "Status", "businessLabel": "Response Status", "column": "status", "type": "text", "category": "status", "sortable": true, "aggregatable": false, "filterOperators": ["equals", "in"], "values": ["submitted", "reviewed", "approved", "rejected"] },
+        { "id": "form_submissions.created_at", "label": "Submitted At", "businessLabel": "Date Submitted", "column": "created_at", "type": "datetime", "category": "dates", "sortable": true, "aggregatable": false, "filterOperators": ["greater_than", "less_than", "between"] }
+      ],
+      "joins": [
+        { "to": "assets", "type": "left", "on": "form_submissions.asset_id = assets.id", "label": "Asset Information" },
+        { "to": "forms", "type": "left", "on": "form_submissions.form_id = forms.id", "label": "Form Information" }
+      ]
+    }
+  },
+  "guides": {
+    "getting_started": {
+      "title": "Building Your First Report",
+      "steps": [
+        {
+          "title": "Choose What to Report On",
+          "description": "Start with one of our quick report templates or pick a data category",
+          "action": "select_category"
+        },
+        {
+          "title": "Select Your Columns",
+          "description": "Choose which information you want to see in your report",
+          "action": "select_fields"
+        },
+        {
+          "title": "Add Filters (Optional)",
+          "description": "Narrow down your data with filters like date ranges or specific values",
+          "action": "add_filters"
+        },
+        {
+          "title": "Preview & Export",
+          "description": "See your data and export to Excel or CSV",
+          "action": "preview_export"
+        }
+      ]
+    }
+  },
+  "notes": {
+    "organization_scope": "All queries MUST be scoped to the active organization via organization_id. The runtime/query builder will inject this automatically.",
+    "field_id_convention": "Use 'table.column' identifiers (e.g., assets.name). These map directly to UI column IDs and export headers.",
+    "business_labels": "businessLabel fields provide user-friendly names for non-technical users. Technical users can see both.",
+    "categories": "Field categories help organize columns into logical groups for better UX.",
+    "operators": {
+      "text": ["equals", "not_equals", "contains", "starts_with", "ends_with", "in", "is_null", "is_not_null"],
+      "number": ["equals", "not_equals", "greater_than", "less_than", "between", "in", "is_null", "is_not_null"],
+      "currency": ["equals", "not_equals", "greater_than", "less_than", "between", "in", "is_null", "is_not_null"],
+      "uuid": ["equals", "in", "is_null", "is_not_null"],
+      "date": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"],
+      "datetime": ["equals", "greater_than", "less_than", "between", "is_null", "is_not_null"],
+      "boolean": ["equals", "is_null", "is_not_null"],
+      "json": ["contains"]
+    }
+  }
+}

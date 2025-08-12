@@ -1381,6 +1381,59 @@ export async function executeReport(
   }
 }
 
+// 🚀 NEW SCHEMA-DRIVEN EXECUTION ENGINE (PARALLEL IMPLEMENTATION)
+export async function executeSchemaReport(
+  organizationId: string,
+  config: any,
+  limit?: number,
+  useCache: boolean = true
+): Promise<{
+  data: any[];
+  stats: ExecutionStats;
+  totalCount: number;
+}> {
+  const startTime = performance.now();
+  
+  try {
+    // Call the new Supabase function
+    const { data, error } = await supabase.rpc('execute_report_query', {
+      p_organization_id: organizationId,
+      p_config: config
+    });
+
+    if (error) {
+      console.error('Schema report execution error:', error);
+      throw error;
+    }
+
+    // For now, the stub returns empty results, so we'll handle that
+    const results = data || [];
+    const totalCount = results.length;
+    
+    const endTime = performance.now();
+    const executionTime = Math.round(endTime - startTime);
+    
+    const stats: ExecutionStats = {
+      executionTime,
+      rowCount: results.length,
+      cacheHit: false, // Not implemented in stub yet
+      queryComplexity: 'low', // Will be calculated by RPC
+      dataSourcesUsed: config.dataSources || [],
+      bytesProcessed: JSON.stringify(results).length
+    };
+    
+    return { 
+      data: results, 
+      stats,
+      totalCount 
+    };
+    
+  } catch (error) {
+    console.error('Error executing schema report:', error);
+    throw error;
+  }
+}
+
 // 🚀 UTILITY FUNCTIONS
 
 async function applyPostProcessingCalculations(data: any[], config: ReportConfig): Promise<any[]> {

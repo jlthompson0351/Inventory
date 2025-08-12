@@ -401,6 +401,7 @@ const MobileAssetWorkflow = () => {
                       onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                       placeholder="Enter PIN"
                       className="text-center text-2xl tracking-[0.3em] h-14 font-mono bg-gray-50 border-2 focus:border-blue-500 focus:bg-white transition-all duration-200"
+                      data-testid="pin-input"
                       autoFocus
                     />
                     {authError && (
@@ -414,6 +415,7 @@ const MobileAssetWorkflow = () => {
                     type="submit" 
                     className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg" 
                     disabled={pin.length !== 4 || isAuthenticating}
+                    data-testid="pin-submit"
                   >
                     {isAuthenticating ? (
                       <>

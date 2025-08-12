@@ -1,0 +1,145 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "React 18",
+    "Vite",
+    "Supabase (PostgreSQL, Auth, Storage)",
+    "TailwindCSS",
+    "Radix UI",
+    "React Router",
+    "TanStack Query",
+    "React Hook Form",
+    "Zod",
+    "Recharts",
+    "QR/Barcode (html5-qrcode, jsqr, qrcode, jsbarcode)",
+    "Firebase Hosting"
+  ],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "Supabase auth with login, registration, forced password change, and mobile PIN authentication",
+      "files": [
+        "src/hooks/useAuth.tsx",
+        "src/components/auth/AuthLayout.tsx",
+        "src/components/auth/LoginForm.tsx",
+        "src/components/auth/RegisterForm.tsx",
+        "src/components/auth/ForcePasswordChange.tsx",
+        "src/pages/Login.tsx",
+        "src/pages/InvitationAccept.tsx"
+      ]
+    },
+    {
+      "name": "Organization Management",
+      "description": "Multi-tenant organization system with member roles, invitations, and admin settings",
+      "files": [
+        "src/hooks/useOrganization.tsx",
+        "src/hooks/useOrganizationMembers.ts",
+        "src/hooks/useOrganizationInvitations.ts",
+        "src/components/organization/OrganizationBreadcrumb.tsx",
+        "src/components/organization/MembersList.tsx",
+        "src/components/organization/InviteForm.tsx",
+        "src/pages/OrganizationMembers.tsx",
+        "src/pages/OrganizationAdminPage.tsx"
+      ]
+    },
+    {
+      "name": "Asset Management",
+      "description": "Complete asset tracking system with types, relationships, and barcode generation",
+      "files": [
+        "src/services/assetService.ts",
+        "src/services/assetTypeService.ts",
+        "src/components/inventory/AssetCard.tsx",
+        "src/components/inventory/AssetList.tsx",
+        "src/components/inventory/AssetTypeBrowser.tsx",
+        "src/pages/Assets.tsx",
+        "src/pages/AssetTypes.tsx",
+        "src/pages/NewAsset.tsx",
+        "src/pages/AssetDetail.tsx"
+      ]
+    },
+    {
+      "name": "Inventory Management",
+      "description": "Comprehensive inventory tracking with history, validation, and mobile workflows",
+      "files": [
+        "src/services/inventoryService.ts",
+        "src/components/inventory/InventoryList.tsx",
+        "src/components/inventory/InventoryHistoryViewer.tsx",
+        "src/components/inventory/DynamicInventoryForm.tsx",
+        "src/pages/Inventory.tsx",
+        "src/pages/AddInventoryPage.tsx",
+        "src/pages/EditInventoryItem.tsx",
+        "src/pages/InventoryHistory.tsx"
+      ]
+    },
+    {
+      "name": "Form Builder",
+      "description": "Dynamic form creation with formula fields, validation, and asset type integration",
+      "files": [
+        "src/services/formService.ts",
+        "src/hooks/useFormBuilder.ts",
+        "src/components/forms/FormBuilder.tsx",
+        "src/components/forms/DynamicForm.tsx",
+        "src/components/forms/VisualFormulaBuilder.tsx",
+        "src/pages/Forms.tsx",
+        "src/pages/FormBuilder.tsx",
+        "src/pages/SubmitForm.tsx"
+      ]
+    },
+    {
+      "name": "Mobile QR Workflow",
+      "description": "Mobile-friendly QR scanning with PIN authentication for field operations",
+      "files": [
+        "src/pages/MobileAssetWorkflow.tsx",
+        "src/pages/QRScanHandler.tsx",
+        "src/services/pinService.ts",
+        "src/services/qrService.ts"
+      ]
+    },
+    {
+      "name": "Barcode System",
+      "description": "QR code and barcode generation, scanning, and printing functionality",
+      "files": [
+        "src/services/barcodeService.ts",
+        "src/components/inventory/BarcodeGenerator.tsx",
+        "src/components/inventory/BarcodeScanner.tsx",
+        "src/components/inventory/BarcodeDisplay.tsx",
+        "src/pages/BarcodeScanner.tsx",
+        "src/pages/QRCodePrintManager.tsx"
+      ]
+    },
+    {
+      "name": "Reporting System",
+      "description": "Advanced reporting with performance optimization, caching, and data visualization",
+      "files": [
+        "src/services/reportService.ts",
+        "src/services/optimizedReportService.ts",
+        "src/components/reporting/OptimizedReportBuilder.tsx",
+        "src/components/reporting/ReportVisualization.tsx",
+        "src/pages/Reports.tsx",
+        "src/pages/ReportBuilder.tsx"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Real-time dashboard with statistics, charts, and recent activities",
+      "files": [
+        "src/services/statsService.ts",
+        "src/components/dashboard/DashboardStats.tsx",
+        "src/components/dashboard/DashboardChart.tsx",
+        "src/components/dashboard/RecentActivities.tsx",
+        "src/pages/Dashboard.tsx",
+        "src/pages/PlatformDashboard.tsx"
+      ]
+    },
+    {
+      "name": "Profile Management",
+      "description": "User profile editing with avatar upload and PIN management",
+      "files": [
+        "src/hooks/useProfileData.ts",
+        "src/components/profile/ProfileForm.tsx",
+        "src/components/profile/AvatarUpload.tsx",
+        "src/pages/Profile.tsx"
+      ]
+    }
+  ]
+}

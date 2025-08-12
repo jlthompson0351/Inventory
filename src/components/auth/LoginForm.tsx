@@ -75,6 +75,7 @@ const LoginForm = () => {
               placeholder="Enter your email"
               value={loginData.email}
               onChange={handleLoginChange}
+              data-testid="email"
               required
             />
           </div>
@@ -88,6 +89,7 @@ const LoginForm = () => {
                 placeholder="Enter your password"
                 value={loginData.password}
                 onChange={handleLoginChange}
+                data-testid="password"
                 required
               />
               <Button
@@ -107,7 +109,7 @@ const LoginForm = () => {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col">
-          <Button className="w-full" type="submit" disabled={loading}>
+          <Button className="w-full" type="submit" disabled={loading} data-testid="submit">
             {loading ? "Logging in..." : "Login"}
           </Button>
           <p className="text-sm text-muted-foreground mt-4 text-center">
