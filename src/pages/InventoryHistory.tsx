@@ -487,7 +487,7 @@ export default function InventoryHistory() {
         // Reload data to show updated quantities
         await loadInventoryData();
         
-        console.log('Fix applied successfully:', result.message);
+        // Fix applied successfully
       } else {
         console.error('Fix failed:', result.message);
         alert(`Failed to apply fix: ${result.message}`);
@@ -505,7 +505,7 @@ export default function InventoryHistory() {
       
       if (result.success) {
         setVerifiedEvents(prev => new Set(prev).add(eventId));
-        console.log('Event verified successfully:', result.message);
+        // Event verified successfully
       } else {
         console.error('Verification failed:', result.message);
         alert(`Failed to verify event: ${result.message}`);

@@ -183,7 +183,13 @@ const PageLayout = memo(({ children }: PageLayoutProps) => {
             <SidebarRail />
             <SidebarHeader>
               <div className="px-4 py-3 flex flex-col gap-3">
-                <h1 className="text-xl font-bold text-primary text-center">Coming Soon</h1>
+                <div className="flex justify-center">
+                  <img 
+                    src="https://kxcubbibhofdvporfarj.supabase.co/storage/v1/object/public/logo//depor-logo-retina.png" 
+                    alt="Depor Portland Logo" 
+                    className="h-12 w-auto object-contain"
+                  />
+                </div>
                 <CurrentOrganizationDisplay />
               </div>
             </SidebarHeader>
@@ -223,21 +229,7 @@ const PageLayout = memo(({ children }: PageLayoutProps) => {
           
           <main className="flex-1 py-6 px-4 overflow-y-auto bg-background">
             <div className="container mx-auto max-w-7xl">
-              {/* Smaller, collapsed debug alert */}
-              <details className="mb-4 bg-blue-50 border border-blue-100 rounded-md text-sm">
-                <summary className="p-2 text-blue-700 font-medium cursor-pointer">
-                  Debug Information (click to expand)
-                </summary>
-                <div className="p-3 border-t border-blue-100">
-                  <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-                    <AlertTitle className="font-bold">Page Content Status</AlertTitle>
-                    <AlertDescription>
-                      This message indicates the PageLayout component is rendering properly. 
-                      If you don't see content below this message, the issue is within the page component itself.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </details>
+
               
               <PageErrorBoundary>
                 {children}

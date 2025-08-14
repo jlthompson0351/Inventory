@@ -341,7 +341,7 @@ export const getRecommendedFormsForAssetType = async (
  */
 export const restoreAssetType = async (id: string): Promise<boolean> => {
   if (!id) {
-    console.warn('[assetTypeService] restoreAssetType called with no ID.');
+    // restoreAssetType called with no ID
     return false;
   }
   try {
@@ -376,7 +376,7 @@ export const restoreAssetType = async (id: string): Promise<boolean> => {
  */
 export const softDeleteAssetType = async (id: string): Promise<boolean> => {
   if (!id) {
-    console.warn('[assetTypeService] softDeleteAssetType called with no ID.');
+    // softDeleteAssetType called with no ID
     return false;
   }
   try {
@@ -516,7 +516,7 @@ export const batchGetAssetTypeForms = async (
       }
     });
 
-    console.log(`[batchGetAssetTypeForms] Batched ${assetTypeIds.length} asset types with 2 queries vs ${assetTypeIds.length} individual queries`);
+    // Batched asset type forms with 2 queries
     
     return formsMap;
   } catch (error) {

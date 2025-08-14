@@ -255,6 +255,6 @@ export async function logQRGeneration(assetId: string, userId?: string): Promise
     }
   } catch (error) {
     // Don't throw on logging errors, just console log
-    console.warn('Failed to log QR generation:', error);
+          // Failed to log QR generation
   }
 } 

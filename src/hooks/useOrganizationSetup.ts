@@ -118,7 +118,7 @@ export const useOrganizationSetup = () => {
             .eq('id', newOrgId);
           
           if (avatarUpdateError) {
-            console.warn('Failed to update organization with avatar:', avatarUpdateError);
+            // Failed to update organization with avatar
             toast.info('Organization created, but logo upload failed.');
             // Not returning, org is created, avatar is just a bonus
           }

@@ -1,0 +1,578 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration with Supabase Auth",
+    "description": "Verify that new users can successfully register using the Supabase authentication system with valid data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the registration page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid user details (email, password, other mandatory fields)"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that registration is successful and user is redirected or shown confirmation"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Login Success with Valid Credentials",
+    "description": "Check that a user is able to log in successfully when providing correct credentials.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid email and password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is logged in and redirected to a valid authenticated page"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Login Failure with Invalid Credentials",
+    "description": "Verify that login fails with appropriate error messages when invalid credentials are used.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid email or password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that login fails with proper error notification"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Forced Password Change After Login",
+    "description": "Ensure that users are required to change their password if forced password change flag is set on login.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login with a user whose password change is required"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that user is redirected to forced password change page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid new password and confirm password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the password change form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify password change is successful and user gains normal access"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Mobile PIN Authentication Workflow",
+    "description": "Test the authentication using mobile PIN to verify secure login via PIN on mobile devices.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access the mobile PIN authentication interface"
+      },
+      {
+        "type": "action",
+        "description": "Input correct PIN code"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user is authenticated and gains access"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid PIN code"
+      },
+      {
+        "type": "assertion",
+        "description": "Check for authentication failure and error feedback"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Organization Creation and Role Assignment",
+    "description": "Validate that users can create organizations and assign member roles correctly with role-based access control.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to organization creation interface"
+      },
+      {
+        "type": "action",
+        "description": "Input valid organization details and create organization"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify creation success and availability in user's organization list"
+      },
+      {
+        "type": "action",
+        "description": "Assign roles (Admin, Member) to organization members"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify correct role assignments and corresponding permission enforcement"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Invitation Workflow for Adding Members",
+    "description": "Check sending, accepting, and revoking invitations to join an organization using invitation system.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send an invitation to add new member via invite form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify invite is sent and listed under pending invitations"
+      },
+      {
+        "type": "action",
+        "description": "Accept invitation using invited user's account"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify new member is added correctly with appropriate role"
+      },
+      {
+        "type": "action",
+        "description": "Revoke a sent invitation before acceptance"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the invitation is canceled and member is not added"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Asset Creation with Barcode and QR Code Generation",
+    "description": "Test that assets can be created with correct metadata and that their barcode and QR codes are generated and displayed correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a new asset providing all mandatory fields"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify asset record is saved correctly"
+      },
+      {
+        "type": "assertion",
+        "description": "Check corresponding barcode and QR code are generated and visible"
+      },
+      {
+        "type": "action",
+        "description": "Scan generated barcode and QR code to validate encoding and correctness"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm scanned codes correspond to the correct asset"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Asset Type Relationships and Linkage",
+    "description": "Validate asset types and their relationships can be created and linked properly in the system.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create multiple asset types with relationship configurations"
+      },
+      {
+        "type": "action",
+        "description": "Create assets and link to related assets via defined relationships"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify relationships are stored and reflected correctly in UI and queries"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Inventory Item History Tracking",
+    "description": "Ensure inventory items track all history changes and validations trigger appropriately.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Add inventory item with valid data"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm initial record saved and visible"
+      },
+      {
+        "type": "action",
+        "description": "Update inventory item details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify history entries are created documenting changes"
+      },
+      {
+        "type": "action",
+        "description": "Attempt invalid inventory update violating validation rules"
+      },
+      {
+        "type": "assertion",
+        "description": "Check validation errors are shown and update is rejected"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Dynamic Form Builder Validation and Formula Fields",
+    "description": "Verify that dynamic forms can be built with formula fields, input validation using Zod, and that formulas evaluate securely and correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create dynamic form with multiple fields including formula-based fields"
+      },
+      {
+        "type": "action",
+        "description": "Input valid and invalid data to trigger validation rules"
+      },
+      {
+        "type": "assertion",
+        "description": "Check form validation messages appear as expected for invalid inputs"
+      },
+      {
+        "type": "action",
+        "description": "Submit form and verify formula fields are evaluated correctly and securely (no unsafe eval)"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm formula results are accurate and no security risks present"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Mobile QR Code Scanning with PIN Authentication",
+    "description": "Test mobile workflows that require PIN authentication before QR scanning to add or update inventory data.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access mobile scanning workflow"
+      },
+      {
+        "type": "action",
+        "description": "Enter correct PIN to authenticate"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm access to QR scanning interface"
+      },
+      {
+        "type": "action",
+        "description": "Scan valid QR code associated with inventory item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify scanned data is fetched and displayed correctly for update"
+      },
+      {
+        "type": "action",
+        "description": "Complete update and save"
+      },
+      {
+        "type": "action",
+        "description": "Enter incorrect PIN and verify access denied"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Barcode and QR Code Generation, Scanning, and Printing",
+    "description": "Ensure all barcode and QR code operations (generation, scanning, printing) work across supported formats without error.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Generate barcode and QR code for an asset"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify codes render correctly on screen"
+      },
+      {
+        "type": "action",
+        "description": "Scan codes using both desktop and mobile scanning components"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm scanned data matches asset information"
+      },
+      {
+        "type": "action",
+        "description": "Print barcode and QR code using the print manager interface"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify printout quality and correctness"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Advanced Reporting Accuracy and Performance",
+    "description": "Validate reporting features generate accurate data views, utilize caching correctly, and render Recharts visualizations properly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Generate standard reports with different filters and parameters"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm report data matches expected database state"
+      },
+      {
+        "type": "action",
+        "description": "Reload reports and verify caching optimizes load times"
+      },
+      {
+        "type": "assertion",
+        "description": "Check charts render accurately using Recharts (bar, line, pie)"
+      },
+      {
+        "type": "action",
+        "description": "Export report data and confirm integrity of exports"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Real-time Dashboard Update and Data Accuracy",
+    "description": "Test that dashboard statistics, charts, and recent activities update in real-time and display correct data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access dashboard page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify displayed statistics match current system data"
+      },
+      {
+        "type": "action",
+        "description": "Trigger activities such as adding assets or inventory updates"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm dashboard reflects changes in real-time without refresh"
+      },
+      {
+        "type": "assertion",
+        "description": "Check charts update accordingly with correct data"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "User Profile Management and Avatar Upload",
+    "description": "Validate user profile editing, PIN management, and avatar upload/update functionality works securely and correctly.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to user profile page"
+      },
+      {
+        "type": "action",
+        "description": "Update profile details and save changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify changes are saved and displayed correctly"
+      },
+      {
+        "type": "action",
+        "description": "Upload a new avatar image and save"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm avatar displays updated image without errors"
+      },
+      {
+        "type": "action",
+        "description": "Change PIN with valid inputs"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify PIN change succeeds and new PIN is enforced on next authentication"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "CI/CD Pipeline Deployment Verification",
+    "description": "Test the automated continuous deployment pipeline completes builds and deployments successfully with optimized bundles.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger CI/CD pipeline on code commit"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify pipeline completes without errors"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm production bundle is optimized and deployed correctly"
+      },
+      {
+        "type": "assertion",
+        "description": "Check environment variables are properly configured and secured"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Security Check: Ensure No Usage of Unsafe eval() Calls",
+    "description": "Audit formula evaluation and other dynamic code execution areas to confirm no insecure eval() usage or code injection risk.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Review code and perform runtime tests of formula evaluation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify formulas evaluate using safeEvaluator implementation without unsafe eval() calls"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no code injection or arbitrary execution is possible via form inputs"
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Performance: Page Load and Mobile Responsiveness",
+    "description": "Validate that page load times are under 3 seconds and UI renders properly on mobile devices with responsive design.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load major pages (login, dashboard, reports, forms) on desktop and mobile devices"
+      },
+      {
+        "type": "assertion",
+        "description": "Measure and confirm page load times are <3 seconds under normal network conditions"
+      },
+      {
+        "type": "assertion",
+        "description": "Check UI responsiveness and layout correctness on multiple device screen sizes"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate chunk loading optimization and dynamic imports behave correctly"
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Security Compliance: HTTPS, Environment Protection, Database Policies",
+    "description": "Verify system enforces HTTPS, secures environment variables, and applies database access policies correctly.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to access the application over HTTP"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify automatic redirect or disallowing of non-HTTPS traffic"
+      },
+      {
+        "type": "action",
+        "description": "Check environment variable usage in production build"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm sensitive variables are not exposed or logged"
+      },
+      {
+        "type": "action",
+        "description": "Validate database policies restrict unauthorized queries and updates"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure users can only access data within their organization and permitted roles"
+      }
+    ]
+  }
+]

@@ -1,98 +1,48 @@
-# Logistiq Inventory Builder
+# Logistiq Inventory Management System
 
-A comprehensive, production-ready inventory management system built with React, TypeScript, and Supabase. **Now featuring a complete inventory workflow with smart asset tracking, dynamic forms, and enterprise-grade audit capabilities. Deployed on Firebase hosting with mobile QR workflows.**
+A comprehensive, production-ready inventory management system built with React, TypeScript, and Supabase. Featuring complete inventory workflows, smart asset tracking, dynamic forms, enterprise-grade audit capabilities, and mobile QR workflows.
 
 ## 🚀 Key Features
 
-- **✅ Complete Inventory Management System** with one-to-one asset-inventory tracking
+- **✅ Complete Inventory Management** with one-to-one asset-inventory tracking
 - **✅ Smart Asset Workflow** with automatic inventory creation and visual indicators
-- **✅ Enterprise-Grade Reporting System** with sub-second performance  
+- **✅ Enterprise-Grade Reporting** with sub-second performance and materialized views
 - **✅ Dynamic Form Builder** with formula support and inventory actions
 - **✅ Professional UI/UX** with mobile responsiveness and loading states
 - **✅ Asset Type Management** with barcode/QR code generation
 - **✅ Real-Time Inventory Tracking** with stock warnings and freshness indicators
-- **✅ Organization Management** (one organization per user, fully isolated)
+- **✅ Organization Management** with complete data isolation
 - **✅ Complete Audit Trail** with form-based data capture and history tracking
-- **✅ Advanced Analytics** and Performance Monitoring
+- **✅ Advanced Analytics** and performance monitoring
 - **✅ Mobile QR Workflow** with PIN authentication for field operations
 - **✅ Firebase Production Deployment** with global CDN and SSL
 
-## 🎯 Recent Major Enhancements (January 2025)
-
-### **Firebase Production Deployment - LIVE** ✅
-- **Global Hosting**: Deployed on Firebase with worldwide CDN for fast loading
-- **Environment Configuration**: Fixed production build issues with explicit variable definitions
-- **SSL/HTTPS**: Automatic SSL certificates for secure mobile camera access
-- **SPA Routing**: Proper routing configuration for all mobile QR URLs
-- **Performance**: Sub-second loading times and optimized mobile experience
-- **Deployment Options**: Both automated CI/CD and direct deployment workflows
-
-### **Mobile QR Workflow - PRODUCTION READY** ✅
-- **Anonymous Access**: Mobile QR scanning without traditional authentication required
-- **PIN Authentication**: Secure PIN-based authentication for form submissions
-- **Organization Context**: Proper data scoping through PIN-based access
-- **Dual Authentication**: FormSubmissionWrapper supports both traditional and mobile auth
-- **Security**: Enhanced RLS policies for anonymous mobile access
-- **Audit Trail**: All mobile actions properly logged with user context
-
-### **Enhanced Form Builder - PRODUCTION READY** ✅
-- **Advanced Formula System**: Visual and text-based formula editors with real-time validation
-- **Asset Type Integration**: Automatic linking of forms to asset types with conversion field access
-- **Inventory Actions**: Configure how form fields affect inventory (add, subtract, set, none)
-- **Mock Value Testing**: Test formulas with sample data before deployment
-- **Bulk Operations**: Import/export field definitions, bulk field management
-- **Stability Improvements**: Text editor mode for reliable formula creation (recommended)
-- **Performance Optimization**: Eliminated flickering and excessive re-renders
-- **Clean Codebase**: Removed all debugging code and console spam
-
-### **Inventory Workflow - PRODUCTION READY** ✅
-- **One Asset, One Inventory**: Enforced 1:1 relationship between assets and inventory items
-- **Automatic Creation**: Assets automatically create inventory items and initial history
-- **Smart Button Navigation**: History, Edit Inventory, and Add Inventory buttons adapt to current state
-- **Visual Indicators**: 📦 badges, stock quantities, freshness indicators (🟢🟡🔴), and stock warnings (🚨⚠️)
-- **Mobile Responsive**: Professional design with loading states and error handling
-
-### **Enhanced Asset List** ✅
-- **Smart Routing**: Buttons automatically route to appropriate inventory actions
-- **Real-Time Status**: Stock level warnings and inventory freshness indicators
-- **Professional UI**: Loading states, mobile-responsive layout, text truncation
-- **Complete Integration**: Seamless navigation between assets and inventory management
-
-### **Form System Improvements** ✅  
-- **Fallback Forms**: Basic forms for asset types without configured inventory forms
-- **Enhanced Validation**: Client and server-side validation with comprehensive error handling
-- **Inventory Actions**: Add, subtract, set inventory with proper constraint validation
-- **Complete Data Capture**: Full form responses stored in audit trail
-
-### **Backend & Database** ✅
-- **Fixed Authentication**: Resolved organization_members RLS infinite recursion
-- **Trigger Fixes**: Corrected event type mappings (periodic→audit instead of periodic→check)
-- **Data Integrity**: Complete constraint enforcement and relationship validation
-- **Performance**: Optimized queries and proper indexing throughout
-- **Mobile QR Security**: Enhanced RLS policies for anonymous access with PIN authentication
-
 ## Technology Stack
 
-- **Frontend**: React, TypeScript, Shadcn UI, Vite, TailwindCSS
+- **Frontend**: React 18, TypeScript, Vite, TailwindCSS
+- **UI Components**: Shadcn/ui with Radix UI primitives
 - **Backend**: Supabase (PostgreSQL, Auth, Storage, RLS)
 - **Hosting**: Firebase Hosting with global CDN and SSL
-- **State Management**: React Hooks with custom inventory management logic
-- **Reporting**: Optimized query engine with materialized views
-- **Mobile**: Responsive design with touch-friendly interfaces and QR workflows
+- **State Management**: React Hooks with TanStack Query
+- **Charts**: Recharts for data visualization
+- **QR/Barcode**: html5-qrcode, jsqr, qrcode.react, jsbarcode
+- **Forms**: React Hook Form with Zod validation
+- **Styling**: TailwindCSS with CSS variables
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
-- npm or bun
+- Node.js 16+ 
+- npm or bun package manager
+- Git
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone [repository-url]
-   cd logistiq-inventory-builder
+   git clone <repository-url>
+   cd barcodex-inventory-builder
    ```
 
 2. Install dependencies:
@@ -102,64 +52,75 @@ A comprehensive, production-ready inventory management system built with React, 
    bun install
    ```
 
-3. Start the development server:
+3. Set up environment variables:
+   ```bash
+   # Create .env.local file (not tracked in git)
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+4. Start the development server:
    ```bash
    npm run dev
    # or
    bun run dev
    ```
 
-4. Open your browser and navigate to `http://localhost:8080`
+5. Open your browser and navigate to `http://localhost:8080`
 
-### Production Deployment
+### Available Scripts
 
-The system is deployed on Firebase hosting. For deployment:
-
-```bash
-# Build for production
-npm run build
-
-# Deploy to Firebase
-firebase deploy --only hosting
-```
-
-See [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) for complete deployment documentation.
+- `npm run dev` - Start development server (port 8080)
+- `npm run build` - Build for production
+- `npm run build:production` - Build with production optimizations
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Run ESLint
+- `npm run lint:fix` - Fix ESLint errors automatically
+- `npm run deploy` - Build and deploy to Firebase
+- `npm run deploy:hosting` - Deploy only hosting (faster)
 
 ## Project Structure
 
-- `src/components/`: UI components organized by feature
-  - `inventory/`: Complete inventory management components including AssetList
-  - `forms/`: Dynamic form builder and rendering components
-  - `auth/`, `dashboard/`, etc.: Other feature-specific components
-- `src/hooks/`: Custom React hooks for state management
-- `src/pages/`: Page components with routing
-- `src/services/`: API services and data operations (inventoryService, assetService, etc.)
-- `src/lib/`: Utilities and helper functions
-- `src/types/`: TypeScript type definitions
-- `src/integrations/`: Third-party integrations (Supabase)
-- `docs/`: Comprehensive documentation including Firebase deployment guides
-- `supabase/`: Database migrations and documentation
+```
+src/
+├── components/          # UI components organized by feature
+│   ├── auth/           # Authentication components
+│   ├── dashboard/      # Dashboard and stats components  
+│   ├── forms/          # Dynamic form builder and rendering
+│   ├── inventory/      # Complete inventory management components
+│   ├── organization/   # Organization and user management
+│   ├── reporting/      # Advanced reporting system
+│   └── ui/             # Shadcn/ui components
+├── hooks/              # Custom React hooks
+├── pages/              # Page components with routing
+├── services/           # API services and data operations
+├── lib/                # Utilities and helper functions
+├── types/              # TypeScript type definitions
+├── integrations/       # Third-party integrations (Supabase)
+└── utils/              # Utility functions
+
+docs/                   # Comprehensive documentation
+supabase/              # Database migrations and functions
+```
 
 ## Major Features
 
-### 🏗️ **Complete Inventory Management System** 
+### 🏗️ **Complete Inventory Management System**
 
-**Current Status: ✅ PRODUCTION READY**
+**Status: ✅ PRODUCTION READY**
 
-Our inventory system provides enterprise-grade functionality:
+Enterprise-grade inventory functionality:
 
 - **Asset-Inventory Integration**: Automatic inventory creation when assets are created
 - **Smart Navigation**: Context-aware buttons (History, Edit Inventory, Add Inventory)
-- **Visual Status Indicators**: Real-time stock levels, freshness indicators, and warnings
+- **Visual Status Indicators**: Real-time stock levels, freshness indicators (🟢🟡🔴), and stock warnings (🚨⚠️)
 - **Complete Audit Trail**: Full history of all inventory events with form data
 - **Mobile-Ready**: Responsive design optimized for field operations
 - **Error Prevention**: Comprehensive validation and fallback behaviors
 
-For detailed documentation, see [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md).
-
 ### 📱 **Mobile QR Workflow**
 
-**Current Status: ✅ PRODUCTION READY AND DEPLOYED**
+**Status: ✅ PRODUCTION READY AND DEPLOYED**
 
 Complete mobile QR scanning workflow for field operations:
 
@@ -170,25 +131,11 @@ Complete mobile QR scanning workflow for field operations:
 - **Production Deployment**: Fully functional on Firebase hosting with SSL
 - **Security**: Enhanced RLS policies for secure anonymous access
 
-For complete technical documentation, see [Barcode Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md).
-
-### 🚀 **Enterprise Reporting System**
-
-The latest addition is a world-class reporting system with:
-
-- **Sub-second Performance**: Queries that previously took 3-5 seconds now complete in 200-500ms
-- **Advanced Filtering**: 14 operators including regex, fuzzy matching, and between ranges
-- **Real-time Preview**: Auto-updating report preview with 800ms debouncing
-- **Smart Caching**: Intelligent LRU cache with 50MB memory management
-- **Performance Monitoring**: Live execution statistics and optimization recommendations
-- **Parallel Processing**: Process up to 3 data sources simultaneously
-- **Materialized Views**: Pre-computed aggregations for instant results
-
-For detailed documentation, see [Optimized Reporting System](./docs/OPTIMIZED-REPORTING-SYSTEM.md).
-
 ### 📝 **Dynamic Form Builder**
 
-The Form Builder provides enterprise-grade form creation capabilities with:
+**Status: ✅ PRODUCTION READY**
+
+Enterprise-grade form creation capabilities:
 
 - **Advanced Field Types**: Text, number, textarea, select, date, checkbox, calculated, and current inventory fields
 - **Formula System**: Visual and text-based formula editors with conversion field integration
@@ -197,23 +144,38 @@ The Form Builder provides enterprise-grade form creation capabilities with:
 - **Cross-Form References**: Access fields from other forms linked to the same asset type
 - **Real-time Validation**: Instant feedback on formula syntax and field references
 - **Mock Value Testing**: Test formulas with sample data before deployment
-- **Bulk Operations**: Import/export field definitions and manage multiple fields
 - **Mobile-Responsive**: Professional UI optimized for both desktop and mobile use
 
-For complete documentation and best practices, see [Form Builder Documentation](./README-FORM-BUILDER.md).
+### 🚀 **Enterprise Reporting System**
+
+**Status: ✅ PRODUCTION READY**
+
+World-class reporting with:
+
+- **Sub-second Performance**: Queries optimized from 3-5 seconds to 200-500ms
+- **Advanced Filtering**: 14 operators including regex, fuzzy matching, and between ranges
+- **Real-time Preview**: Auto-updating report preview with intelligent debouncing
+- **Smart Caching**: Intelligent LRU cache with memory management
+- **Performance Monitoring**: Live execution statistics and optimization recommendations
+- **Parallel Processing**: Process multiple data sources simultaneously
+- **Materialized Views**: Pre-computed aggregations for instant results
 
 ### 🔢 **Formula Evaluator**
 
-The built-in formula evaluator allows for safe evaluation of mathematical expressions:
+**Status: ✅ PRODUCTION READY**
+
+Secure mathematical expression evaluation:
 
 - **🔒 Zero eval() Usage**: Complete security with mathjs-powered evaluation engine
 - **Basic Operations**: +, -, *, /, %, ^ with JavaScript-compatible behavior
 - **Field References**: Variables can reference other fields and mapped conversion fields
-- **Performance Optimized**: Intelligent caching system (285x speedup on repeated formulas)
+- **Performance Optimized**: Intelligent caching system with significant speedup
 - **Real-time Validation**: Instant syntax checking and error feedback
 - **Mock Value Testing**: Test formulas with sample data before deployment
 
 ### 📦 **Asset Management**
+
+**Status: ✅ PRODUCTION READY**
 
 - Create and manage asset types with barcode/QR code generation
 - **Automatic inventory creation** when assets are created
@@ -225,47 +187,140 @@ The built-in formula evaluator allows for safe evaluation of mathematical expres
 
 ### 🏢 **Organization Management**
 
-- Users belong to a single organization (complete isolation)
+**Status: ✅ PRODUCTION READY**
+
+- Single organization per user with complete data isolation
 - System administrators can view and manage all organizations
-- Manage user roles (e.g., admin, member) and permissions within their organization
+- Manage user roles and permissions within organizations
 - Advanced diagnostic tools for system monitoring
 - **Enhanced RLS policies** prevent cross-organization data access
+- Organization and user deletion capabilities
+
+## Production Deployment
+
+### Firebase Hosting
+
+The system is deployed on Firebase hosting with:
+
+- **Global CDN**: Sub-second loading times worldwide
+- **SSL/HTTPS**: Automatic SSL certificates for secure mobile camera access
+- **SPA Routing**: Proper routing configuration for all mobile QR URLs
+- **Performance**: Optimized build with chunk splitting and caching
+
+### Deployment Commands
+
+```bash
+# Build for production
+npm run build:production
+
+# Deploy to Firebase (includes build)
+npm run deploy
+
+# Deploy only hosting (faster, includes build)
+npm run deploy:hosting
+
+# Test production build locally
+npm run check-build
+```
+
+### Environment Configuration
+
+For production deployment, ensure environment variables are configured:
+
+```bash
+# Environment variables (set in hosting provider)
+VITE_SUPABASE_URL=your_production_supabase_url
+VITE_SUPABASE_ANON_KEY=your_production_anon_key
+```
 
 ## Development
 
-### Generating Supabase Types
+### Database Migrations
 
-To update TypeScript definitions from your Supabase schema:
+Apply database migrations using Supabase:
+
+```bash
+# Using Supabase CLI
+supabase db push
+
+# Or apply directly in Supabase Dashboard
+# Navigate to SQL Editor and run migration files from supabase/migrations/
+```
+
+### Generating TypeScript Types
+
+Update TypeScript definitions from your Supabase schema:
 
 ```bash
 npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/database.types.ts
 ```
 
-### Running Database Migrations
+### Performance Optimization
 
-The system includes advanced database optimizations. To apply performance migrations:
+The system includes advanced database optimizations. For maintenance:
 
-1. Use Supabase Dashboard or CLI
-2. Apply migrations in the `supabase/migrations` folder
+1. Use Supabase Dashboard or CLI to apply migrations
+2. Apply migrations in the `supabase/migrations` folder in order
 3. Run maintenance functions: `SELECT run_reporting_maintenance();`
 
-## 📚 Comprehensive Documentation
+## 📚 Documentation
 
-- [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) - Complete Firebase hosting and deployment documentation
-- [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features
-- [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation
-- [Form Builder Documentation](./README-FORM-BUILDER.md) - Comprehensive form creation and management guide
-- [Main System Documentation](./LOGISTIQ-README.md) - Comprehensive system overview
-- [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships
-- [Optimized Reporting System](./docs/OPTIMIZED-REPORTING-SYSTEM.md) - Enterprise reporting features
-- [Barcode Integration](./docs/BARCODE-INTEGRATION.md) - Barcode/QR code functionality
-- [Barcode Technical Implementation](./docs/BARCODE-TECHNICAL-IMPLEMENTATION.md) - Mobile QR workflow and technical reference
+-   **[🚀 New Guided Report Builder](./docs/Features/06_Reporting_and_Analytics.md)** - **(NEW)** Complete guide to the new business-friendly report builder.
+-   [Firebase Deployment Guide](./docs/FIREBASE-DEPLOYMENT-GUIDE.md) - Complete Firebase hosting and deployment.
+-   [Implementation Complete](./docs/implementation-complete.md) - Current system status and completed features.
+-   [Inventory Workflow Implementation](./docs/InventoryWorkflowPlan.md) - Complete inventory system documentation.
+-   [Form Builder Documentation](./README-FORM-builder.md) - Comprehensive form creation and management guide.
+-   [Database Model](./supabase/docs/data-model.md) - Complete data model and relationships.
+-   [Mobile QR + PIN Workflow](./docs/MOBILE-QR-PIN-WORKFLOW.md) - Documented exception, rationale, mitigations, and roadmap.
+
+## Security Features
+
+- **Row-Level Security (RLS)**: Comprehensive RLS policies across all database tables
+- **Organization Isolation**: Complete data separation between organizations
+- **Mobile PIN Authentication**: Secure PIN-based authentication for mobile workflows
+- **SSL/HTTPS**: Enforced HTTPS through Firebase hosting
+- **Input Validation**: Client and server-side validation throughout
+- **Secure Formula Evaluation**: Zero eval() usage with mathjs-based safe evaluation
+
+## Performance Features
+
+- **Optimized Queries**: Sub-second response times for most operations
+- **Materialized Views**: Pre-computed aggregations for instant reporting
+- **Smart Caching**: LRU cache with intelligent memory management
+- **Chunk Splitting**: Optimized JavaScript bundles for faster loading
+- **CDN Distribution**: Global content delivery through Firebase
+- **Lazy Loading**: Component-level code splitting for improved initial load
+
+## User Management
+
+### Organization Deletion
+Organization admins can permanently delete their entire organization through the Advanced Settings tab. This action:
+
+- Removes all organization members (users are completely deleted)
+- Deletes all assets, inventory items, forms, and reports
+- Cannot be undone
+- Requires typing "DELETE ORGANIZATION" to confirm
+
+### User Management
+Organization admins have two options for managing users:
+
+1. **Remove from Organization**: Removes user from the organization but keeps their account
+2. **Delete User Permanently**: Completely removes the user and all their data from the system
+
+Both actions are available in the Members tab of Organization Settings.
+
+## Support and Contributing
+
+- All major features have been implemented and tested
+- The system is production-ready and deployed
+- Comprehensive documentation is available in the `docs/` directory
+- For technical implementation details, see the technical documentation files
 
 ## 🎉 Production Status
 
 **✅ SYSTEM IS PRODUCTION READY AND DEPLOYED**
 
-The Logistiq Inventory Management System is now a fully-featured, enterprise-grade platform that provides:
+The Logistiq Inventory Management System is a fully-featured, enterprise-grade platform that provides:
 
 - **Professional Inventory Management** with complete audit trails
 - **Sub-second Performance** for all operations  
@@ -278,29 +333,5 @@ The Logistiq Inventory Management System is now a fully-featured, enterprise-gra
 All major features have been implemented, tested, verified, and deployed to production on Firebase hosting. The system is ready for full production use and field operations.
 
 **🌐 Live Deployment**: Available on Firebase hosting with global availability
-**📱 Mobile QR**: Fully functional mobile QR workflow with PIN authentication
+**📱 Mobile QR**: Fully functional mobile QR workflow with PIN authentication  
 **🔒 Security**: Enterprise-grade security with proper RLS policies and SSL
-
-## Organization and User Deletion
-
-### Organization Deletion
-Organization admins can permanently delete their entire organization through the Advanced Settings tab. This action:
-
-- Removes all organization members (users are completely deleted)
-- Deletes all assets, inventory items, forms, and reports
-- Cannot be undone
-- Requires typing "DELETE ORGANIZATION" to confirm
-
-### User Deletion
-Organization admins have two options for managing users:
-
-1. **Remove from Organization**: Removes user from the organization but keeps their account
-2. **Delete User Permanently**: Completely removes the user and all their data from the system
-
-Both actions are available in the Members tab of Organization Settings.
-
-## Security
-
-- Role-based permissions ensure only authorized users can delete data
-- Multiple confirmation steps prevent accidental deletions
-- All deletion actions are logged for audit purposes

@@ -96,11 +96,11 @@ const MobileAssetWorkflow = () => {
 
   const loadAssetData = async () => {
     try {
-      console.log('🚀 MobileAssetWorkflow - Loading asset data for:', assetId);
+      // Loading asset data
       setIsLoading(true);
       
       // First get the asset data - use maybeSingle() to handle missing assets gracefully
-      console.log('MobileAssetWorkflow - Fetching asset data...');
+      // Fetching asset data
       const { data: assetData, error: assetError } = await supabase
         .from('assets')
         .select('id, name, barcode, asset_type_id, organization_id')
@@ -119,7 +119,7 @@ const MobileAssetWorkflow = () => {
       }
       
       if (!assetData) {
-        console.log('MobileAssetWorkflow - No asset data returned');
+        // No asset data returned
         toast({
           variant: "destructive",
           title: "Asset Not Found",
@@ -128,10 +128,10 @@ const MobileAssetWorkflow = () => {
         return;
       }
 
-      console.log('MobileAssetWorkflow - Asset data loaded:', assetData);
+              // Asset data loaded
 
       // Then get the asset type info - use maybeSingle() here too
-      console.log('MobileAssetWorkflow - Fetching asset type data...');
+      // Fetching asset type data
       const { data: assetTypeData, error: assetTypeError } = await supabase
         .from('asset_types')
         .select('*')
@@ -148,10 +148,10 @@ const MobileAssetWorkflow = () => {
         return;
       }
 
-      console.log('MobileAssetWorkflow - Asset type data loaded:', assetTypeData);
+              // Asset type data loaded
 
       // Get linked forms for this asset type from asset_type_forms table
-      console.log('MobileAssetWorkflow - Fetching linked forms...');
+      // Fetching linked forms
       const { data: linkedForms, error: formsError } = await supabase
         .from('asset_type_forms')
         .select('form_id, purpose')
@@ -163,7 +163,7 @@ const MobileAssetWorkflow = () => {
         // Don't fail here, continue with no forms
       }
 
-      console.log('MobileAssetWorkflow - Linked forms loaded:', linkedForms);
+              // Linked forms loaded
 
       let intakeFormId = null;
       let inventoryFormId = null;
@@ -176,7 +176,7 @@ const MobileAssetWorkflow = () => {
         if (inventoryForm) inventoryFormId = inventoryForm.form_id;
       }
       
-      console.log('MobileAssetWorkflow - Form IDs resolved:', { intakeFormId, inventoryFormId });
+      // Form IDs resolved
       
       // Transform the data to match our expected format
       const transformedAssetData: AssetData = {
@@ -207,7 +207,7 @@ const MobileAssetWorkflow = () => {
         ]
       };
       
-      console.log('MobileAssetWorkflow - Setting asset data and moving to PIN step');
+      // Setting asset data and moving to PIN step
       setAssetData(transformedAssetData);
       setStep('pin');
     } catch (error) {
@@ -218,7 +218,7 @@ const MobileAssetWorkflow = () => {
         description: error instanceof Error ? error.message : "Failed to load asset information.",
       });
     } finally {
-      console.log('MobileAssetWorkflow - Setting loading to false');
+      // Setting loading to false
       setIsLoading(false);
     }
   };
@@ -401,6 +401,7 @@ const MobileAssetWorkflow = () => {
                       onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                       placeholder="Enter PIN"
                       className="text-center text-2xl tracking-[0.3em] h-14 font-mono bg-gray-50 border-2 focus:border-blue-500 focus:bg-white transition-all duration-200"
+                      data-testid="pin-input"
                       autoFocus
                     />
                     {authError && (
@@ -414,6 +415,7 @@ const MobileAssetWorkflow = () => {
                     type="submit" 
                     className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 shadow-lg" 
                     disabled={pin.length !== 4 || isAuthenticating}
+                    data-testid="pin-submit"
                   >
                     {isAuthenticating ? (
                       <>

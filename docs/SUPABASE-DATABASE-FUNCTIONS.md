@@ -1,186 +1,130 @@
-# 📊 Supabase Database Functions - UPDATED WITH PERFORMANCE OPTIMIZATIONS
+# Supabase Database Functions (Updated August 2025)
 
-**Last Updated**: January 8, 2025  
-**Status**: Enhanced with Performance Optimization Functions
+**Status**: ✅ **Comprehensive & Accurate**
 
-This document outlines all custom database functions, materialized views, and performance optimizations implemented in the Logistiq Supabase database.
-
-## 🌟 NEW: Performance Optimization Functions (January 8, 2025)
-
-### Asset Counting Optimization
-```sql
-CREATE OR REPLACE FUNCTION get_asset_count_by_type(
-  p_organization_id UUID,
-  p_asset_type_id UUID DEFAULT NULL,
-  p_include_deleted BOOLEAN DEFAULT FALSE
-)
-RETURNS INTEGER AS $$
-DECLARE
-  asset_count INTEGER;
-BEGIN
-  SELECT COUNT(*)
-  INTO asset_count
-  FROM assets a
-  WHERE a.organization_id = p_organization_id
-    AND (p_asset_type_id IS NULL OR a.asset_type_id = p_asset_type_id)
-    AND (p_include_deleted OR a.is_deleted = false);
-  
-  RETURN COALESCE(asset_count, 0);
-END;
-$$ LANGUAGE plpgsql STABLE;
-```
-
-**Usage**: `SELECT get_asset_count_by_type('org-uuid', 'type-uuid', false);`  
-**Performance**: 40-60% faster than application-level counting
-
-### Latest Submission Optimization
-```sql
-CREATE OR REPLACE FUNCTION get_latest_submission_for_asset(
-  p_asset_id UUID
-)
-RETURNS TABLE(
-  submission_id UUID,
-  submission_data JSONB,
-  created_at TIMESTAMPTZ,
-  form_id UUID
-) AS $$
-BEGIN
-  RETURN QUERY
-  SELECT 
-    fs.id,
-    fs.submission_data,
-    fs.created_at,
-    fs.form_id
-  FROM form_submissions fs
-  WHERE fs.asset_id = p_asset_id
-    AND fs.is_deleted = false
-  ORDER BY fs.created_at DESC
-  LIMIT 1;
-END;
-$$ LANGUAGE plpgsql STABLE;
-```
-
-**Usage**: `SELECT * FROM get_latest_submission_for_asset('asset-uuid');`  
-**Performance**: Optimized single-record lookup with proper indexing
-
-### Performance Monitoring Function
-```sql
-CREATE OR REPLACE FUNCTION analyze_report_performance()
-RETURNS TABLE(
-  metric_name TEXT,
-  metric_value TEXT,
-  recommendation TEXT
-) AS $$
-BEGIN
-  -- Performance analysis with recommendations
-  RETURN QUERY
-  SELECT 
-    'System Performance'::TEXT,
-    'Optimized'::TEXT,
-    'All optimizations implemented'::TEXT;
-END;
-$$ LANGUAGE plpgsql STABLE;
-```
-
-## 🚀 NEW: Materialized Views for Dashboard Performance
-
-### Asset Summary View
-```sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_asset_summary AS
-SELECT 
-  a.organization_id,
-  a.asset_type_id,
-  at.name as asset_type_name,
-  at.color as asset_type_color,
-  COUNT(a.id) as total_assets,
-  COUNT(fs.id) as assets_with_submissions,
-  COUNT(DISTINCT fs.id) as total_submissions,
-  MAX(fs.created_at) as last_submission_date
-FROM assets a
-INNER JOIN asset_types at ON a.asset_type_id = at.id
-LEFT JOIN form_submissions fs ON fs.asset_id = a.id AND fs.is_deleted = false
-WHERE a.is_deleted = false AND at.is_deleted = false
-GROUP BY a.organization_id, a.asset_type_id, at.name, at.color;
-```
-
-**Performance Impact**: Dashboard statistics load 83% faster
-
-### High-Performance Composite Indexes
-```sql
--- Form submissions optimization
-CREATE INDEX idx_form_submissions_asset_date 
-ON form_submissions(asset_id, created_at DESC) 
-WHERE is_deleted = false;
-
--- Asset organization optimization
-CREATE INDEX idx_assets_org_type_active 
-ON assets(organization_id, asset_type_id, created_at DESC) 
-WHERE is_deleted = false;
-
--- Asset type form optimization
-CREATE INDEX idx_asset_types_org_form 
-ON asset_types(organization_id, inventory_form_id) 
-WHERE is_deleted = false;
-```
-
-## 🛡️ Data Integrity Functions
-
-### Soft Delete Consistency Enforcement
-```sql
-CREATE OR REPLACE FUNCTION sync_soft_delete_fields()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.deleted_at IS NOT NULL AND NEW.is_deleted = false THEN
-    NEW.is_deleted = true;
-  ELSIF NEW.deleted_at IS NULL AND NEW.is_deleted = true THEN
-    NEW.deleted_at = NOW();
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply to all tables with soft delete
-CREATE TRIGGER trg_sync_soft_delete_asset_types
-  BEFORE UPDATE ON asset_types
-  FOR EACH ROW EXECUTE FUNCTION sync_soft_delete_fields();
-```
-
-## 📈 Performance Metrics & Monitoring
-
-### Benchmark Results
-| Operation | Before | After | Improvement |
-|-----------|--------|-------|-------------|
-| Dashboard Loading | 300ms | 50ms | **83% faster** |
-| Asset Counting | 150ms | 60ms | **60% faster** |
-| Latest Submission | 200ms | 80ms | **60% faster** |
-| Complex Reports | 2000ms | 600ms | **70% faster** |
-
-### Usage Patterns
-```typescript
-// Use materialized views for dashboard statistics
-import { getAssetSummaryStats } from '@/services/reportPerformanceService';
-
-// Use optimized functions for counting
-import { getAssetCountOptimized } from '@/services/reportPerformanceService';
-```
-
-## 🔄 Function Maintenance
-
-### Materialized View Refresh
-```sql
-CREATE OR REPLACE FUNCTION refresh_report_materialized_views()
-RETURNS void AS $$
-BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_asset_summary;
-  REFRESH MATERIALIZED VIEW CONCURRENTLY mv_monthly_submission_activity;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-**Recommended Schedule**: Refresh every 30-60 minutes or after bulk operations
+This document provides a complete reference for all custom database functions (RPCs), triggers, and views in the BarcodEx Supabase backend.
 
 ---
 
-**Status**: ✅ **ALL OPTIMIZATIONS IMPLEMENTED**  
-**Performance Impact**: 50-70% improvement across all operations  
-**Production Ready**: Enterprise-grade database optimization complete
+## 🚀 **Core Functions**
+
+### **Authentication & Authorization**
+| Function Name | Return Type | Description |
+|---|---|---|
+| `accept_invitation` | uuid | Accepts an organization invitation. |
+| `add_user_to_organization` | json | Adds a user to an organization. |
+| `add_user_to_organization_as_platform_admin` | boolean | Adds a user to an organization as a platform admin. |
+| `admin_create_user` | json | Creates a new user as an admin. |
+| `authenticate_mobile_pin` | record | Authenticates a user's mobile PIN. |
+| `check_password_change_required` | boolean | Checks if the current user is required to change their password. |
+| `check_platform_operator_status` | boolean | Checks if the current user is a platform operator. |
+| `create_invitation` | uuid | Creates an organization invitation. |
+| `create_organization_with_admin` | uuid | Creates a new organization and assigns an admin. |
+| `create_user_for_platform_operator` | json | Creates a new user as a platform operator. |
+| `delete_user_completely` | boolean | Permanently deletes a user and all associated data. |
+| `get_current_organization_id` | uuid | Gets the organization ID for the current user. |
+| `get_current_user_platform_status` | record | Gets the platform status for the current user. |
+| `get_invitation_by_token` | record | Retrieves an invitation by its token. |
+| `get_user_id_by_email` | uuid | Gets a user's ID by their email address. |
+| `get_user_organization` | uuid | Gets the organization for a user. |
+| `get_user_profile_with_org` | json | Gets a user's profile with their organization details. |
+| `is_current_user_org_admin` | boolean | Checks if the current user is an admin of their organization. |
+| `is_member_of_organization` | boolean | Checks if a user is a member of an organization. |
+| `is_org_admin` | boolean | Checks if a user is an admin of a specific organization. |
+| `is_super_admin` | boolean | Checks if the current user is a super admin. |
+| `is_system_admin` | boolean | Checks if the current user is a system admin. |
+| `verify_quick_access_pin` | record | Verifies a user's quick access PIN. |
+
+### **Asset & Inventory Management**
+| Function Name | Return Type | Description |
+|---|---|---|
+| `apply_asset_calculation_formulas` | jsonb | Applies calculation formulas to an asset. |
+| `auto_generate_asset_barcode` | trigger | A trigger function that automatically generates a barcode for a new asset. |
+| `check_asset_current_month_inventory` | record | Checks the current month's inventory for an asset. |
+| `check_asset_type_dependencies` | record | Checks the dependencies for an asset type before deletion. |
+| `check_duplicate_assets` | record | Checks for duplicate assets. |
+| `create_asset_with_inventory` | jsonb | Creates a new asset and its initial inventory item. |
+| `create_inventory_adjustment` | jsonb | Creates a new inventory adjustment. |
+| `create_periodic_inventory_check` | jsonb | Creates a periodic inventory check. |
+| `delete_inventory_item` | boolean | Deletes an inventory item. |
+| `generate_asset_barcode` | text | Generates a barcode for an asset. |
+| `generate_asset_qr_data` | jsonb | Generates the data for an asset's QR code. |
+| `get_asset_by_barcode` | jsonb | Retrieves an asset by its barcode. |
+| `get_asset_count_by_type` | integer | Gets the count of assets for a given type. |
+| `get_asset_inventory_history` | record | Retrieves the inventory history for an asset. |
+| `get_asset_inventory_report` | record | Generates an inventory report for an asset. |
+| `get_asset_type_stats` | record | Gets statistics for an asset type. |
+| `get_asset_with_formulas_by_barcode` | json | Retrieves an asset and its formulas by barcode. |
+| `get_latest_inventory_check` | record | Gets the latest inventory check for an asset. |
+| `insert_inventory_history_record` | json | Inserts a new record into the inventory history. |
+| `insert_inventory_history_simple` | json | A simplified function to insert an inventory history record. |
+| `recalculate_inventory_after_edit` | jsonb | Recalculates inventory after an edit. |
+| `reconcile_inventory` | jsonb | Reconciles inventory for an asset. |
+| `safe_delete_asset_type` | record | Safely deletes an asset type, checking for dependencies. |
+| `scan_asset_barcode` | jsonb | Scans an asset barcode and returns the asset data. |
+| `update_inventory_atomic` | jsonb | Atomically updates an inventory item. |
+| `validate_asset_type_operation` | record | Validates an operation on an asset type. |
+| `verify_inventory_balance` | jsonb | Verifies the inventory balance for an item. |
+
+### **Forms & Submissions**
+| Function Name | Return Type | Description |
+|---|---|---|
+| `calculate_form_formulas` | jsonb | Calculates the formula fields in a form submission. |
+| `clone_form` | uuid | Clones an existing form. |
+| `create_default_forms_for_asset_type` | record | Creates default forms for a new asset type. |
+| `create_form_template` | uuid | Creates a new form template. |
+| `extract_form_field_values` | record | Extracts field values from a form submission. |
+| `find_recommended_forms_for_asset_type` | record | Finds recommended forms for an asset type. |
+| `get_asset_forms_with_history` | record | Gets the forms for an asset, along with their submission history. |
+| `get_asset_pending_forms` | record | Gets the pending forms for an asset. |
+| `get_forms_for_asset_type` | record | Retrieves the forms associated with an asset type. |
+| `get_latest_submission_for_asset` | record | Gets the latest form submission for an asset. |
+| `get_mappable_fields` | jsonb | Gets the mappable fields for a form. |
+| `get_mappable_fields_with_form_names` | json | Gets mappable fields with their form names. |
+| `get_submission_count_in_range` | record | Gets the number of form submissions in a date range. |
+| `link_asset_type_form` | void | Links a form to an asset type. |
+| `process_form_submission` | uuid | Processes a new form submission. |
+| `register_mapped_field` | uuid | Registers a new mappable field. |
+| `submit_qr_form` | record | Submits a form via a QR code scan. |
+| `unlink_asset_type_form` | void | Unlinks a form from an asset type. |
+| `unregister_mapped_field` | boolean | Unregisters a mappable field. |
+| `update_asset_type_conversion_fields` | record | Updates the conversion fields for an asset type. |
+
+### **Reporting & Analytics**
+| Function Name | Return Type | Description |
+|---|---|---|
+| `analyze_report_performance` | record | Analyzes the performance of reports. |
+| `get_aggregated_inventory_values` | jsonb | Gets aggregated inventory values for reporting. |
+| `get_dashboard_stats` | record | Gets the statistics for the main dashboard. |
+| `get_inventory_performance_stats` | json | Gets performance statistics for the inventory system. |
+| `get_inventory_value_fast` | numeric | A fast function to get the total inventory value. |
+| `get_monthly_inventory_report` | jsonb | Generates a monthly inventory report. |
+| `get_organization_health` | json | Gets the health status of an organization. |
+| `get_report_performance_stats` | record | Gets performance statistics for the reporting system. |
+| `get_reporting_table_stats` | record | Gets statistics for the reporting tables. |
+| `get_slow_reports` | record | Identifies slow-running reports. |
+| `get_system_health_stats` | json | Gets the overall health statistics for the system. |
+| `get_table_counts` | jsonb | Gets the row counts for major tables. |
+| `log_slow_query` | void | Logs a slow-running query. |
+
+---
+
+## 🔄 **Triggers & Automation**
+
+| Trigger Name | Table | Event | Function | Description |
+|---|---|---|---|---|
+| `trg_auto_generate_asset_barcode` | `assets` | INSERT | `auto_generate_asset_barcode` | Automatically generates a barcode when a new asset is created. |
+| `trg_copy_conversion_fields` | `assets` | INSERT | `copy_conversion_fields_to_asset` | Copies conversion fields from the asset type to the new asset. |
+| `trg_create_price_history` | `inventory_items` | UPDATE | `create_price_history_entry` | Creates a price history record when the price of an item changes. |
+| `trg_handle_new_user` | `auth.users` | INSERT | `handle_new_user` | Handles new user creation, setting up their profile and organization. |
+| `trg_handle_password_req` | `auth.users` | INSERT | `handle_new_user_password_requirement` | Sets the password change requirement for a new user. |
+| `trg_set_updated_at` | (multiple) | UPDATE | `update_updated_at_column` | Automatically updates the `updated_at` timestamp on row update. |
+
+---
+
+## 📈 **Materialized Views**
+
+| View Name | Description |
+|---|---|
+| `mv_asset_summary` | A summary of assets by type and organization, used to speed up the dashboard. |
+| `mv_monthly_submission_activity` | A summary of monthly form submission activity. |

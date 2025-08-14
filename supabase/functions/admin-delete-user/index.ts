@@ -38,12 +38,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('🔐 Validating admin authentication...');
+    // Validating admin authentication
     
     // Validate admin authentication
     const auth = await validateAdminAuth(req);
     if (!auth.isValid || !auth.isAdmin) {
-      console.log('❌ Auth failed:', auth.error);
+      // Auth failed
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('✅ Admin authenticated:', auth.user.email);
+    // Admin authenticated
 
     // Parse request body
     const body: DeleteUserRequest = await req.json();
@@ -91,7 +91,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`🗑️ Deleting user: ${userId}`);
+    // Deleting user
 
     // Create service client with full permissions
     const serviceSupabase = createServiceClient();
@@ -118,14 +118,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log('✅ User found in organization');
+          // User found in organization
 
     // Get user details before deletion for logging
     const { data: userDetails } = await serviceSupabase.auth.admin.getUserById(userId);
     const userEmail = userDetails.user?.email || 'unknown';
 
     // Remove user from organization first
-    console.log('🏢 Removing user from organization...');
+    // Removing user from organization
     const { error: removeError } = await serviceSupabase
       .from('organization_members')
       .delete()
@@ -133,18 +133,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq('organization_id', organizationId);
 
     if (removeError) {
-      console.error('❌ Failed to remove from organization:', removeError);
+      // Failed to remove from organization
       throw removeError;
     }
 
-    console.log('✅ User removed from organization');
+          // User removed from organization
 
     // Delete user from auth (this will cascade delete related data)
-    console.log('👤 Deleting user from auth...');
+    // Deleting user from auth
     const { error: authDeleteError } = await serviceSupabase.auth.admin.deleteUser(userId);
 
     if (authDeleteError) {
-      console.error('❌ Auth deletion failed:', authDeleteError);
+      // Auth deletion failed
       // Try to re-add to organization if auth deletion failed
       await serviceSupabase
         .from('organization_members')
@@ -158,7 +158,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw authDeleteError;
     }
 
-    console.log('✅ User deleted from auth');
+          // User deleted from auth
 
     // Return success response
     const response: DeleteUserResponse = {
@@ -166,7 +166,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       message: `User ${userEmail} has been successfully deleted`
     };
 
-    console.log('🎉 User deletion completed successfully');
+    // User deletion completed successfully
 
     return new Response(
       JSON.stringify(response),
@@ -177,7 +177,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
 
   } catch (error) {
-    console.error('💥 Error deleting user:', error);
+    // Error deleting user
     
     const response: DeleteUserResponse = {
       success: false,

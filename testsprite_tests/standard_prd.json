@@ -1,0 +1,202 @@
+{
+  "meta": {
+    "project": "InventoryDepor",
+    "date": "2025-08-08",
+    "prepared_by": "Software Development Manager"
+  },
+  "product_overview": "InventoryDepor is a comprehensive multi-tenant inventory management platform that provides advanced asset tracking, organization and member management, dynamic form building with validation, barcode and QR code generation and scanning, mobile-friendly workflows, advanced reporting, and real-time dashboard analytics. The platform leverages modern technologies to ensure security, performance, and scalability while delivering enterprise-grade features for organizations requiring robust inventory and asset management.",
+  "core_goals": [
+    "Enable secure multi-tenant organization management with role-based access and invitation workflows.",
+    "Provide comprehensive asset and inventory tracking with barcode and QR code support.",
+    "Support dynamic form creation and submission with formula evaluation and validation.",
+    "Facilitate mobile workflows with QR scanning and PIN authentication for field operations.",
+    "Deliver advanced reporting capabilities with data visualization and performance optimizations.",
+    "Offer real-time dashboard statistics and activity monitoring for quick insights.",
+    "Ensure high security standards including zero usage of unsafe eval() calls, secure authentication, and environment variable management.",
+    "Enable seamless continuous deployment with automated CI/CD pipelines and optimized production builds."
+  ],
+  "key_features": [
+    "Authentication system using Supabase auth supporting login, registration, forced password changes, and mobile PIN authentication.",
+    "Multi-tenant organization management with member roles, invitations, and admin interface.",
+    "Complete asset management including asset types, relationships, barcode and QR code generation.",
+    "Comprehensive inventory management with history tracking, validation, and mobile support.",
+    "Dynamic form builder supporting formula fields, validation using Zod, and integration with asset types.",
+    "Mobile-optimized QR code scanning workflows secured by PIN authentication for field operations.",
+    "Barcode and QR code generation, scanning, and printing capabilities.",
+    "Advanced reporting with caching, performance optimization, and data visualization using Recharts.",
+    "Real-time dashboards with statistics, charts, and recent activity feeds.",
+    "User profile management including avatar uploads and PIN management."
+  ],
+  "user_flow_summary": [
+    "Users register and authenticate via Supabase auth including optional forced password changes and PIN authentication.",
+    "Users create or join organizations with role-based access and send invitations to new members.",
+    "Within organizations, users manage assets by defining asset types, relationships, and generating corresponding barcodes or QR codes.",
+    "Users track inventory items with detailed history and validations, supporting mobile scanning workflows.",
+    "Users design and submit dynamic forms associated with assets, leveraging formula evaluation and validation.",
+    "Field users authenticate with PIN and scan QR codes using mobile interfaces to add or update inventory data.",
+    "Users generate, view, and export advanced reports with visual analytics for organizational assets and inventory.",
+    "Users monitor real-time stats, recent activities, and dashboard widgets for operational insights.",
+    "Users manage personal profiles including updating avatars and PINs."
+  ],
+  "validation_criteria": [
+    "All authentication flows work as intended including login, registration, forced password change, and PIN authentication.",
+    "Organization management supports multi-tenant roles, invitations, and admin settings correctly.",
+    "Asset management functions include correct barcode/QR generation, asset linkage, and CRUD operations.",
+    "Inventory tracking records history accurately and supports validation rules and mobile workflows.",
+    "Dynamic forms validate input correctly and formula fields evaluate securely with performance optimizations.",
+    "Mobile QR code scanning workflows require PIN authentication and function reliably on mobile devices.",
+    "Barcode systems generate, scan, and print codes without errors across supported formats.",
+    "Reporting system generates accurate data views with caching and renders charts properly.",
+    "Dashboard components update in real-time and display correct statistics and activities.",
+    "Profile management allows secure editing, avatar uploads, and PIN changes.",
+    "Production deployment completes successfully with optimized bundles, secure environment configuration, and automated CI/CD.",
+    "No eval() usage in production; formula evaluation uses secure safeEvaluator implementation.",
+    "Performance criteria such as page load <3 seconds, mobile responsiveness, and chunk loading optimization are met.",
+    "Security criteria including HTTPS usage, environment variable protection, and database policies are enforced."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "TypeScript",
+      "React 18",
+      "Vite",
+      "Supabase (PostgreSQL, Auth, Storage)",
+      "TailwindCSS",
+      "Radix UI",
+      "React Router",
+      "TanStack Query",
+      "React Hook Form",
+      "Zod",
+      "Recharts",
+      "QR/Barcode (html5-qrcode, jsqr, qrcode, jsbarcode)",
+      "Firebase Hosting"
+    ],
+    "features": [
+      {
+        "name": "Authentication",
+        "description": "Supabase auth with login, registration, forced password change, and mobile PIN authentication",
+        "files": [
+          "src/hooks/useAuth.tsx",
+          "src/components/auth/AuthLayout.tsx",
+          "src/components/auth/LoginForm.tsx",
+          "src/components/auth/RegisterForm.tsx",
+          "src/components/auth/ForcePasswordChange.tsx",
+          "src/pages/Login.tsx",
+          "src/pages/InvitationAccept.tsx"
+        ]
+      },
+      {
+        "name": "Organization Management",
+        "description": "Multi-tenant organization system with member roles, invitations, and admin settings",
+        "files": [
+          "src/hooks/useOrganization.tsx",
+          "src/hooks/useOrganizationMembers.ts",
+          "src/hooks/useOrganizationInvitations.ts",
+          "src/components/organization/OrganizationBreadcrumb.tsx",
+          "src/components/organization/MembersList.tsx",
+          "src/components/organization/InviteForm.tsx",
+          "src/pages/OrganizationMembers.tsx",
+          "src/pages/OrganizationAdminPage.tsx"
+        ]
+      },
+      {
+        "name": "Asset Management",
+        "description": "Complete asset tracking system with types, relationships, and barcode generation",
+        "files": [
+          "src/services/assetService.ts",
+          "src/services/assetTypeService.ts",
+          "src/components/inventory/AssetCard.tsx",
+          "src/components/inventory/AssetList.tsx",
+          "src/components/inventory/AssetTypeBrowser.tsx",
+          "src/pages/Assets.tsx",
+          "src/pages/AssetTypes.tsx",
+          "src/pages/NewAsset.tsx",
+          "src/pages/AssetDetail.tsx"
+        ]
+      },
+      {
+        "name": "Inventory Management",
+        "description": "Comprehensive inventory tracking with history, validation, and mobile workflows",
+        "files": [
+          "src/services/inventoryService.ts",
+          "src/components/inventory/InventoryList.tsx",
+          "src/components/inventory/InventoryHistoryViewer.tsx",
+          "src/components/inventory/DynamicInventoryForm.tsx",
+          "src/pages/Inventory.tsx",
+          "src/pages/AddInventoryPage.tsx",
+          "src/pages/EditInventoryItem.tsx",
+          "src/pages/InventoryHistory.tsx"
+        ]
+      },
+      {
+        "name": "Form Builder",
+        "description": "Dynamic form creation with formula fields, validation, and asset type integration",
+        "files": [
+          "src/services/formService.ts",
+          "src/hooks/useFormBuilder.ts",
+          "src/components/forms/FormBuilder.tsx",
+          "src/components/forms/DynamicForm.tsx",
+          "src/components/forms/VisualFormulaBuilder.tsx",
+          "src/pages/Forms.tsx",
+          "src/pages/FormBuilder.tsx",
+          "src/pages/SubmitForm.tsx"
+        ]
+      },
+      {
+        "name": "Mobile QR Workflow",
+        "description": "Mobile-friendly QR scanning with PIN authentication for field operations",
+        "files": [
+          "src/pages/MobileAssetWorkflow.tsx",
+          "src/pages/QRScanHandler.tsx",
+          "src/services/pinService.ts",
+          "src/services/qrService.ts"
+        ]
+      },
+      {
+        "name": "Barcode System",
+        "description": "QR code and barcode generation, scanning, and printing functionality",
+        "files": [
+          "src/services/barcodeService.ts",
+          "src/components/inventory/BarcodeGenerator.tsx",
+          "src/components/inventory/BarcodeScanner.tsx",
+          "src/components/inventory/BarcodeDisplay.tsx",
+          "src/pages/BarcodeScanner.tsx",
+          "src/pages/QRCodePrintManager.tsx"
+        ]
+      },
+      {
+        "name": "Reporting System",
+        "description": "Advanced reporting with performance optimization, caching, and data visualization",
+        "files": [
+          "src/services/reportService.ts",
+          "src/services/optimizedReportService.ts",
+          "src/components/reporting/OptimizedReportBuilder.tsx",
+          "src/components/reporting/ReportVisualization.tsx",
+          "src/pages/Reports.tsx",
+          "src/pages/ReportBuilder.tsx"
+        ]
+      },
+      {
+        "name": "Dashboard",
+        "description": "Real-time dashboard with statistics, charts, and recent activities",
+        "files": [
+          "src/services/statsService.ts",
+          "src/components/dashboard/DashboardStats.tsx",
+          "src/components/dashboard/DashboardChart.tsx",
+          "src/components/dashboard/RecentActivities.tsx",
+          "src/pages/Dashboard.tsx",
+          "src/pages/PlatformDashboard.tsx"
+        ]
+      },
+      {
+        "name": "Profile Management",
+        "description": "User profile editing with avatar upload and PIN management",
+        "files": [
+          "src/hooks/useProfileData.ts",
+          "src/components/profile/ProfileForm.tsx",
+          "src/components/profile/AvatarUpload.tsx",
+          "src/pages/Profile.tsx"
+        ]
+      }
+    ]
+  }
+}

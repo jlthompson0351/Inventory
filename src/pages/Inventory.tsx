@@ -16,9 +16,7 @@ export default function Inventory() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  console.log("Inventory.tsx rendering with InventoryList component");
-  console.log("- isLoading:", isLoading);
-  console.log("- currentOrganization:", currentOrganization);
+  // Inventory component rendering
 
   const handleAddInventory = () => {
     navigate("/inventory/add");

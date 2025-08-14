@@ -52,13 +52,13 @@ const assetsCache = new Map<string, { assets: Asset[]; timestamp: number }>();
 
 // Function to clear cache for all organizations/asset types
 export const clearAssetCache = () => {
-  console.log("[AssetGrid] Clearing all asset cache");
+      // Clearing all asset cache
   assetsCache.clear();
 };
 
 // Function to clear cache for specific organization
 export const clearAssetCacheForOrg = (organizationId: string) => {
-  console.log(`[AssetGrid] Clearing asset cache for org: ${organizationId}`);
+      // Clearing asset cache for org
   for (const [key] of assetsCache) {
     if (key.includes(`org:${organizationId}`)) {
       assetsCache.delete(key);
@@ -143,7 +143,7 @@ export default function AssetGrid({
   // Create a memoized fetch function
   const fetchAssets = useCallback(async (force = false) => {
     if (!organizationId) {
-      console.log("[AssetGrid] No organizationId provided, skipping fetch");
+      // No organizationId provided, skipping fetch
       setAssets([]);
       hasFetched.current = true;
       return;
@@ -153,7 +153,7 @@ export default function AssetGrid({
     if (!force) {
       const cached = assetsCache.get(cacheKey);
       if (cached && (Date.now() - cached.timestamp < 10000)) {
-        console.log("[AssetGrid] Using cached assets data");
+        // Using cached assets data
         setAssets(cached.assets);
         hasFetched.current = true;
         return;
@@ -166,7 +166,7 @@ export default function AssetGrid({
       setLoading(true);
     }
     
-    console.log(`[AssetGrid] Fetching assets with organizationId: ${organizationId}`);
+    // Fetching assets
     
     try {
       let query = supabase
@@ -191,7 +191,7 @@ export default function AssetGrid({
       const { data, error } = await query.order('name', { ascending: true });
       
       if (fetchId !== currentFetchId.current) {
-        console.log(`[AssetGrid] Fetch ${fetchId} was superseded, discarding results`);
+        // Fetch was superseded, discarding results
         return;
       }
       
@@ -205,7 +205,7 @@ export default function AssetGrid({
       }
       
       if (!data) {
-        console.log('[AssetGrid] No asset data returned');
+        // No asset data returned
         if (isMounted.current) {
           setAssets([]);
           setLoading(false);
@@ -214,7 +214,7 @@ export default function AssetGrid({
       }
       
       const processedAssets = processAssetData(data);
-      console.log(`[AssetGrid] Processed ${processedAssets.length} assets`);
+      // Processed assets
       
       // Cache the results
       assetsCache.set(cacheKey, { 

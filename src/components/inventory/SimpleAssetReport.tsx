@@ -226,14 +226,11 @@ const SimpleAssetReport: React.FC = () => {
     
     setIsLoading(true);
     try {
-      console.log('Generating report for organization:', currentOrganization.id);
-      console.log('Selected asset types:', selectedAssetTypes);
-      console.log('Date range type:', dateRangeType);
-      console.log('View mode:', viewMode);
+          // Generating report
 
       // Get date range
       const { start: startDate, end: endDate } = getDateRange(dateRangeType, customStartDate, customEndDate);
-      console.log('Date range:', startDate, 'to', endDate);
+      // Date range set
 
       // Build query based on selected asset types
       const { data, error } = await supabase
@@ -284,7 +281,7 @@ const SimpleAssetReport: React.FC = () => {
         throw error;
       }
 
-      console.log('Query returned data:', filteredData);
+      // Query returned data
 
       if (!filteredData || filteredData.length === 0) {
         toast.error('No assets found. Make sure you have assets created with the selected criteria.');
@@ -296,7 +293,7 @@ const SimpleAssetReport: React.FC = () => {
 
       // Get form schemas to map field IDs to labels
       const formIds = Array.from(new Set(filteredData?.map((asset: any) => asset.asset_types?.inventory_form_id).filter(Boolean)));
-      console.log('Form IDs found:', formIds);
+              // Form IDs found
       
       const formSchemas: Record<string, FormField[]> = {};
       if (formIds.length > 0) {
@@ -308,7 +305,7 @@ const SimpleAssetReport: React.FC = () => {
         if (formError) {
           console.error('Form schema error:', formError);
         } else {
-          console.log('Form schemas:', forms);
+          // Form schemas loaded
           forms?.forEach((form: any) => {
             const fields = form.form_data?.fields || [];
             formSchemas[form.id] = fields.map((field: any, index: number) => ({
@@ -441,8 +438,7 @@ const SimpleAssetReport: React.FC = () => {
         }
       });
 
-      console.log('Processed data:', processedData);
-      console.log('Field set:', Array.from(fieldSet));
+      // Processed data
 
       // Convert field set to sorted array with labels - only if no template is loaded
       if (!currentTemplate || formFields.length === 0) {
@@ -472,8 +468,7 @@ const SimpleAssetReport: React.FC = () => {
           return true;
         });
 
-        console.log('Original field set:', Array.from(fieldSet));
-        console.log('Filtered field set:', filteredFieldSet);
+        // Field set filtered
 
         const fieldsWithLabels = filteredFieldSet
           .sort()
@@ -511,8 +506,7 @@ const SimpleAssetReport: React.FC = () => {
         ];
 
         setFormFields([...specialFields, ...fieldsWithLabels]);
-        console.log('System fields filtered out:', systemFields);
-        console.log('Final form fields:', [...specialFields, ...fieldsWithLabels]);
+              // System fields filtered out
       }
 
       setReportData(processedData);

@@ -68,7 +68,7 @@ export function FormRenderer({
 }: FormRendererProps) {
   const [formData, setFormData] = useState<any>(() => {
     // Initialize with initialData on first render
-    console.log('FormRenderer - Initial mount with data:', initialData);
+    // Initial mount with data
     return initialData;
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -80,9 +80,9 @@ export function FormRenderer({
 
   // Update form data when initialData changes (but preserve user edits)
   useEffect(() => {
-    console.log('FormRenderer - initialData changed:', initialData);
+          // initialData changed
     setFormData(prevData => {
-      console.log('FormRenderer - prevData in initialData useEffect:', prevData);
+      // prevData in initialData useEffect
       // If we have no data yet, use initialData
       if (!prevData || Object.keys(prevData).length === 0) {
         const defaultData = { ...initialData };
@@ -99,7 +99,7 @@ export function FormRenderer({
           }
         });
         
-        console.log('FormRenderer - Setting initial form data from useEffect:', defaultData);
+        // Setting initial form data from useEffect
         return defaultData;
       }
       
@@ -114,12 +114,12 @@ export function FormRenderer({
           }
         });
         
-        console.log('FormRenderer - New submission data detected, replacing form data in useEffect');
+        // New submission data detected, replacing form data in useEffect
         return newData;
       }
       
       // Otherwise keep current data
-      console.log('FormRenderer - Keeping previous form data in useEffect:', prevData);
+              // Keeping previous form data in useEffect
       return prevData;
     });
   }, [initialData]);
@@ -276,7 +276,7 @@ export function FormRenderer({
       
       // CRITICAL: Override with historical conversion rates if editing historical data
       if (formData._historical_conversion_rates) {
-        console.log('FormRenderer - Using historical conversion rates for calculations:', formData._historical_conversion_rates);
+        // Using historical conversion rates for calculations
         Object.entries(formData._historical_conversion_rates).forEach(([key, value]) => {
           context.mappedFields[`mapped.${key}`] = Number(value) || 0;
         });
@@ -284,9 +284,7 @@ export function FormRenderer({
       
       // Debug logging for mapped fields
       if (field.formula.includes('mapped.convert')) {
-        console.log(`FormRenderer - Calculating ${field.id} with formula: ${field.formula}`);
-        console.log(`FormRenderer - Available mapped fields:`, context.mappedFields);
-        console.log(`FormRenderer - Current field values:`, context.fields);
+        // Calculating field with formula
       }
       
                   // Use cached formula evaluator for performance
@@ -295,7 +293,7 @@ export function FormRenderer({
                       // Return the result (already formatted)
           return String(result);
               } else {
-          console.error('Formula evaluation error:', result);
+          // Formula evaluation error
           return '0.00';
         }
     } catch (e) {
@@ -351,7 +349,7 @@ export function FormRenderer({
 
   // Handle form change
   const handleChange = (fieldId: string, value: any) => {
-    console.log(`FormRenderer - handleChange for ${fieldId}, new value: ${value}`);
+    // handleChange for field
     
     // Update the form data immediately
     const updatedData = { ...formData, [fieldId]: value };
@@ -373,12 +371,12 @@ export function FormRenderer({
     let iterations = 0;
     const MAX_ITERATIONS = 10; // Prevent infinite loops
     
-    console.log('FormRenderer - Starting calculation pass for all calculated fields');
+    // Starting calculation pass for all calculated fields
     
     while (hasChanges && iterations < MAX_ITERATIONS) {
       hasChanges = false;
       iterations++;
-      console.log(`FormRenderer - Calculation iteration ${iterations}`);
+      // Calculation iteration
       
       fields.forEach(field => {
         if (field.type === 'calculated' && field.formula) {
@@ -404,7 +402,7 @@ export function FormRenderer({
             
             // CRITICAL: Override with historical conversion rates if editing historical data
             if (updatedData._historical_conversion_rates) {
-              console.log('FormRenderer - Using historical conversion rates for calculations:', updatedData._historical_conversion_rates);
+              // Using historical conversion rates for calculations
               Object.entries(updatedData._historical_conversion_rates).forEach(([key, value]) => {
                 context.mappedFields[`mapped.${key}`] = Number(value) || 0;
               });
@@ -412,9 +410,7 @@ export function FormRenderer({
             
             // Debug logging for mapped fields
             if (field.formula.includes('mapped.convert')) {
-              console.log(`FormRenderer - Calculating ${field.id} with formula: ${field.formula}`);
-              console.log(`FormRenderer - Available mapped fields:`, context.mappedFields);
-              console.log(`FormRenderer - Current field values:`, context.fields);
+                      // Calculating field with formula
             }
             
             // Use cached formula evaluator for performance
@@ -424,16 +420,16 @@ export function FormRenderer({
               
               // Check if value changed
               if (updatedData[field.id] !== newValue) {
-                console.log(`FormRenderer - Calculated field ${field.id} changed from ${updatedData[field.id]} to ${newValue}`);
+                // Calculated field changed
                 updatedData[field.id] = newValue;
                 hasChanges = true; // Mark that we need another iteration
               }
                     } else {
-          console.error('Formula evaluation error:', result);
+          // Formula evaluation error
           updatedData[field.id] = '0.00';
         }
           } catch (e) {
-            console.error('Formula evaluation error:', e);
+            // Formula evaluation error
             updatedData[field.id] = '0.00';
           }
         }
@@ -441,9 +437,9 @@ export function FormRenderer({
     }
     
     if (iterations >= MAX_ITERATIONS) {
-      console.warn('FormRenderer - Maximum calculation iterations reached. Possible circular dependency.');
+              // Maximum calculation iterations reached. Possible circular dependency.
     } else {
-      console.log(`FormRenderer - Calculations completed in ${iterations} iteration(s)`);
+      // Calculations completed
     }
     
     setFormData(updatedData);
@@ -540,7 +536,7 @@ export function FormRenderer({
         let calculationAttempts = 0;
         const MAX_CALC_ATTEMPTS = 3;
         
-        console.log('FormRenderer - Ensuring all calculated fields are up to date before submission');
+        // Ensuring all calculated fields are up to date before submission
         
         // Run calculations one more time to ensure everything is current
         while (calculationAttempts < MAX_CALC_ATTEMPTS) {
@@ -582,19 +578,17 @@ export function FormRenderer({
                   
                   // Check if value changed
                   if (finalFormData[field.id] !== newValue) {
-                    console.log(`FormRenderer - Final calculation: ${field.id} = ${newValue} (was ${finalFormData[field.id]})`);
+                    // Final calculation
                     finalFormData[field.id] = newValue;
                     hasCalculationChanges = true;
                   }
                 } else {
-                  console.error(`FormRenderer - Formula evaluation error for ${field.id}:`, (result as { success: false; error: string }).error);
-                  console.log(`FormRenderer - Setting ${field.id} to 0.00 due to calculation error`);
+                            // Formula evaluation error, setting to 0.00
                   finalFormData[field.id] = '0.00';
                   hasCalculationChanges = true;
                 }
               } catch (e) {
-                console.error(`FormRenderer - Exception calculating ${field.id}:`, e);
-                console.log(`FormRenderer - Setting ${field.id} to 0.00 due to exception`);
+                          // Exception calculating field, setting to 0.00
                 finalFormData[field.id] = '0.00';
                 hasCalculationChanges = true;
               }
@@ -611,25 +605,17 @@ export function FormRenderer({
         fields.forEach(field => {
           if (field.type === 'calculated') {
             if (finalFormData[field.id] === undefined || finalFormData[field.id] === null || finalFormData[field.id] === '') {
-              console.warn(`FormRenderer - Calculated field ${field.id} has no value, setting to 0.00`);
+              // Calculated field has no value, setting to 0.00
               finalFormData[field.id] = '0.00';
             }
           }
         });
         
-        console.log('FormRenderer - Final form data being submitted:', finalFormData);
-        console.log('FormRenderer - Calculated fields in submission:', 
-          fields.filter(f => f.type === 'calculated').map(f => ({
-            id: f.id,
-            label: f.label,
-            value: finalFormData[f.id],
-            formula: f.formula
-          }))
-        );
+        // Final form data being submitted
         
         await onSubmit(finalFormData);
       } catch (error) {
-        console.error('Form submission error:', error);
+        // Form submission error
         // Could set a general form error here
       }
     }
@@ -781,30 +767,7 @@ export function FormRenderer({
     );
   };
 
-  // Debug helper - expose current form state to window for debugging
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).__debugFormState = () => {
-        console.log('=== Form Debug Info ===');
-        console.log('Form Data:', formData);
-        console.log('Mapped Fields:', mappedFields);
-        console.log('Fields:', fields);
-        console.log('Calculated Fields:', fields.filter(f => f.type === 'calculated').map(f => ({
-          id: f.id,
-          label: f.label,
-          formula: f.formula,
-          value: formData[f.id]
-        })));
-        console.log('======================');
-      };
-    }
-    
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete (window as any).__debugFormState;
-      }
-    };
-  }, [formData, mappedFields, fields]);
+  // Debug helper removed - no longer exposing form state to window
 
   return (
     <form onSubmit={handleSubmit} className={`space-y-6 ${isMobile ? 'space-y-4' : ''}`}>

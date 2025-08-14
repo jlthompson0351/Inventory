@@ -237,7 +237,7 @@ class OptimizedDataProcessor {
       case 'form_submissions':
         return this.processFormSubmissionsOptimized(config, organizationId);
       default:
-        console.warn(`Unknown data source: ${dataSource}`);
+        // Unknown data source
         return [];
     }
   }

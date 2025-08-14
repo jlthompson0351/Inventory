@@ -49,10 +49,12 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { getAssetTypes } from "@/services/assetTypeService";
-import { ReportConfig, createReport, updateReport, getReport, executeReport, Report, AVAILABLE_DATA_SOURCES, DATA_SOURCE_COLUMNS } from "@/services/reportService";
+import { ReportConfig, createReport, updateReport, getReport, executeSchemaReport, Report } from "@/services/reportService";
+import { getAvailableSources, getFieldsForSources_Legacy as getFieldsForSources } from '@/services/reportingSchemaService';
 import { supabase } from "@/integrations/supabase/client";
 import { getMappedFieldsForReporting, getAllMappedFieldsForAssetType } from '@/services/mappedFieldService';
 import { createForm, updateForm, getFormById } from "@/services/formService";
@@ -65,8 +67,8 @@ import { SmartFilter } from '@/components/reporting/SmartFilter';
 import { debounce } from 'lodash';
 import * as XLSX from 'xlsx';
 
-// Use enhanced data sources from report service
-const availableDataSources = AVAILABLE_DATA_SOURCES;
+// Data sources derived from schema
+const availableDataSources = getAvailableSources();
 
 // 🎯 SMART REPORT TEMPLATES
 const reportTemplates = [
@@ -233,6 +235,7 @@ const ReportBuilder = () => {
   const [assetTypes, setAssetTypes] = useState<any[]>([]);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
   const [formFields, setFormFields] = useState<any[]>([]);
   const [availableColumns, setAvailableColumns] = useState<any[]>([]);
   const [fieldSearch, setFieldSearch] = useState("");
@@ -344,7 +347,16 @@ const ReportBuilder = () => {
           setSelectedAssetTypes(report.report_config.assetTypes || []);
           
           if (report.report_config.columns && report.report_config.columns.length > 0) {
-                      const previewResults = await executeReport(report, 10);
+                      const config = {
+            subject: report.name,
+            dataSources: report.report_config.dataSources,
+            columns: report.report_config.columns,
+            filters: report.report_config.filters || [],
+            sorts: report.report_config.sorts || [],
+            assetTypes: report.report_config.assetTypes || [],
+            limit: 10
+          };
+          const previewResults = await executeSchemaReport(report.organization_id, config, 10);
           setPreviewData(previewResults.data);
           }
         }
@@ -386,39 +398,32 @@ const ReportBuilder = () => {
           });
         }
 
-        // Load columns from the DATA_SOURCE_COLUMNS registry
-        selectedDataSources.forEach(sourceId => {
-          const sourceColumns = DATA_SOURCE_COLUMNS[sourceId];
-          if (sourceColumns) {
-            const dataSourceInfo = availableDataSources.find(ds => ds.id === sourceId);
-            const formName = dataSourceInfo?.name || sourceId;
-            
-            staticColumns.push(...sourceColumns.map(col => ({
-              id: col.id,
-              field_label: col.label,
-              field_type: col.type === 'uuid' ? 'text' : col.type,
-              form_name: formName,
-              description: col.description || '',
-              aggregatable: col.aggregatable,
-              sortable: col.sortable,
-              filterable: col.filterable,
-              format: col.format
-            })));
-          }
-        });
+        // Load columns from the reporting schema
+        const schemaFields = await getFieldsForSources(selectedDataSources);
+        staticColumns.push(...schemaFields.map(f => ({
+          id: f.id,
+          field_label: f.field_label,
+          field_type: f.field_type === 'uuid' ? 'text' : f.field_type,
+          form_name: f.form_name,
+          description: f.description || '',
+          aggregatable: f.aggregatable,
+          sortable: f.sortable,
+          filterable: f.filterable,
+          format: f.format
+        })));
 
         // 🎯 AUTOMATICALLY LOAD ALL ASSET TYPE FIELDS - No manual selection required!
         const allAssetTypeFields: any[] = [];
         
         // If any data source that relates to asset types is selected, load ALL asset type fields
         if (selectedDataSources.some(ds => ['assets', 'asset_types', 'inventory_items', 'form_submissions', 'intake_forms', 'inventory_forms', 'mapping_forms'].includes(ds))) {
-          console.log('🔍 Auto-discovering ALL asset type fields...');
+          // Auto-discovering ALL asset type fields
           
           // Get ALL asset types for this organization
           const allAssetTypesData = await getAssetTypes(currentOrganization.id);
           
           for (const assetType of allAssetTypesData || []) {
-            console.log(`🔍 Processing asset type: ${assetType.name} (${assetType.id})`);
+            // Processing asset type
             
             // Add conversion fields from asset type configuration
             if (assetType.conversion_fields && Array.isArray(assetType.conversion_fields)) {
@@ -432,7 +437,7 @@ const ReportBuilder = () => {
                   source: 'conversion',
                   asset_type_id: assetType.id
                 });
-                console.log(`✅ Added conversion field: ${field.field_name} for ${assetType.name}`);
+                // Added conversion field
               });
             }
             
@@ -452,10 +457,10 @@ const ReportBuilder = () => {
                   form_id: field.form_id,
                   asset_type_id: assetType.id
                 });
-                console.log(`✅ Added form field: ${field.field_label} for ${assetType.name}`);
+                // Added form field
               });
             } catch (error) {
-              console.warn(`⚠️ Could not get mapped fields for asset type ${assetType.name}:`, error);
+              // Could not get mapped fields for asset type
             }
           }
         }
@@ -511,7 +516,7 @@ const ReportBuilder = () => {
           index === self.findIndex(f => f.id === field.id)
         );
         
-        console.log(`🎉 Discovered ${uniqueFields.length} total fields (${staticColumns.length} static, ${formFieldsData.length} form mapped, ${allAssetTypeFields.length} auto asset type, ${manualAssetTypeFields.length} manual asset type)`);
+        // Discovered fields summary
         
         setFormFields(uniqueFields);
 
@@ -650,29 +655,26 @@ const ReportBuilder = () => {
         updated_at: new Date().toISOString()
       };
 
-      // 🐛 DEBUG: Log the report config and organization info
-      console.log('🔍 DEBUG - Generating preview with:', {
-        organization_id: currentOrganization.id,
-        organization_name: currentOrganization.name,
+      // DEBUG - Generating preview
+
+      // Use new schema-driven engine
+      const config = {
+        subject,
         dataSources: selectedDataSources,
         columns: selectedColumns,
-        tempReport
-      });
-
-      const results = await executeReport(tempReport, 10);
+        filters: filterRules,
+        sorts: sortRules,
+        assetTypes: selectedAssetTypes,
+        limit: 10
+      };
+      const results = await executeSchemaReport(currentOrganization.id, config, 10);
+      
       const endTime = performance.now();
       const executionTime = Math.round(endTime - startTime);
       
       setLastPreviewTime(executionTime);
       
-      // 🐛 DEBUG: Log the results
-      console.log('🔍 DEBUG - Preview results:', {
-        resultsCount: results.data.length,
-        firstResult: results.data[0],
-        allResults: results.data,
-        executionTimeMs: executionTime,
-        stats: results.stats
-      });
+      // DEBUG - Preview results generated
 
       setPreviewData(results.data);
       
@@ -728,7 +730,15 @@ const ReportBuilder = () => {
     };
     
     try {
-      const response = await executeReport(tempReport); // Fetch all data for export
+      const config = {
+        subject,
+        dataSources: selectedDataSources,
+        columns: selectedColumns,
+        filters: filterRules,
+        sorts: sortRules,
+        assetTypes: selectedAssetTypes
+      };
+      const response = await executeSchemaReport(currentOrganization.id, config); // Fetch all data for export
       const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
@@ -811,7 +821,15 @@ const ReportBuilder = () => {
       updated_at: new Date().toISOString()
     };
     try {
-      const response = await executeReport(tempReport); // Fetch all data
+      const config = {
+        subject,
+        dataSources: selectedDataSources,
+        columns: selectedColumns,
+        filters: filterRules,
+        sorts: sortRules,
+        assetTypes: selectedAssetTypes
+      };
+      const response = await executeSchemaReport(currentOrganization.id, config); // Fetch all data
       const results = response.data || [];
       if (results.length === 0) {
         toast({title: "No Data to Export", description: "Your report configuration resulted in no data.", variant: "default"});
@@ -1269,8 +1287,8 @@ const ReportBuilder = () => {
                     formFields={formFields}
                     reportName={reportName}
                     onExportChart={(chartType, chartData) => {
-                      // TODO: Implement chart export
-                      console.log('Export chart:', chartType, chartData);
+                              // TODO: Implement chart export
+        // Export chart functionality
                       toast({
                         title: "Chart Export",
                         description: `${chartType} chart exported successfully!`,
@@ -1519,7 +1537,8 @@ const ReportBuilder = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-xl font-semibold">🔍 Live Data Preview</h2>
-                      <div className="flex space-x-2">
+                      <div className="flex items-center space-x-3">
+
                         <Button onClick={generatePreview} disabled={isLoading || selectedColumns.length === 0} variant="outline" size="sm">
                           {isLoading ? (
                               <><Loader2 className="animate-spin rounded-full h-3 w-3 mr-1.5" />Refreshing...</>

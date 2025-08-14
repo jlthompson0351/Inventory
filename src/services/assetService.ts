@@ -25,7 +25,7 @@ export interface Asset {
 export const getAssetById = async (id: string): Promise<Asset | null> => {
   try {
     if (!id) {
-      console.warn('getAssetById called with empty ID');
+      // getAssetById called with empty ID
       return null;
     }
     
@@ -45,7 +45,7 @@ export const getAssetById = async (id: string): Promise<Asset | null> => {
     }
 
     if (!data) {
-      console.warn(`Asset with ID ${id} not found in database`);
+      // Asset not found in database
       return null;
     }
 

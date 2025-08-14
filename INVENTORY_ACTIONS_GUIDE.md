@@ -2,14 +2,14 @@
 
 ## Overview
 
-The inventory actions system allows form fields (especially calculated fields) to automatically update inventory levels when forms are submitted. This is perfect for intake forms, inventory counts, and usage tracking.
+The inventory actions system allows form fields to automatically update inventory levels when forms are submitted. This system integrates with the asset management workflow and supports various field types for flexible inventory tracking.
 
 ## How It Works
 
 ### Field Types Supporting Inventory Actions
-- **Number fields**: Direct numeric input
+- **Number fields**: Direct numeric input with inventory actions
 - **Calculated fields**: Formula-based values (PERFECT for totals and conversions)
-- **Current Inventory fields**: Special inventory tracking fields
+- **Current Inventory fields**: Specialized fields designed for inventory tracking
 
 ### Action Types
 
@@ -52,7 +52,7 @@ The inventory actions system allows form fields (especially calculated fields) t
 ## Enhanced Features
 
 ### Visual Indicators
-- Form fields with inventory actions show colored badges
+- Form fields with inventory actions show colored badges in the form builder
 - 🔼 ADD = Green badge
 - 🔽 SUB = Orange badge  
 - 📋 SET = Blue badge
@@ -105,41 +105,44 @@ If this calculated field has "SET" action, it will set the total inventory based
 ### History Tracking
 
 Every inventory action creates detailed history records including:
-- Previous quantity
-- New quantity  
-- Change amount and description
+- Previous quantity and new quantity  
+- Change amount and detailed description
 - Which form field caused the change
-- Full form submission data
-- Automatic "usage" tracking for SET actions
+- Complete form submission data with metadata
+- Automatic usage calculation for SET actions
+- User ID and timestamp tracking
 
 ### Advanced Usage
 
-#### Multiple Actions in One Form
-- Only ONE "SET" action per form (takes priority)
-- Multiple "ADD" and "SUBTRACT" actions are combined
-- SET always overrides ADD/SUBTRACT
-
-#### Processing Order
-1. SET actions (highest priority)
-2. ADD actions (applied to SET result or current stock)
-3. SUBTRACT actions (applied after ADD)
+#### Processing Order (CRITICAL)
+1. **SET actions have HIGHEST priority** - Only ONE SET action per form is processed
+2. **ADD/SUBTRACT actions are ignored** if a SET action exists
+3. **Multiple SET actions** will trigger a warning, first one wins
+4. **Zero quantity protection** - inventory never goes below 0
 
 #### Safety Features
-- Inventory never goes below 0
-- Invalid numbers are ignored
+- Inventory quantities are clamped to minimum of 0
+- Invalid numbers are automatically ignored
 - Detailed logging for troubleshooting
-- Full audit trail in history
+- Complete audit trail in inventory_history table
+- Automatic event type detection based on form type
+
+#### Event Type Detection
+The system automatically determines the correct event type:
+- **Form Type: 'intake'** → Event: 'intake'
+- **Form Type: 'inventory'** → Event: 'audit' 
+- **Default** → Event: 'audit'
 
 ## Backend Implementation
 
 ### Form Submission Process
-1. Parse form schema for inventory_action fields
-2. Find matching field values in submission
-3. Process SET actions first (override everything)
-4. Process ADD/SUBTRACT actions
-5. Update inventory_items table
-6. Create detailed inventory_history record
-7. Log all changes for audit
+1. Parse form schema to find fields with `inventory_action` property
+2. Find matching field values in form submission data
+3. **Priority 1**: Process SET actions first (overrides everything)
+4. **Priority 2**: Process ADD/SUBTRACT actions (only if no SET action)
+5. Update `inventory_items` table with final quantity
+6. Create detailed `inventory_history` record with change tracking
+7. Set appropriate event_type based on form type
 
 ### History Record Structure
 ```json
@@ -147,6 +150,8 @@ Every inventory action creates detailed history records including:
   "inventory_item_id": "uuid",
   "quantity": 22,
   "notes": "Form: Paint Intake. Changes: Added 5 units via Gallons Received",
+  "event_type": "intake",
+  "check_type": "form_submission",
   "response_data": {
     "gallons_received": 5,
     "supplier": "ABC Paint Co",
@@ -163,30 +168,64 @@ Every inventory action creates detailed history records including:
 }
 ```
 
+### Database Integration
+- **inventory_items**: Main inventory tracking table
+- **inventory_history**: Complete audit trail with form data
+- **assets**: Linked to inventory items for asset-based tracking
+- **organization_members**: User tracking for audit purposes
+
+## Form Builder Integration
+
+### Setting Up Inventory Actions
+1. Add Number, Calculated, or Current Inventory field to form
+2. Select inventory action in field properties panel
+3. Choose from: None, Add, Subtract, or Set
+4. Preview examples and descriptions in real-time
+5. Visual badges automatically appear on fields with actions
+
+### Field Type Recommendations
+- **Number fields**: Direct measurements, simple inputs
+- **Calculated fields**: Totals, conversions, complex calculations
+- **Current Inventory fields**: Specialized for count workflows
+
 ## Best Practices
 
 ### Form Design
-1. Use calculated fields for totals
-2. Put inventory actions on final calculated values
-3. Use clear field labels
-4. Add helpful descriptions
+1. Use calculated fields for automatic totals
+2. Apply SET action on final calculated inventory values
+3. Use clear, descriptive field labels
+4. Add helpful descriptions for user guidance
 
-### Inventory Counts  
-1. Use SET action on calculated total
-2. Include individual measurement fields
-3. Add location and notes fields
-4. Set up monthly/periodic forms
+### Inventory Count Forms  
+1. Use SET action on calculated total field
+2. Include individual measurement fields for transparency
+3. Add location and condition notes
+4. Design for monthly/periodic use
 
 ### Intake Forms
 1. Use ADD action on quantity received
-2. Include supplier, date, batch info
-3. Track unit costs if needed
-4. Link to purchase orders
+2. Include supplier, date, batch information
+3. Track unit costs and purchase order data
+4. Link to asset management workflow
 
-### Usage Forms
-1. Use SUBTRACT for consumption
-2. Track job/project details
-3. Include start/end dates
-4. Note equipment or location used
+### Usage/Consumption Forms
+1. Use SUBTRACT for actual consumption
+2. Track job/project details for accountability
+3. Include start/end times and locations
+4. Document equipment or personnel involved
 
-This enhanced system provides complete inventory automation while maintaining detailed audit trails and supporting complex calculated field scenarios. 
+## Troubleshooting
+
+### Common Issues
+- **Multiple SET actions**: Only first SET field is processed, others ignored
+- **Negative quantities**: Automatically clamped to 0 for safety
+- **Missing inventory item**: Form submission fails if asset has no inventory record
+- **Invalid numbers**: Non-numeric values are silently ignored
+
+### Debugging Tips
+- Check browser console for inventory action processing logs
+- Review inventory_history table for complete audit trail
+- Verify form schema has correct `inventory_action` properties
+- Confirm asset has associated inventory_items record
+
+This enhanced system provides complete inventory automation while maintaining detailed audit trails and supporting complex calculated field scenarios with robust error handling. 

@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
+import { getAvailableSources, getFieldsForSources } from '@/services/reportingSchemaService';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/hooks/useOrganization';
 import {
@@ -113,6 +114,37 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
   // Real-time preview with debouncing
   const previewTimeoutRef = useRef<NodeJS.Timeout>();
   const [isPreviewScheduled, setIsPreviewScheduled] = useState(false);
+
+  // Load available sources from schema
+  const schemaSources = useMemo(() => getAvailableSources(), []);
+
+  // Helper component: fields for a single source from schema
+  const SourceFieldSelector: React.FC<{
+    source: string;
+    selected: string[];
+    onToggle: (columnId: string, checked: boolean) => void;
+  }> = ({ source, selected, onToggle }) => {
+    const [fields, setFields] = React.useState<any[]>([]);
+    React.useEffect(() => {
+      (async () => {
+        const fs = await getFieldsForSources([source]);
+        setFields(fs);
+      })();
+    }, [source]);
+    return (
+      <>
+        {fields.map((f) => (
+          <div key={f.id} className="flex items-center space-x-2">
+            <Checkbox
+              checked={selected.includes(f.id)}
+              onCheckedChange={(checked) => onToggle(f.id, !!checked)}
+            />
+            <Label className="text-sm">{f.field_label}</Label>
+          </div>
+        ))}
+      </>
+    );
+  };
 
   // 🚀 SMART PREVIEW SYSTEM
   const schedulePreview = useCallback(() => {
@@ -463,7 +495,7 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    {['assets', 'asset_types', 'inventory_items', 'form_submissions'].map(source => (
+                    {schemaSources.map(({ id: source, name, icon, description }) => (
                       <Card key={source} className={`cursor-pointer transition-all ${
                         config.dataSources.includes(source) ? 'ring-2 ring-primary' : ''
                       }`}>
@@ -479,13 +511,8 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
                               }}
                             />
                             <div>
-                              <div className="font-medium capitalize">{source.replace('_', ' ')}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {source === 'assets' && 'Physical assets and equipment'}
-                                {source === 'asset_types' && 'Asset categories and types'}
-                                {source === 'inventory_items' && 'Stock and inventory data'}
-                                {source === 'form_submissions' && 'Form response data'}
-                              </div>
+                              <div className="font-medium capitalize">{icon} {name}</div>
+                              <div className="text-xs text-muted-foreground">{description}</div>
                             </div>
                           </div>
                         </CardContent>
@@ -508,22 +535,17 @@ const OptimizedReportBuilder: React.FC<OptimizedReportBuilderProps> = ({
                           <CardTitle className="text-sm capitalize">{source.replace('_', ' ')}</CardTitle>
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 gap-2">
-                          {/* Basic columns for each data source */}
-                          {source === 'assets' && ['id', 'name', 'status', 'serial_number'].map(col => (
-                            <div key={col} className="flex items-center space-x-2">
-                              <Checkbox
-                                checked={config.columns.includes(`${source}.${col}`)}
-                                onCheckedChange={(checked) => {
-                                  const columnId = `${source}.${col}`;
-                                  const newColumns = checked
-                                    ? [...config.columns, columnId]
-                                    : config.columns.filter(c => c !== columnId);
-                                  updateConfig({ columns: newColumns });
-                                }}
-                              />
-                              <Label className="text-sm capitalize">{col.replace('_', ' ')}</Label>
-                            </div>
-                          ))}
+                          {/* Load columns dynamically from schema */}
+                          <SourceFieldSelector
+                            source={source}
+                            selected={config.columns}
+                            onToggle={(columnId, checked) => {
+                              const newColumns = checked
+                                ? [...config.columns, columnId]
+                                : config.columns.filter(c => c !== columnId);
+                              updateConfig({ columns: newColumns });
+                            }}
+                          />
                         </CardContent>
                       </Card>
                     ))}

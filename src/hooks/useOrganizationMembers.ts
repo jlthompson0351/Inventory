@@ -27,7 +27,7 @@ export const useOrganizationMembers = () => {
 
       if (memberError) {
         // Fallback to the basic function if the activity one fails
-        console.warn('Activity function failed, falling back to basic:', memberError);
+        // Activity function failed, falling back to basic
         const { data: basicData, error: basicError } = await supabase
           .rpc('get_organization_members_with_emails' as any, {
             org_id: organization.id

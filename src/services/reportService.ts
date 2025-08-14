@@ -689,7 +689,7 @@ class ParallelDataProcessor {
         return this.processAssetTypeFormsDataSource(config, organizationId);
       
       default:
-        console.warn(`Unknown data source: ${dataSource}`);
+        // Unknown data source
         return [];
     }
   }
@@ -1381,6 +1381,59 @@ export async function executeReport(
   }
 }
 
+// 🚀 NEW SCHEMA-DRIVEN EXECUTION ENGINE (PARALLEL IMPLEMENTATION)
+export async function executeSchemaReport(
+  organizationId: string,
+  config: any,
+  limit?: number,
+  useCache: boolean = true
+): Promise<{
+  data: any[];
+  stats: ExecutionStats;
+  totalCount: number;
+}> {
+  const startTime = performance.now();
+  
+  try {
+    // Call the new Supabase function
+    const { data, error } = await supabase.rpc('execute_report_query', {
+      p_organization_id: organizationId,
+      p_config: config
+    });
+
+    if (error) {
+      console.error('Schema report execution error:', error);
+      throw error;
+    }
+
+    // For now, the stub returns empty results, so we'll handle that
+    const results = data || [];
+    const totalCount = results.length;
+    
+    const endTime = performance.now();
+    const executionTime = Math.round(endTime - startTime);
+    
+    const stats: ExecutionStats = {
+      executionTime,
+      rowCount: results.length,
+      cacheHit: false, // Not implemented in stub yet
+      queryComplexity: 'low', // Will be calculated by RPC
+      dataSourcesUsed: config.dataSources || [],
+      bytesProcessed: JSON.stringify(results).length
+    };
+    
+    return { 
+      data: results, 
+      stats,
+      totalCount 
+    };
+    
+  } catch (error) {
+    console.error('Error executing schema report:', error);
+    throw error;
+  }
+}
+
 // 🚀 UTILITY FUNCTIONS
 
 async function applyPostProcessingCalculations(data: any[], config: ReportConfig): Promise<any[]> {
@@ -1507,7 +1560,7 @@ async function logReportExecution(report: Report, stats: ExecutionStats): Promis
 
 export async function getReportRuns(reportId: string, limit: number = 10): Promise<ReportRun[]> {
   // TODO: Implement when report_runs table is created
-  console.warn('Report runs tracking not yet implemented');
+      // Report runs tracking not yet implemented
   return [];
 }
 
@@ -2209,7 +2262,7 @@ export async function buildMonthlyInventoryReport(config: any, dateRange: { star
         lastMonthData = await getLastMonthTotal(item.id, currentMonth);
         startingQuantity = lastMonthData.amount;
       } catch (error) {
-        console.warn(`Failed to get last month total for ${item.name}, falling back to history:`, error);
+                    // Failed to get last month total, falling back to history
         // Fallback to original logic
         startingQuantity = preReportHistory.length > 0 
           ? preReportHistory[preReportHistory.length - 1].quantity || 0

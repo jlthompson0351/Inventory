@@ -178,7 +178,7 @@ export async function getFormById(formId: string) {
  * Get a form with all related data (validation rules, dependencies, categories)
  */
 export async function getFormWithRelatedData(formId: string) {
-  console.log(`Starting getFormWithRelatedData for formId: ${formId}`);
+  // Starting getFormWithRelatedData
   
   if (!formId) {
     console.error('Form ID is required for getFormWithRelatedData');
@@ -199,14 +199,14 @@ export async function getFormWithRelatedData(formId: string) {
       
       if (formError.code === 'PGRST116') {
         // This is the "not found" error code for single()
-        console.log(`Form with ID ${formId} not found`);
+        // Form not found
         return { form: null, validationRules: [], fieldDependencies: [], categories: [] };
       }
       
       throw formError;
     }
 
-    console.log('Form fetched successfully:', form);
+    // Form fetched successfully
 
     // Handle form_data formatting
     if (form) {
@@ -294,7 +294,7 @@ export async function getFormWithRelatedData(formId: string) {
       }
     }
 
-    console.log('getFormWithRelatedData completed successfully');
+    // getFormWithRelatedData completed successfully
     return {
       form,
       validationRules: validationRules || [],
@@ -346,7 +346,7 @@ export async function createForm(form: FormInsert) {
       throw error;
     }
 
-    console.log('Form created successfully:', data.id);
+          // Form created successfully
     return data;  // Return the complete form data including the ID
   } catch (err) {
     console.error('Exception in createForm:', err);
@@ -387,7 +387,7 @@ export async function updateForm(formId: string, form: FormUpdate) {
       throw error;
     }
 
-    console.log('Form updated successfully:', formId);
+          // Form updated successfully
     return data;  // Return the complete form data
   } catch (err) {
     console.error(`Exception in updateForm for ${formId}:`, err);
@@ -515,7 +515,7 @@ export async function deleteForm(formId: string) {
  */
 export async function restoreForm(formId: string): Promise<Form | null> {
   if (!formId) {
-    console.warn('[formService] restoreForm called with no ID.');
+    // restoreForm called with no ID
     return null;
   }
   try {
@@ -535,7 +535,7 @@ export async function restoreForm(formId: string): Promise<Form | null> {
       }
       throw error;
     }
-    console.log(`[formService] Form ${formId} restored successfully.`);
+          // Form restored successfully
     return data;
   } catch (error) {
     console.error(`[formService] Failed to restore form ${formId}:`, error);

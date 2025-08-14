@@ -132,7 +132,7 @@ const AssetTypes = () => {
     if (supabaseConnected !== null) return supabaseConnected;
     
     try {
-      console.log('Checking Supabase connection...');
+      // Checking Supabase connection
       // Correct syntax for Supabase count query
       const { data, error } = await supabase
         .from('asset_types')
@@ -149,7 +149,7 @@ const AssetTypes = () => {
         return false;
       }
       
-      console.log('Supabase connection successful');
+      // Supabase connection successful
       setSupabaseConnected(true);
       return true;
     } catch (err) {
@@ -189,12 +189,12 @@ const AssetTypes = () => {
         const data = await getAssetTypesWithCounts(supabase, currentOrgId);
         setAssetTypes(data || []);
         setArchivedAssetTypes([]);
-        console.log('Fetched active asset types successfully:', data?.length || 0);
+        // Fetched active asset types successfully
       } else {
         const data = await getArchivedAssetTypesWithCounts(supabase, currentOrgId);
         setArchivedAssetTypes(data || []);
         setAssetTypes([]);
-        console.log('Fetched archived asset types successfully:', data?.length || 0);
+        // Fetched archived asset types successfully
       }
     } catch (error) {
       console.error(`Failed to fetch ${viewMode} asset types:`, error);
@@ -532,7 +532,7 @@ const AssetTypes = () => {
         
         setAssetTypeForms(formsMap);
         
-        console.log(`✅ Performance improvement: Loaded forms for ${assetTypeIds.length} asset types with 1 query instead of ${assetTypeIds.length} queries`);
+        // Performance improvement: Loaded forms with batch query
       } catch (e) {
         console.error('Error batch fetching forms for asset types:', e);
         // Fallback to empty forms map
@@ -655,7 +655,7 @@ const AssetTypes = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={() => {
-                  console.log('Refresh clicked, current loading states:', { isLoading });
+                  // Refresh clicked
                   setIsLoading(false);
                   setTimeout(() => {
                     fetchDataBasedOnViewMode();

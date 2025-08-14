@@ -295,7 +295,7 @@ export function ReportVisualization({
       }
 
       // Success notification
-      console.log('Chart exported successfully', exportData);
+      // Chart exported successfully
     } catch (error) {
       console.error('Export failed:', error);
     }

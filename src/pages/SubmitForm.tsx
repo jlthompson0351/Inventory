@@ -75,36 +75,35 @@ export default function SubmitForm() {
   const [showCalculatedFields, setShowCalculatedFields] = useState(false);
   
   const loadForm = useCallback(async () => {
-    console.log('🚀 SubmitForm - loadForm function called!');
-    console.log('SubmitForm - Parameters:', { id, currentOrganization: !!currentOrganization, fromMobileQR });
+    // loadForm function called
     
     if (!id) {
-      console.log('SubmitForm - Missing form ID, exiting early');
+      // Missing form ID, exiting early
       return;
     }
     
     // For mobile QR workflow, we can proceed without currentOrganization initially
     // We'll get the organization from the form data
     if (!currentOrganization && !fromMobileQR) {
-      console.log('SubmitForm - Missing currentOrganization and not from mobile QR, exiting early');
+      // Missing currentOrganization and not from mobile QR, exiting early
       return;
     }
     
     try {
-      console.log('SubmitForm - Setting loading to true...');
+      // Setting loading to true
       setLoading(true);
       
-      console.log('SubmitForm - Calling getFormWithRelatedData...');
+      // Calling getFormWithRelatedData
       const { form: fetchedForm, validationRules: fetchedValidationRules, fieldDependencies: fetchedFieldDependencies } = await getFormWithRelatedData(id);
-      console.log('SubmitForm - getFormWithRelatedData completed:', { fetchedForm: !!fetchedForm });
+      // getFormWithRelatedData completed
       
       if (fetchedForm) {
-        console.log('SubmitForm - Form found, processing...');
+        // Form found, processing
         
         // For mobile QR, use the organization from the form if currentOrganization is not available
         let workingOrganization = currentOrganization;
         if (!workingOrganization && fromMobileQR && fetchedForm.organization_id) {
-          console.log('SubmitForm - Using organization from form for mobile QR:', fetchedForm.organization_id);
+          // Using organization from form for mobile QR
           workingOrganization = { id: fetchedForm.organization_id };
         }
         
@@ -153,7 +152,7 @@ export default function SubmitForm() {
               currentAssetMetadata = (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) 
                 ? metadata as Record<string, any>
                 : {};
-              console.log('SubmitForm - Fetched base assetMetadata:', currentAssetMetadata);
+              // Fetched base assetMetadata
               
               // Fetch the inventory item for this asset to get the current quantity
               // SKIP for intake forms - we want them to start blank
@@ -166,7 +165,7 @@ export default function SubmitForm() {
                 
                 if (!inventoryError && inventoryItem) {
                   currentAssetMetadata.current_inventory = inventoryItem.quantity;
-                  console.log('SubmitForm - Added current inventory quantity:', inventoryItem.quantity);
+                  // Added current inventory quantity
                   
                   // Fetch the most recent inventory history to get the starting point
                   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -182,15 +181,15 @@ export default function SubmitForm() {
                   if (!historyError && recentHistory) {
                     // Use the most recent past inventory as the starting point
                     currentAssetMetadata.starting_inventory = recentHistory.quantity;
-                    console.log('SubmitForm - Found previous inventory from', recentHistory.month_year, 'with quantity:', recentHistory.quantity);
+                    // Found previous inventory
                   } else {
                     // If no previous history, use current inventory as starting point
                     currentAssetMetadata.starting_inventory = inventoryItem.quantity;
-                    console.log('SubmitForm - No previous history found, using current inventory as starting point');
+                    // No previous history found, using current inventory as starting point
                   }
                 }
               } else {
-                console.log('SubmitForm - Skipping inventory pre-population for intake form');
+                // Skipping inventory pre-population for intake form
               }
               
               // Check for existing submissions this month
@@ -229,9 +228,7 @@ export default function SubmitForm() {
                       ? JSON.parse(latestSubmission.submission_data)
                       : latestSubmission.submission_data;
                     
-                    console.log('SubmitForm - Found existing submission from', latestSubmission.created_at);
-                    console.log('SubmitForm - Loading existing data:', existingData);
-                    console.log('SubmitForm - finalMergedData BEFORE merging existing:', { ...finalMergedData });
+                                  // Found existing submission
                     
                     // Override finalMergedData with existing submission data
                     // Latest submission data should take priority over everything else
@@ -239,15 +236,15 @@ export default function SubmitForm() {
                       finalMergedData[key] = existingData[key];
                     });
                     
-                    console.log('SubmitForm - finalMergedData AFTER merging existing:', { ...finalMergedData });
+                    // finalMergedData AFTER merging existing
                   } else if (!editExisting) {
                     // For new entries, still need to ensure we have current inventory
                     // This was already fetched above but make sure it's available
-                    console.log('SubmitForm - Creating new entry with current inventory:', currentAssetMetadata.current_inventory);
+                    // Creating new entry with current inventory
                   }
                 }
               } else {
-                console.log('SubmitForm - Skipping existing submission check (no working organization)');
+                // Skipping existing submission check (no working organization)
               }
             } else if (assetError) {
               console.error('SubmitForm - Error fetching asset data:', assetError);
@@ -273,7 +270,7 @@ export default function SubmitForm() {
             }
             
             if (assetTypeData?.conversion_fields) {
-              console.log('SubmitForm - Found conversion_fields in asset_type:', assetTypeData.conversion_fields);
+              // Found conversion_fields in asset_type
               const conversionFields = assetTypeData.conversion_fields as any[];
               const metadataWithDefaults = { ...currentAssetMetadata }; // Start with current asset's metadata
               
@@ -285,22 +282,22 @@ export default function SubmitForm() {
                     if (!(cf.field_name in metadataWithDefaults)) {
                       // Use 1.0 as default for conversion fields instead of 0 so math works
                       const defaultValue = cf.field_name.startsWith('convert_') ? 1.0 : (cf.default_value !== undefined ? cf.default_value : 0);
-                      console.warn(`SubmitForm - Adding default (${defaultValue}) for missing conversion field: ${cf.field_name}`);
+                      // Adding default for missing conversion field
                       metadataWithDefaults[cf.field_name] = defaultValue;
                     } else {
-                      console.log(`SubmitForm - Using existing value for conversion field ${cf.field_name}:`, metadataWithDefaults[cf.field_name]);
+                      // Using existing value for conversion field
                     }
                   }
                 });
               }
               
               currentAssetMetadata = metadataWithDefaults;
-              console.log('SubmitForm - assetMetadata after adding conversion fields:', currentAssetMetadata);
+              // assetMetadata after adding conversion fields
             } else {
-              console.log('SubmitForm - No conversion_fields found for asset_type_id:', actualAssetTypeId);
+              // No conversion_fields found for asset_type_id
             }
           } else {
-            console.log('SubmitForm - No asset_type_id available to fetch conversion_fields.');
+            // No asset_type_id available to fetch conversion_fields
           }
         }
         
@@ -321,7 +318,7 @@ export default function SubmitForm() {
                 }
               });
             } else if (formType === 'intake') {
-              console.log('SubmitForm - Skipping form field pre-population for intake form');
+              // Skipping form field pre-population for intake form
             }
             
             finalMergedData = await applyFormulaMappings(
@@ -329,7 +326,7 @@ export default function SubmitForm() {
               assetDataForEffect.asset_type_id,
               currentAssetMetadata // Use metadata with conversion defaults
             );
-            console.log('SubmitForm - finalMergedData after applyFormulaMappings:', finalMergedData);
+            // finalMergedData after applyFormulaMappings
           } catch (mappingError) {
             console.error('SubmitForm - Error applying formula mappings:', mappingError);
           }
@@ -339,7 +336,7 @@ export default function SubmitForm() {
         if (Object.keys(calculationFormulas).length > 0) {
           setHasFormulaFields(true);
           try {
-            console.log('SubmitForm - Applying asset-specific calculationFormulas using assetMetadata:', currentAssetMetadata);
+                          // Applying asset-specific calculationFormulas
             const processedData = await applyAssetCalculationFormulas(
               supabase,
               finalMergedData, // Current form data
@@ -349,7 +346,7 @@ export default function SubmitForm() {
             
             if (processedData) {
               finalMergedData = processedData;
-              console.log('SubmitForm - finalMergedData after applyAssetCalculationFormulas:', finalMergedData);
+              // finalMergedData after applyAssetCalculationFormulas
             }
           } catch (formulaError) {
             console.error('SubmitForm - Error applying asset-specific calculation formulas:', formulaError);
@@ -362,22 +359,20 @@ export default function SubmitForm() {
         // For now, let's assume formData is primary.
         setMergedFormData(finalMergedData); 
         
-        console.log('SubmitForm - Final assetMetadata for FormRenderer:', currentAssetMetadata);
-        console.log('SubmitForm - Final formData for FormRenderer:', finalMergedData);
+                  // Final assetMetadata and formData for FormRenderer
         
         // Debug: Show what will be passed as mappedFields
-        console.log('SubmitForm - Mapped fields for calculations:', currentAssetMetadata);
-        console.log('SubmitForm - Available conversion fields in mappedFields:');
+                  // Mapped fields for calculations
         Object.entries(currentAssetMetadata).forEach(([key, value]) => {
-          console.log(`  - ${key}: ${value} (type: ${typeof value})`);
+                      // Conversion field value
         });
         
         // Additional debugging to ensure conversion fields are numbers
-        console.log('SubmitForm - Conversion fields as numbers:');
+                  // Conversion fields as numbers
         Object.entries(currentAssetMetadata).forEach(([key, value]) => {
           if (key.startsWith('convert_')) {
             const numValue = Number(value);
-            console.log(`  - ${key}: original="${value}" numeric=${numValue} isNaN=${isNaN(numValue)}`);
+                          // Conversion field numeric value
           }
         });
         
@@ -388,23 +383,23 @@ export default function SubmitForm() {
             : fetchedForm.form_data;
           debugFormFields = parsedData?.fields || [];
         }
-        console.log('SubmitForm - DEBUG: Form fields with mapped.convert formulas:', debugFormFields.filter((f: any) => f.formula?.includes('mapped.convert')));
+                  // DEBUG: Form fields with mapped.convert formulas
         
         // Log specific examples of formula fields
         debugFormFields.forEach((field: any) => {
           if (field.formula?.includes('mapped.convert')) {
-            console.log(`SubmitForm - Field "${field.label}" (${field.id}) formula: ${field.formula}`);
+                          // Field formula
             // Extract the conversion field name from the formula
             const match = field.formula.match(/\{mapped\.(convert_[^}]+)\}/);
             if (match) {
               const conversionField = match[1];
-              console.log(`  - Requires: ${conversionField} = ${currentAssetMetadata[conversionField]}`);
+                                // Requires conversion field
             }
           }
         });
 
       } else {
-        console.log('SubmitForm - No form found!');
+                  // No form found
         toast({
           title: 'Form Not Found',
           description: 'The requested form could not be found',
@@ -419,7 +414,7 @@ export default function SubmitForm() {
         variant: 'destructive',
       });
     } finally {
-      console.log('SubmitForm - Setting loading to false...');
+      // Setting loading to false
       setLoading(false);
     }
   }, [id, currentOrganization?.id, assetId, prefillData, calculationFormulas, formType, forceNewEntry, actionParam, assetTypeId, fromMobileQR]);
@@ -433,7 +428,7 @@ export default function SubmitForm() {
     let workingOrganization = currentOrganization;
     if (!workingOrganization && fromMobileQR && form?.organization_id) {
       workingOrganization = { id: form.organization_id };
-      console.log('SubmitForm - Using organization from form for submission:', form.organization_id);
+              // Using organization from form for submission
     }
     
     if (!workingOrganization || !id) {
@@ -452,13 +447,7 @@ export default function SubmitForm() {
       // Get asset type ID from multiple sources
       const submissionAssetTypeId = assetTypeId || fetchedAssetTypeId || prefillData.asset_type_id || form.asset_type_id;
       
-      console.log('SubmitForm - AssetTypeId sources:', {
-        fromState: assetTypeId,
-        fromFetchedAsset: fetchedAssetTypeId,
-        fromPrefillData: prefillData.asset_type_id,
-        fromForm: form.asset_type_id,
-        final: submissionAssetTypeId
-      });
+      // AssetTypeId sources determined
       
       if (isEditingExisting && existingSubmissionId) {
         // Update existing submission
@@ -511,7 +500,7 @@ export default function SubmitForm() {
                   if (updateError) {
                     console.error('Error updating inventory:', updateError);
                   } else {
-                    console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
+                    // Inventory updated
                     
                     // Get current asset to preserve existing metadata (especially conversion rates)
                     const { data: currentAsset, error: assetFetchError } = await supabase
@@ -539,7 +528,7 @@ export default function SubmitForm() {
                       if (assetUpdateError) {
                         console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
                       } else {
-                        console.log('Asset metadata updated while preserving conversion rates');
+                        // Asset metadata updated while preserving conversion rates
                       }
                     }
                     
@@ -636,7 +625,7 @@ export default function SubmitForm() {
                 if (updateError) {
                   console.error('Error updating inventory:', updateError);
                 } else {
-                  console.log(`Inventory updated: ${newQuantity} gallons (stored as ${roundedQuantity} in database)`);
+                  // Inventory updated
                   
                   // Get current asset to preserve existing metadata (especially conversion rates)
                   const { data: currentAsset, error: assetFetchError } = await supabase
@@ -664,7 +653,7 @@ export default function SubmitForm() {
                     if (assetUpdateError) {
                       console.error('Error updating asset metadata with exact quantity:', assetUpdateError);
                     } else {
-                      console.log('Asset metadata updated while preserving conversion rates');
+                      // Asset metadata updated while preserving conversion rates
                     }
                   }
                   
