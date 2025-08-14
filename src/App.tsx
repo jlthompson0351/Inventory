@@ -156,8 +156,8 @@ const AppRoutes = () => {
         
         {/* Reporting Routes */}
         <Route path="/reports" element={user ? <PageLayout><Reports /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/new" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
-        <Route path="/reports/:id" element={user ? <PageLayout><ReportBuilder /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/reports/new" element={user ? <Navigate to="/reports" /> : <Navigate to="/login" />} />
+        <Route path="/reports/:id" element={user ? <Navigate to="/reports" /> : <Navigate to="/login" />} />
         <Route path="/data-quality" element={user ? <PageLayout><DataQualityDashboard /></PageLayout> : <Navigate to="/login" />} />
         
         {/* User and Organization Settings Routes */}
