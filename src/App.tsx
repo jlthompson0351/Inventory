@@ -16,6 +16,10 @@ import Assets from "./pages/Assets";
 import NewAsset from "./pages/NewAsset";
 import AssetDetail from "./pages/AssetDetail";
 import AssetQRManager from "./pages/AssetQRManager";
+import AssetInventoryDetail from "./pages/AssetInventoryDetail";
+import AssetInventoryHistory from "./pages/AssetInventoryHistory";
+import CreateAssetInventory from "./pages/CreateAssetInventory";
+import InventoryHistoryCorrection from "./pages/InventoryHistoryCorrection";
 import Reports from "./pages/Reports";
 import NewReportBuilder from "./pages/NewReportBuilder";
 import Login from "./pages/Login";
@@ -32,6 +36,8 @@ import DataQualityDashboard from "./pages/DataQualityDashboard";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import LoadingScreen from "./components/common/LoadingScreen";
 import { usePasswordRequirement } from "./hooks/usePasswordRequirement";
+import { getInventoryItem } from "./services/inventoryService";
+import { useParams, useNavigate } from "react-router-dom";
 import { ForcePasswordChange } from "./components/auth/ForcePasswordChange";
 import FormPreview from "./pages/FormPreview";
 import AssetTypeDetail from "./pages/AssetTypeDetail";
@@ -59,6 +65,39 @@ import React, { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 
 // Create a new query client for React Query
 const queryClient = new QueryClient();
+
+// Redirect component for legacy inventory history routes
+function InventoryHistoryRedirect() {
+  const { inventoryItemId } = useParams<{ inventoryItemId: string }>();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const redirectToAssetHistory = async () => {
+      if (!inventoryItemId) {
+        navigate('/inventory');
+        return;
+      }
+      
+      try {
+        const inventoryItem = await getInventoryItem(inventoryItemId);
+        if (inventoryItem?.asset_id) {
+          // Redirect to asset-centric history route
+          navigate(`/assets/${inventoryItem.asset_id}/inventory/history`);
+        } else {
+          // Keep legacy route if no asset_id (orphaned inventory)
+          navigate(`/inventory/item/${inventoryItemId}`);
+        }
+      } catch (error) {
+        console.error('Error redirecting inventory history:', error);
+        navigate('/inventory');
+      }
+    };
+    
+    redirectToAssetHistory();
+  }, [inventoryItemId, navigate]);
+  
+  return <LoadingScreen />;
+}
 
 /**
  * AppRoutes Component
@@ -150,7 +189,20 @@ const AppRoutes = () => {
         <Route path="/assets/new" element={user ? <PageLayout><NewAsset /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/assets/:id" element={user ? <PageLayout><AssetDetail /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/assets/:id/edit" element={user ? <PageLayout><NewAsset /></PageLayout> : <Navigate to="/login" />} />
+        
+        {/* Asset-Centric Inventory Routes (NEW CONSISTENT PATTERN) */}
+        <Route path="/assets/:assetId/inventory" element={user ? <PageLayout><AssetInventoryDetail /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/assets/:assetId/inventory/check" element={user ? <PageLayout><InventoryCheck /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/assets/:assetId/inventory/history" element={user ? <PageLayout><AssetInventoryHistory /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/assets/:assetId/inventory/create" element={user ? <PageLayout><CreateAssetInventory /></PageLayout> : <Navigate to="/login" />} />
+        <Route path="/assets/:assetId/inventory/correct/:historyId" element={user ? <PageLayout><InventoryHistoryCorrection /></PageLayout> : <Navigate to="/login" />} />
+        
+        {/* Legacy inventory-check route - redirect to new pattern */}
         <Route path="/assets/:assetId/inventory-check" element={user ? <PageLayout><InventoryCheck /></PageLayout> : <Navigate to="/login" />} />
+        
+        {/* Redirect legacy inventory history routes to asset-centric pattern */}
+        <Route path="/inventory/:inventoryItemId/history" element={<InventoryHistoryRedirect />} />
+        
         <Route path="/assets/scan/:qrCode" element={user ? <PageLayout><ScanAsset /></PageLayout> : <Navigate to="/login" />} />
         <Route path="/assets/qr-manager" element={user ? <PageLayout><AssetQRManager /></PageLayout> : <Navigate to="/login" />} />
         

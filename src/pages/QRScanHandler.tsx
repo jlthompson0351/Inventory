@@ -200,7 +200,8 @@ const QRScanHandler: React.FC = () => {
     if (formType === 'intake') {
       navigate(`/inventory/add?assetId=${asset.id}&formId=${formId}`);
     } else {
-      navigate(`/inventory/check?assetId=${asset.id}&formId=${formId}`);
+      // Use the correct inventory check route
+      navigate(`/assets/${asset.id}/inventory-check`);
     }
   };
 

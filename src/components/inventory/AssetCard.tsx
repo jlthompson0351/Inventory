@@ -89,7 +89,7 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
 
   const handleInventoryHistory = () => {
     if (inventoryItemId) {
-      navigate(`/inventory/${inventoryItemId}/history`);
+      navigate(`/assets/${asset.id}/inventory/history`);
     } else {
       console.error("No inventory item found for this asset");
     }

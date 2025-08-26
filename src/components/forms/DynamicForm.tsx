@@ -186,7 +186,7 @@ export default function DynamicForm({
     if (onChange) {
       onChange({ ...values, ...newCalculatedValues });
     }
-  }, [values, formSchema, onChange]);
+  }, [values, formSchema]); // Removed onChange from dependencies to prevent infinite loop
 
   // Update field visibility based on conditions
   useEffect(() => {

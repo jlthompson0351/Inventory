@@ -15,7 +15,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { createInventoryItem, InventoryItemInsert } from "@/services/inventoryService";
+import { InventoryItemInsert } from "@/services/inventoryService";
 import { getAssetTypes, AssetType } from "@/services/assetTypeService";
 
 const NewItem = () => {
@@ -107,18 +107,18 @@ const NewItem = () => {
         organization_id: currentOrganization.id
       };
       
-      // Create the item
-      const newItem = await createInventoryItem(itemData);
+      // DEPRECATED: Direct inventory creation is no longer supported
+      // Redirect to asset-based workflow
+      toast({
+        title: "Workflow Changed",
+        description: "Please create an asset first, then add inventory to it.",
+        variant: "destructive"
+      });
+      navigate("/assets/new");
+      return;
       
-      if (newItem) {
-        toast({
-          title: "Item Created",
-          description: `${formData.name} has been added to inventory.`,
-        });
-        navigate("/inventory");
-      } else {
-        throw new Error("Failed to create item");
-      }
+      // This code path is now unreachable due to the redirect above
+      // Keeping for reference but will never execute
     } catch (error) {
       console.error("Error creating item:", error);
       toast({

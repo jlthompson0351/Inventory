@@ -844,55 +844,103 @@ export type Database = {
       }
       inventory_history: {
         Row: {
+          adjustment_reason: string | null
+          calculation_metadata: Json | null
           check_date: string | null
           check_type: string
           condition: string | null
           created_at: string | null
           created_by: string | null
+          deleted_at: string | null
+          edit_history: Json | null
           event_type: string
           id: string
           inventory_item_id: string | null
+          is_deleted: boolean | null
           location: string | null
           month_year: string | null
+          movement_type:
+            | Database["public"]["Enums"]["inventory_movement_type"]
+            | null
           notes: string | null
           organization_id: string | null
+          previous_quantity: number | null
           quantity: number | null
+          related_entity_id: string | null
+          related_entity_type: string | null
           response_data: Json | null
           status: string | null
+          updated_at: string | null
+          validated_at: string | null
+          validated_by: string | null
+          validation_notes: string | null
+          validation_status: string | null
         }
         Insert: {
+          adjustment_reason?: string | null
+          calculation_metadata?: Json | null
           check_date?: string | null
           check_type: string
           condition?: string | null
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
+          edit_history?: Json | null
           event_type?: string
           id?: string
           inventory_item_id?: string | null
+          is_deleted?: boolean | null
           location?: string | null
           month_year?: string | null
+          movement_type?:
+            | Database["public"]["Enums"]["inventory_movement_type"]
+            | null
           notes?: string | null
           organization_id?: string | null
+          previous_quantity?: number | null
           quantity?: number | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
           response_data?: Json | null
           status?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_notes?: string | null
+          validation_status?: string | null
         }
         Update: {
+          adjustment_reason?: string | null
+          calculation_metadata?: Json | null
           check_date?: string | null
           check_type?: string
           condition?: string | null
           created_at?: string | null
           created_by?: string | null
+          deleted_at?: string | null
+          edit_history?: Json | null
           event_type?: string
           id?: string
           inventory_item_id?: string | null
+          is_deleted?: boolean | null
           location?: string | null
           month_year?: string | null
+          movement_type?:
+            | Database["public"]["Enums"]["inventory_movement_type"]
+            | null
           notes?: string | null
           organization_id?: string | null
+          previous_quantity?: number | null
           quantity?: number | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
           response_data?: Json | null
           status?: string | null
+          updated_at?: string | null
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_notes?: string | null
+          validation_status?: string | null
         }
         Relationships: [
           {
@@ -921,6 +969,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_history_validated_by_fkey"
+            columns: ["validated_by"]
+            isOneToOne: false
+            referencedRelation: "users_view"
             referencedColumns: ["id"]
           },
         ]

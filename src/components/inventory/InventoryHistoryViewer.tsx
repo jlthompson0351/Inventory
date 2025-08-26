@@ -333,7 +333,7 @@ export const InventoryHistoryViewer: React.FC<InventoryHistoryViewerProps> = ({ 
           <Card className="mb-4 border-l-4 border-l-amber-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                📊 Monthly Usage Summary
+                Monthly Usage Summary
                 <Badge variant="outline" className="text-xs">
                   {usageSummary.length} months tracked
                 </Badge>

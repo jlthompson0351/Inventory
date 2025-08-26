@@ -11,7 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import VisualFormulaBuilder from './VisualFormulaBuilder';
+import ExcelFormulaBuilder from './ExcelFormulaBuilder';
 
 export interface FormField {
   id: string;
@@ -69,7 +69,6 @@ export const FormFieldCard: React.FC<FormFieldCardProps> = ({
     date: 'Date',
     checkbox: 'Checkbox',
     calculated: 'Calculated Field',
-    current_inventory: 'Current Inventory',
   };
 
   const getInventoryActionBadge = () => {
@@ -200,17 +199,7 @@ export const FormFieldCard: React.FC<FormFieldCardProps> = ({
           <Input type="number" disabled placeholder={field.placeholder} />
         )}
         
-        {field.type === "current_inventory" && (
-          <div>
-            <Input 
-              type="number" 
-              disabled 
-              placeholder={field.placeholder || "Enter initial quantity"} 
-              className="border-amber-300"
-            />
-            <p className="text-xs text-amber-600 mt-1">Initial inventory value</p>
-          </div>
-        )}
+
         
         {field.type === "textarea" && (
           <Textarea disabled placeholder={field.placeholder} />
@@ -238,13 +227,12 @@ export const FormFieldCard: React.FC<FormFieldCardProps> = ({
         {field.type === "calculated" && (
           <div>
             <div className="space-y-4">
-              <VisualFormulaBuilder
+              <ExcelFormulaBuilder
                 formula={field.formula || ''}
                 onChange={onUpdateFormula}
                 currentFields={allFields.filter(f => f.id !== field.id)}
                 mappedFields={mappedFields}
                 onPreview={onPreviewCalculation}
-                resetToTextMode={resetFormulaToTextMode}
               />
               {field.formula && (
                 <div className="mt-2 text-sm text-muted-foreground bg-gray-50 p-2 rounded">

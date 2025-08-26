@@ -167,7 +167,7 @@ export function safeEval(expression: string): number | undefined {
  * FormBuilder-specific evaluation functions
  */
 export const FormBuilderEvaluator = {
-  // Line 206 replacement: Formula validation
+  // Line 206 replacement: Formula validation (supports both {field_1} and [Field Name] syntax)
   validateFormula(formula: string, currentFields: FormField[] = [], mappedFields: any[] = []): ValidationResult {
     const result: ValidationResult = {
       isValid: true,
@@ -175,13 +175,32 @@ export const FormBuilderEvaluator = {
       referencedMappedFields: [],
     };
 
-    // Find all field references
+    // Find all field references - both old {field_1} and new [Field Name] syntax
     const fieldMatches = formula.match(/\{field_\d+\}/g) || [];
     result.referencedFields = fieldMatches.map(m => m.slice(1, -1));
     
+    // Find bracket field references [Field Name]
+    const bracketMatches = formula.match(/\[[^\]]+\]/g) || [];
+    bracketMatches.forEach(match => {
+      const fieldName = match.slice(1, -1);
+      // Check if it's an asset field like [Asset.Field Name]
+      if (fieldName.includes('.')) {
+        const [source, fieldLabel] = fieldName.split('.', 2);
+        if (source === 'Asset' || mappedFields.some(f => f.form_name === source)) {
+          result.referencedMappedFields.push(`mapped.${fieldLabel}`);
+        }
+      } else {
+        // Regular form field [Field Name]
+        const field = currentFields.find(f => f.label === fieldName);
+        if (field) {
+          result.referencedFields.push(field.id);
+        }
+      }
+    });
+    
     // Find all mapped field references
     const mappedMatches = formula.match(/\{mapped\.[a-zA-Z0-9_]+\}/g) || [];
-    result.referencedMappedFields = mappedMatches.map(m => m.slice(1, -1));
+    result.referencedMappedFields.push(...mappedMatches.map(m => m.slice(1, -1)));
     
     // Check if referenced fields exist
     const nonExistentFields = result.referencedFields.filter(
@@ -257,7 +276,7 @@ export const FormBuilderEvaluator = {
     return sampleResult;
   },
 
-  // Line 762 replacement: Actual calculation with formatting
+  // Line 762 replacement: Actual calculation with formatting (supports both {field_1} and [Field Name] syntax)
   calculateWithFormatting(formula: string, formFields: FormField[], mockValues: Record<string, any>): string {
     if (!formula || formula.trim() === '') {
       return "No formula";
@@ -265,7 +284,31 @@ export const FormBuilderEvaluator = {
     
     let processedFormula = formula;
     try {
-      // First, replace mapped field references
+      // First, replace bracket syntax [Field Name] with values
+      const bracketMatches = formula.match(/\[[^\]]+\]/g) || [];
+      bracketMatches.forEach(match => {
+        const fieldName = match.slice(1, -1);
+        let value = 0;
+        
+        // Check if it's an asset field like [Asset.Field Name]
+        if (fieldName.includes('.')) {
+          const [source, fieldLabel] = fieldName.split('.', 2);
+          const mappedKey = `mapped.${fieldLabel}`;
+          if (mockValues[mappedKey] !== undefined) {
+            value = parseFloat(mockValues[mappedKey]) || 0;
+          }
+        } else {
+          // Regular form field [Field Name]
+          const field = formFields.find(f => f.label === fieldName);
+          if (field && mockValues[field.id] !== undefined) {
+            value = parseFloat(mockValues[field.id]) || 0;
+          }
+        }
+        
+        processedFormula = processedFormula.replace(match, String(value));
+      });
+      
+      // Then replace legacy brace syntax for backward compatibility
       for (const key in mockValues) {
         const value = mockValues[key];
         if (value !== '' && value !== undefined && value !== null) {

@@ -66,7 +66,7 @@ import { Badge } from "@/components/ui/badge";
 import { addAssetTypeFormLink, getFormAssetTypeLinks } from '@/services/assetTypeService';
 import { registerMappedField, unregisterMappedField } from "@/services/mappedFieldService";
 import { getAssetTypes } from "@/services/assetTypeService";
-import VisualFormulaBuilder from '@/components/forms/VisualFormulaBuilder';
+import ExcelFormulaBuilder from '@/components/forms/ExcelFormulaBuilder';
 import { FormBuilderEvaluator } from '@/utils/safeEvaluator';
 
 // Field type options
@@ -78,7 +78,6 @@ const fieldTypes = [
   { value: "date", label: "Date" },
   { value: "checkbox", label: "Checkbox" },
   { value: "calculated", label: "Calculated Field" },
-  { value: "current_inventory", label: "Current Inventory" },
 ];
 
 // Initial form data
@@ -395,17 +394,7 @@ const FieldRow = memo(function FieldRow({
           <Input type="number" disabled placeholder={field.placeholder} />
         )}
         
-        {field.type === "current_inventory" && (
-          <div>
-            <Input 
-              type="number" 
-              disabled 
-              placeholder={field.placeholder || "Enter initial quantity"} 
-              className="border-amber-300"
-            />
-            <p className="text-xs text-amber-600 mt-1">Initial inventory value</p>
-          </div>
-        )}
+
         
         {field.type === "textarea" && (
           <Textarea disabled placeholder={field.placeholder} />
@@ -433,7 +422,7 @@ const FieldRow = memo(function FieldRow({
         {field.type === "calculated" && (
           <div>
             <div className="space-y-4">
-              <VisualFormulaBuilder
+              <ExcelFormulaBuilder
                 formula={field.formula || ''}
                 onChange={(formula) => updateField(field.id, 'formula', formula)}
                 currentFields={formData.fields.filter(f => f.id !== field.id)}
@@ -690,17 +679,15 @@ const FormBuilder = () => {
   const addFieldOfType = useCallback((type: string) => {
     const newField: FormField = {
       id: generateFieldId(),
-      label: type === "current_inventory" ? "Current Inventory" : 
-             type === "calculated" ? "Calculated Field" : "New Field",
+      label: type === "calculated" ? "Calculated Field" : "New Field",
       type: type,
-      required: type === "current_inventory",
-      placeholder: type === "current_inventory" ? "Enter current inventory count" : 
-                   type === "number" ? "Enter number" : 
+      required: false,
+      placeholder: type === "number" ? "Enter number" : 
                    type === "calculated" ? "Will be calculated automatically" : "Enter value",
       options: [],
       formula: "",
       description: "",
-      mappable: type === "current_inventory" || type === "calculated",
+      mappable: type === "calculated",
       inventory_action: 'none'
     };
     
@@ -1611,7 +1598,7 @@ const FormBuilder = () => {
                         </div>
 
                         {/* Enhanced Inventory Action selector for number and calculated fields */}
-                        {(field.type === "number" || field.type === "calculated" || field.type === "current_inventory") && (
+                        {(field.type === "number" || field.type === "calculated") && (
                           <div className="space-y-3">
                             <Label htmlFor="inventoryAction" className="text-sm font-medium">Inventory Action</Label>
                             <Select
@@ -1725,14 +1712,7 @@ const FormBuilder = () => {
                           />
                         </div>
                         
-                        {field.type === "current_inventory" && (
-                          <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
-                            <p className="text-sm text-amber-800">
-                              This field will be used as the baseline for inventory tracking. The initial value 
-                              will be used to create an inventory item with the specified quantity.
-                            </p>
-                          </div>
-                        )}
+
                         
                         {field.type === "select" && (
                           <div>
@@ -1810,10 +1790,7 @@ const FormBuilder = () => {
                         </Button>
                       ) : (
                         <div className="space-y-2">
-                          <Button variant="outline" size="sm" onClick={() => addFieldOfType("current_inventory")} className="w-full">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Inventory Field
-                          </Button>
+
                           <Button variant="ghost" size="sm" onClick={addField} className="w-full">
                             <Plus className="mr-2 h-4 w-4" />
                             Add Basic Field

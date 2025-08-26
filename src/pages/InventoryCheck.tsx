@@ -9,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, ArrowLeft, Clipboard, ClipboardCheck } from 'lucide-react';
 import { useOrganization } from '@/hooks/useOrganization';
-import { supabase } from '@/integrations/supabase/client';
-import { getAssetById } from '@/services/assetService';
-import { recordNewInventoryCheck } from '@/services/inventoryService';
+import { getAssetWithInventory, recordAssetInventoryCheck } from '@/services/assetInventoryService';
 import { getFormById } from '@/services/formService';
+import { getAssetTypeById } from '@/services/assetTypeService';
 import DynamicForm from '@/components/forms/DynamicForm';
 
 const conditionOptions = [
@@ -92,8 +91,8 @@ const InventoryCheck = () => {
     try {
       setLoading(true);
       
-      // Fetch asset data
-      const assetData = await getAssetById(assetId!);
+      // Use new asset-centric service
+      const assetData = await getAssetWithInventory(assetId!);
       if (!assetData) {
         toast({
           title: "Error",
@@ -106,78 +105,47 @@ const InventoryCheck = () => {
       
       setAsset(assetData);
       
-      // Set initial location, notes, condition from asset if available
-      let initialLocation = '';
-      let initialNotes = '';
-      let initialCondition = '';
-      let initialStaticQuantity = 0;
-
-      if (assetData.metadata && typeof assetData.metadata === 'object' && !Array.isArray(assetData.metadata)) {
-        const meta = assetData.metadata as Record<string, any>;
-        initialLocation = meta.location || '';
-        initialNotes = meta.notes || '';
-        initialCondition = meta.condition || '';
-        initialStaticQuantity = typeof meta.current_inventory === 'number' ? meta.current_inventory : 0;
-      }
-      initialLocation = assetData.location || initialLocation; // asset.location can override metadata.location
-
+      // Pre-fill form with current data
       setFormData(prev => ({
         ...prev,
-        quantity: initialStaticQuantity, // For static fallback form
-        location: initialLocation,
-        notes: initialNotes,
-        condition: initialCondition
+        quantity: assetData.current_quantity || 0,
+        location: assetData.asset_location || '',
+        condition: '',
+        notes: ''
       }));
 
-      // Fetch the asset type to get the inventory_form_id
+      // Load inventory form if asset type has one
       if (assetData.asset_type_id) {
-        const { data: assetTypeData, error: assetTypeError } = await supabase
-          .from('asset_types')
-          .select('inventory_form_id')
-          .eq('id', assetData.asset_type_id)
-          .single();
-
-        if (assetTypeError) {
-          console.error('Error fetching asset type:', assetTypeError);
-          toast({ title: "Error", description: "Could not load asset type details.", variant: "destructive" });
-        } else if (assetTypeData && assetTypeData.inventory_form_id) {
+        const assetTypeData = await getAssetTypeById(assetData.asset_type_id);
+        
+        if (assetTypeData?.inventory_form_id) {
           const formDef = await getFormById(assetTypeData.inventory_form_id);
-          if (formDef && formDef.form_data) {
+          if (formDef?.form_data) {
             try {
               const schema = typeof formDef.form_data === 'string' ? JSON.parse(formDef.form_data) : formDef.form_data;
               setInventoryFormSchema(schema);
             } catch (e) {
               console.error("Error parsing inventory form schema", e);
-              toast({ title: "Error", description: "Could not parse inventory form.", variant: "destructive" });
+              toast({ 
+                title: "Error", 
+                description: "Could not parse inventory form.", 
+                variant: "destructive" 
+              });
             }
           }
-        } else {
-          toast({ title: "Info", description: "No specific inventory form linked to this asset type.", variant: "default" });
         }
       }
       
-      // Fetch the most recent inventory record for reference
-      const { data: inventoryData, error: inventoryError } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .eq('asset_id', assetId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-        
-      if (inventoryError) {
-        console.error('Error fetching inventory data:', inventoryError);
-      } else if (inventoryData) {
-        setLastInventory(inventoryData);
-        
-        // Pre-fill static form data further from lastInventory, if not already better set by assetData
-        setFormData(prev => ({
-          quantity: prev.quantity || inventoryData.quantity || 0,
-          condition: prev.condition || (inventoryData.metadata && typeof inventoryData.metadata === 'object' && !Array.isArray(inventoryData.metadata) && (inventoryData.metadata as Record<string,any>).condition as string) || '',
-          location: prev.location || inventoryData.location || '',
-          notes: prev.notes // Notes are generally new per check, so don't override from last inventory unless prev.notes is empty
-        }));
+      // Set last inventory reference for display
+      if (assetData.has_inventory) {
+        setLastInventory({
+          quantity: assetData.current_quantity,
+          location: assetData.asset_location,
+          created_at: assetData.last_check_date,
+          metadata: { condition: assetData.inventory_status }
+        });
       }
+      
     } catch (error) {
       console.error('Error fetching asset data:', error);
       toast({
@@ -206,10 +174,10 @@ const InventoryCheck = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!assetId || !currentOrganization || !asset) {
+    if (!assetId) {
       toast({
         title: "Error",
-        description: "Missing required data",
+        description: "Missing asset ID",
         variant: "destructive",
       });
       return;
@@ -218,75 +186,48 @@ const InventoryCheck = () => {
     try {
       setSubmitting(true);
       
-      let finalQuantity = 0;
-      const notes = formData.notes; 
-      const location = formData.location; 
-      const condition = formData.condition; 
-      const status = asset.status;
-      const responseData = { ...dynamicFormValues }; // Start with dynamic form values
-
-      if (inventoryFormSchema && Object.keys(dynamicFormValues).length > 0) {
-        const { newQuantity, foundAction } = computeNewInventoryQuantity(
-          lastInventory?.quantity || (asset.metadata && typeof asset.metadata === 'object' && (asset.metadata as Record<string,any>).current_inventory) || 0, // Base quantity
-          inventoryFormSchema,
-          dynamicFormValues
-        );
-        finalQuantity = newQuantity;
-
-        // If dynamic form has fields for these, they are already in dynamicFormValues / responseData
-        // If not, the static formData values will be used for notes, location, condition for the history record.
-        // We can ensure they are part of responseData if not already overridden by a dynamic field.
-        if (dynamicFormValues.notes === undefined) responseData.notes = notes;
-        if (dynamicFormValues.location === undefined) responseData.location = location;
-        if (dynamicFormValues.condition === undefined) responseData.condition = condition;
-
-      } else {
-        finalQuantity = Number(formData.quantity);
-        // If using static form, ensure static fields are in responseData for logging
-        responseData.quantity = finalQuantity;
-        responseData.notes = notes;
-        responseData.location = location;
-        responseData.condition = condition;
-      }
-      
-      await recordNewInventoryCheck(
-        assetId,
-        {
-          quantity: finalQuantity, // This is the key field for inventory_items update
-          // location, notes, status are taken from response_data or inventoryItem by recordNewInventoryCheck
-          status: status, // Pass overall asset status
-          check_date: new Date(), 
-          response_data: responseData, 
-          form_schema: inventoryFormSchema 
-        }
-      );
-      
-      // Update the asset's metadata (current_inventory and last_inventory_check)
-      // This might be redundant if recordNewInventoryCheck already updates inventory_items.quantity
-      // and assets.metadata.current_inventory is just a denormalized view of that.
-      // For now, keeping it as it was, but this could be reviewed.
-      const updatedMetadata = {
-        ...(asset.metadata || {}),
-        current_inventory: finalQuantity, // Update with the computed/submitted quantity
-        last_inventory_check: new Date().toISOString(),
-        // Persist other dynamic form values to asset metadata if needed (optional)
-        // ...dynamicFormValues 
+      // Prepare check data
+      const checkData = {
+        quantity: Number(formData.quantity),
+        location: formData.location,
+        condition: formData.condition,
+        notes: formData.notes,
+        status: formData.status || 'active',
+        response_data: Object.keys(dynamicFormValues).length > 0 ? {
+          ...dynamicFormValues,
+          // Include static form data as fallback
+          _static_quantity: formData.quantity,
+          _static_location: formData.location,
+          _static_condition: formData.condition,
+          _static_notes: formData.notes
+        } : {
+          quantity: formData.quantity,
+          location: formData.location,
+          condition: formData.condition,
+          notes: formData.notes
+        },
+        form_schema: inventoryFormSchema
       };
       
-      await supabase
-        .from('assets')
-        .update({ 
-          metadata: updatedMetadata,
-          location: location || asset.location // Update asset location if changed
-        })
-        .eq('id', assetId);
+      // Use new asset-centric service
+      const result = await recordAssetInventoryCheck(assetId, checkData);
       
-      toast({
-        title: "Success",
-        description: "Inventory check completed successfully",
-      });
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: result.message,
+        });
+        
+        // Navigate back to asset detail page
+        navigate(`/assets/${assetId}`);
+      } else {
+        toast({
+          title: "Error",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
       
-      navigate(`/assets/${assetId}`);
     } catch (error) {
       console.error('Error saving inventory check:', error);
       toast({
@@ -341,11 +282,11 @@ const InventoryCheck = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <ClipboardCheck className="mr-2 h-5 w-5 text-primary" />
-            Inventory Check: {asset.name}
+            Inventory Check: {asset.asset_name}
           </CardTitle>
           <CardDescription>
             {inventoryFormSchema 
-              ? `Complete the inventory form for this ${asset.asset_type?.name || 'asset'}.` 
+              ? `Complete the inventory form for this ${asset.asset_type_name || 'asset'}.` 
               : "Record the current inventory status for this asset"}
           </CardDescription>
         </CardHeader>

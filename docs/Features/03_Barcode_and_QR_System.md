@@ -40,3 +40,8 @@ This document provides a detailed overview of the barcode and QR code system in 
 For more details on the mobile-specific aspects of this system, refer to `05_Features/04_Mobile_QR_Workflow.md`.
 
 
+
+
+
+
+

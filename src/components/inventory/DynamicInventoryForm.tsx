@@ -20,7 +20,6 @@ import {
   getFormById
 } from "@/services/formService";
 import {
-  createInventoryItem, 
   InventoryItemInsert
 } from "@/services/inventoryService";
 import DynamicForm from "@/components/forms/DynamicForm";
@@ -103,16 +102,11 @@ export function DynamicInventoryForm() {
         metadata: formData,
       };
       
-      // Create the inventory item
-      await createInventoryItem(itemData);
-      
-      toast({
-        title: "Success",
-        description: "Inventory item added successfully"
-      });
-      
-      // Navigate back to inventory list
-      navigate("/inventory");
+      // DEPRECATED: Use asset-centric workflow instead
+      throw new Error(
+        "Direct inventory creation is deprecated. " +
+        "Use the asset-centric workflow through assetInventoryService instead."
+      );
     } catch (error) {
       console.error("Error creating inventory item:", error);
       toast({

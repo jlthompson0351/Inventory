@@ -1653,56 +1653,56 @@ export const AVAILABLE_DATA_SOURCES = [
     id: "inventory_items",
     name: "Inventory Items",
     description: "Current inventory levels and stock information",
-    icon: "📋",
+    icon: "clipboard",
     table: "inventory_items"
   },
   {
     id: "inventory_history",
     name: "Inventory History",
     description: "Historical inventory changes and movements",
-    icon: "📊",
+    icon: "chart",
     table: "inventory_history"
   },
   {
     id: "inventory_price_history",
     name: "Price History",
     description: "Historical price changes for inventory items",
-    icon: "💰",
+    icon: "dollar-sign",
     table: "inventory_price_history"
   },
   {
     id: "forms",
     name: "Forms",
     description: "All form definitions and templates",
-    icon: "📄",
+    icon: "file",
     table: "forms"
   },
   {
     id: "form_submissions",
     name: "Form Submissions",
     description: "All submitted form data",
-    icon: "📝",
+    icon: "edit",
     table: "form_submissions"
   },
   {
     id: "form_responses",
     name: "Form Responses",
     description: "Individual form response data",
-    icon: "✍️",
+    icon: "pen-tool",
     table: "form_responses"
   },
   {
     id: "organizations",
     name: "Organizations",
     description: "Organization information",
-    icon: "🏢",
+    icon: "building",
     table: "organizations"
   },
   {
     id: "organization_members",
     name: "Organization Members",
     description: "Team members and their roles",
-    icon: "👥",
+    icon: "users",
     table: "organization_members"
   },
   {
@@ -1716,14 +1716,14 @@ export const AVAILABLE_DATA_SOURCES = [
     id: "locations",
     name: "Locations",
     description: "Physical locations and hierarchies",
-    icon: "📍",
+    icon: "map-pin",
     table: "locations"
   },
   {
     id: "mapped_fields",
     name: "Mapped Fields",
     description: "Form field mappings and configurations",
-    icon: "🔗",
+    icon: "link",
     table: "mapped_fields"
   },
   {
@@ -1744,7 +1744,7 @@ export const AVAILABLE_DATA_SOURCES = [
     id: "asset_type_forms",
     name: "Asset Type Forms",
     description: "Forms linked to asset types",
-    icon: "📎",
+    icon: "paperclip",
     table: "asset_type_forms"
   },
   {
@@ -1765,7 +1765,7 @@ export const AVAILABLE_DATA_SOURCES = [
     id: "form_schedules",
     name: "Form Schedules",
     description: "Scheduled form submissions and recurring forms",
-    icon: "📅",
+    icon: "calendar",
     table: "form_schedules"
   },
   {

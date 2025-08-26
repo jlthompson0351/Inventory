@@ -65,3 +65,8 @@ firebase deploy --only hosting
 This guide provides the essential information for deploying the application. For a more detailed breakdown of the underlying services, refer to `03_Supabase_Backend.md`.
 
 
+
+
+
+
+

@@ -337,8 +337,8 @@ export default function AssetList({
         // NEW: View inventory/intake history instead of asset detail
         if (asset.has_inventory && asset.inventory_items && asset.inventory_items.length > 0) {
           const inventoryId = asset.inventory_items[0].id;
-          // Navigate to inventory item detail which shows history
-          navigate(`/inventory/item/${inventoryId}?tab=history`);
+          // Navigate to asset inventory history
+          navigate(`/assets/${asset.id}/inventory/history`);
         } else {
           // No inventory yet - show asset detail with option to create inventory
           navigate(`/assets/${asset.id}?focus=inventory`);

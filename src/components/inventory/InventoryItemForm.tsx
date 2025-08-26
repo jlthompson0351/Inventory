@@ -28,7 +28,6 @@ import {
   getAssetTypes 
 } from "@/services/assetTypeService";
 import {
-  createInventoryItem,
   updateInventoryItem,
   getInventoryItem,
   generateBarcode,
@@ -253,18 +252,12 @@ export function InventoryItemForm({
           description: "Inventory item updated successfully",
         });
       } else {
-        // Create new inventory item
-        result = await createInventoryItem({
-          ...values,
-          name: values.name || "",
-          organization_id: currentOrganization.id,
-          event_type: eventType,
-        });
-        inventoryItemId = result?.id;
-        toast({
-          title: "Success",
-          description: "Inventory item created successfully",
-        });
+        // DEPRECATED: This component should not create inventory items directly
+        // Use the asset-centric workflow instead
+        throw new Error(
+          "Direct inventory item creation is deprecated. " +
+          "Please create inventory through the asset workflow instead."
+        );
       }
       
       // Upsert inventory_history for the selected month

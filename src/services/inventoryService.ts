@@ -189,12 +189,20 @@ function mapCheckTypeToEventType(checkType: string): string {
 }
 
 /**
+ * @deprecated Use assetInventoryService.createInventoryForAsset() instead
+ * This function has data consistency issues and creates orphaned inventory items
+ * 
  * Create a new inventory item (must be linked to an asset, only one per asset)
  * Now also creates an initial inventory_history entry for the intake month with the intake quantity.
  */
 export const createInventoryItem = async (
   itemData: InventoryItemInsert
 ): Promise<any> => {
+  // DEPRECATED: Throw error to prevent usage in production
+  throw new Error(
+    'createInventoryItem is deprecated. Use assetInventoryService.createInventoryForAsset() instead. ' +
+    'This function has been disabled to prevent data consistency issues.'
+  );
   try {
     let assetExists = true;
     let assetIdToUse = itemData.asset_id;

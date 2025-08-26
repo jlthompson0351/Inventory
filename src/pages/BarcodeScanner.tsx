@@ -159,11 +159,14 @@ const BarcodeScanner = () => {
   };
 
   const navigateToItem = (id: string) => {
-    navigate(`/inventory/${id}`);
+    // This should navigate to inventory item detail - keep legacy route for now
+    // since we don't have asset_id context here
+    navigate(`/inventory/item/${id}`);
   };
 
   const navigateToNewItem = () => {
-    navigate("/inventory/new", { state: { barcode: scanResult } });
+    // Redirect to asset creation since direct inventory creation is deprecated
+    navigate("/assets/new", { state: { barcode: scanResult } });
   };
 
   const navigateToIntakeForm = () => {

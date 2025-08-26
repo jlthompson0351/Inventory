@@ -282,6 +282,9 @@ The system includes advanced database optimizations. For maintenance:
 - **Input Validation**: Client and server-side validation throughout
 - **Secure Formula Evaluation**: Zero eval() usage with mathjs-based safe evaluation
 
+### Security Notes
+- `inventory_corrections` table RLS disabled for operational simplicity (1/19/25) - organization filtering handled in frontend code
+
 ## Performance Features
 
 - **Optimized Queries**: Sub-second response times for most operations

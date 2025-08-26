@@ -39,14 +39,15 @@ This document provides a complete reference for all custom database functions (R
 | Function Name | Return Type | Description |
 |---|---|---|
 | `apply_asset_calculation_formulas` | jsonb | Applies calculation formulas to an asset. |
+| `apply_inventory_correction` | jsonb | Applies manual corrections to inventory with audit trail. |
 | `auto_generate_asset_barcode` | trigger | A trigger function that automatically generates a barcode for a new asset. |
 | `check_asset_current_month_inventory` | record | Checks the current month's inventory for an asset. |
 | `check_asset_type_dependencies` | record | Checks the dependencies for an asset type before deletion. |
 | `check_duplicate_assets` | record | Checks for duplicate assets. |
 | `create_asset_with_inventory` | jsonb | Creates a new asset and its initial inventory item. |
-| `create_inventory_adjustment` | jsonb | Creates a new inventory adjustment. |
-| `create_periodic_inventory_check` | jsonb | Creates a periodic inventory check. |
-| `delete_inventory_item` | boolean | Deletes an inventory item. |
+| `create_inventory_adjustment` | jsonb | Creates a new inventory adjustment with movement types. |
+| `create_periodic_inventory_check` | jsonb | Creates a periodic inventory check with form data. |
+| `delete_inventory_item` | boolean | Deletes an inventory item with proper cleanup. |
 | `generate_asset_barcode` | text | Generates a barcode for an asset. |
 | `generate_asset_qr_data` | jsonb | Generates the data for an asset's QR code. |
 | `get_asset_by_barcode` | jsonb | Retrieves an asset by its barcode. |
@@ -55,16 +56,26 @@ This document provides a complete reference for all custom database functions (R
 | `get_asset_inventory_report` | record | Generates an inventory report for an asset. |
 | `get_asset_type_stats` | record | Gets statistics for an asset type. |
 | `get_asset_with_formulas_by_barcode` | json | Retrieves an asset and its formulas by barcode. |
+| **🔧 `get_asset_with_inventory_status`** | **jsonb** | **Enhanced: Get single asset with inventory data and error handling.** |
+| **🔧 `get_inventory_stats`** | **jsonb** | **NEW: Comprehensive inventory statistics with consistent thresholds.** |
+| **🔧 `get_organization_assets_with_inventory`** | **jsonb** | **Enhanced: Get all organization assets with inventory status.** |
 | `get_latest_inventory_check` | record | Gets the latest inventory check for an asset. |
 | `insert_inventory_history_record` | json | Inserts a new record into the inventory history. |
-| `insert_inventory_history_simple` | json | A simplified function to insert an inventory history record. |
-| `recalculate_inventory_after_edit` | jsonb | Recalculates inventory after an edit. |
-| `reconcile_inventory` | jsonb | Reconciles inventory for an asset. |
+| `insert_inventory_history_simple` | json | A simplified function to insert an inventory history record with automatic event type mapping. |
+| `mark_inventory_event_verified` | jsonb | Marks an inventory event as verified to dismiss anomalies. |
+| `recalculate_inventory_after_edit` | jsonb | Recalculates inventory after an edit with validation. |
+| `reconcile_inventory` | jsonb | Reconciles inventory for an asset with physical count. |
 | `safe_delete_asset_type` | record | Safely deletes an asset type, checking for dependencies. |
 | `scan_asset_barcode` | jsonb | Scans an asset barcode and returns the asset data. |
-| `update_inventory_atomic` | jsonb | Atomically updates an inventory item. |
+| `update_inventory_atomic` | jsonb | Atomically updates an inventory item with version control. |
 | `validate_asset_type_operation` | record | Validates an operation on an asset type. |
 | `verify_inventory_balance` | jsonb | Verifies the inventory balance for an item. |
+
+**🔧 Enhanced Functions (August 2025):**
+- **`get_asset_with_inventory_status()`**: Now returns structured JSONB with enhanced error handling
+- **`get_organization_assets_with_inventory()`**: Enhanced with structured responses and validation
+- **`get_inventory_stats()`**: New comprehensive statistics function with consistent thresholds (≤10 units for low stock)
+- **`get_inventory_performance_stats()`**: Updated to use consistent low stock threshold (≤10 units)
 
 ### **Forms & Submissions**
 | Function Name | Return Type | Description |

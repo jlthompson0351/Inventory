@@ -109,11 +109,24 @@ export default function InventoryList({
   };
 
   const handleViewHistory = (item: InventoryItem) => {
-    navigate(`/inventory/item/${item.id}?tab=history`);
+    // Use asset-centric routing if asset_id is available
+    if (item.asset_id) {
+      navigate(`/assets/${item.asset_id}/inventory/history`);
+    } else {
+      // Fallback to legacy route for orphaned inventory items
+      navigate(`/inventory/item/${item.id}?tab=history`);
+    }
   };
 
   const handleInventoryCheck = (item: InventoryItem) => {
-    navigate(`/inventory/check/${item.asset_id || item.id}`);
+    // Navigate to the correct route for inventory check - use modern routing
+    if (item.asset_id) {
+      navigate(`/assets/${item.asset_id}/inventory/check`);
+    } else {
+      console.warn('No asset_id found for inventory item:', item);
+      // Fallback to inventory item detail if no asset_id
+      navigate(`/inventory/item/${item.id}`);
+    }
   };
 
   // Filter items based on search and category
@@ -242,7 +255,7 @@ export default function InventoryList({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/inventory/${item.id}/history`)}
+                onClick={() => handleViewHistory(item)}
                 className="text-xs h-7"
               >
                 <History className="h-3 w-3 mr-1" />

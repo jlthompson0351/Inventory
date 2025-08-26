@@ -13,6 +13,7 @@ import { useOrganization } from '@/hooks/useOrganization';
 import { submitForm } from '@/services/formSubmissionService';
 import { supabase } from '@/integrations/supabase/client';
 import AddItemSelectionModal from '@/components/inventory/AddItemSelectionModal';
+import { createInventoryForAsset } from '@/services/assetInventoryService';
 
 const AddInventoryPage = () => {
   const { assetId } = useParams<{ assetId: string }>();
@@ -228,18 +229,21 @@ const AddInventoryPage = () => {
           }
         }
         
-        // Actually create the inventory item
-        const { createInventoryItem } = await import("@/services/inventoryService");
-        const itemData = {
-          name: asset.name,
-          description: asset.description,
-          organization_id: currentOrganization.id,
-          asset_id: asset.asset_id, // Make sure we're using the asset_id property
-          quantity: formValues.quantity || 0, // or use a specific field from your form
+        // Use the modern asset-centric service instead
+        const initialData = {
+          quantity: formValues.quantity || 0,
           location: formValues.location || '',
-          category: formValues.category || '',
+          status: 'active',
+          notes: 'Initial inventory setup via form'
         };
-        newInventoryItem = await createInventoryItem(itemData);
+        const result = await createInventoryForAsset(asset.asset_id, initialData);
+        
+        if (!result.success) {
+          throw new Error(result.message || "Failed to create inventory item.");
+        }
+        
+        // Get the created inventory item for navigation
+        newInventoryItem = { id: result.inventory_item_id };
         if (!newInventoryItem || !newInventoryItem.id) {
           throw new Error("Failed to create inventory item.");
         }

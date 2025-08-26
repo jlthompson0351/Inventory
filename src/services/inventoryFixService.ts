@@ -115,57 +115,35 @@ export const applyInventoryFix = async (
 
 /**
  * Mark an inventory event as verified (no anomaly)
+ * Uses database function to bypass client-side schema issues
  */
 export const markEventAsVerified = async (eventId: string): Promise<InventoryFixResponse> => {
   try {
-    // Get the current event
-    const { data: currentEvent, error: fetchError } = await supabase
-      .from('inventory_history')
-      .select('*')
-      .eq('id', eventId)
-      .single();
-      
-    if (fetchError || !currentEvent) {
+    // Use bulletproof database function instead of client update
+    const { data, error } = await supabase.rpc('mark_inventory_event_verified', {
+      p_event_id: eventId
+    });
+    
+    if (error) {
+      console.error('Database function error:', error);
       return {
         success: false,
-        message: 'Failed to find inventory event'
+        message: `Database error: ${error.message}`
       };
     }
     
-    // Add verification flag to response_data
-    const updatedResponseData = {
-      ...currentEvent.response_data,
-      verified: {
-        timestamp: new Date().toISOString(),
-        status: 'verified',
-        message: 'Anomaly dismissed - data verified as correct'
-      }
-    };
-    
-    const updatedNotes = `${currentEvent.notes || ''}\n\n[VERIFIED] Anomaly dismissed - data confirmed correct by user`;
-    
-    // Update the event
-    const { data: updatedEvent, error: updateError } = await supabase
-      .from('inventory_history')
-      .update({
-        notes: updatedNotes,
-        response_data: updatedResponseData,
-      })
-      .eq('id', eventId)
-      .select()
-      .single();
-      
-    if (updateError) {
+    // The function returns the result directly
+    if (data && typeof data === 'object') {
       return {
-        success: false,
-        message: `Failed to verify event: ${updateError.message}`
+        success: data.success || false,
+        message: data.message || 'Unknown response'
       };
     }
     
+    // Fallback if data format is unexpected
     return {
       success: true,
-      message: 'Event marked as verified',
-      updatedEvent
+      message: 'Event verified successfully'
     };
     
   } catch (error) {

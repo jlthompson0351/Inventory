@@ -65,7 +65,38 @@ This migration creates the base form system tables:
 
 **Added**: June 2024
 
-This migration creates the inventory_items table for tracking stock items.
+This migration creates the inventory_items table for tracking stock items with 1:1 relationship to assets.
+
+### `20250820090000_fix_inventory_low_stock_threshold.sql`
+
+**Added**: August 2025
+
+This migration fixes the low stock threshold inconsistency between frontend and backend:
+
+- **Fixed**: `get_inventory_performance_stats()` function to use ≤10 units (was <10)
+- **Added**: Performance index `idx_inventory_items_low_stock` for optimized low stock queries
+- **Standardized**: Consistent threshold across all inventory functions
+
+### `20250820090100_create_inventory_stats_rpc.sql`
+
+**Added**: August 2025
+
+This migration creates the comprehensive inventory statistics RPC function:
+
+- **NEW**: `get_inventory_stats()` function matching frontend expectations exactly
+- **Features**: Organization-based filtering, consistent thresholds, comprehensive metrics
+- **Returns**: Total assets, assets with inventory, low stock items, out of stock items, inventory coverage percentage
+
+### `20250820090200_improve_inventory_error_handling.sql`
+
+**Added**: August 2025
+
+This migration enhances error handling across inventory functions:
+
+- **Enhanced**: `get_asset_with_inventory_status()` with structured JSONB responses
+- **Enhanced**: `get_organization_assets_with_inventory()` with validation and error handling
+- **Improved**: Consistent response format with success/error status
+- **Added**: Comprehensive access control and organization validation
 
 ### `asset_types_mothership.sql`
 

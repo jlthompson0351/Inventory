@@ -386,8 +386,8 @@ const SimpleAssetReport: React.FC = () => {
               });
               
               if (totalField && submissionData[totalField]) {
-                lastMonthTotal = `${renderFieldValue(submissionData[totalField])} 📅`;
-                break; // Use first found total, add calendar icon to indicate it's not from last month
+                lastMonthTotal = renderFieldValue(submissionData[totalField]);
+                break; // Use first found total from available data
               }
             }
           }
@@ -610,7 +610,7 @@ const SimpleAssetReport: React.FC = () => {
       const assetTypeName = selectedAssetTypes.length > 1 ? 'Multiple_Assets' : selectedAssetTypes[0] === 'all' ? 'All_Assets' : 
         assetTypes.find(t => t.id === selectedAssetTypes[0])?.name || 'Assets';
       
-      link.download = `📊_Monthly_Inventory_${assetTypeName}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `Monthly_Inventory_${assetTypeName}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
 
       toast.success('Report exported successfully!');
@@ -625,14 +625,14 @@ const SimpleAssetReport: React.FC = () => {
   const previewData = showPreview ? reportData.slice(0, 3) : reportData; // Limit to 3 for preview
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            🚀 Advanced Asset Reporting
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Advanced Asset Reporting
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 text-sm">
             Complete reporting system with templates, flexible date ranges, and asset history
           </p>
         </div>
@@ -707,13 +707,13 @@ const SimpleAssetReport: React.FC = () => {
       {/* Save Template Modal */}
       {showSaveTemplate && (
         <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Save className="h-5 w-5 text-green-600" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Save className="h-4 w-4 text-green-600" />
               Save Report Template
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 pt-2">
             <div>
               <Label htmlFor="template-name">Template Name *</Label>
               <Input
@@ -747,15 +747,15 @@ const SimpleAssetReport: React.FC = () => {
 
       {/* Advanced Controls */}
       <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Target className="h-5 w-5 text-purple-600" />
+            <Target className="h-4 w-4 text-purple-600" />
             Report Configuration
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 pt-2">
           {/* View Mode Selector */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label className="block text-sm font-medium text-gray-700 mb-2">
                 View Mode
@@ -849,7 +849,7 @@ const SimpleAssetReport: React.FC = () => {
 
           {/* Custom Date Range */}
           {dateRangeType === 'custom' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <div>
                 <Label htmlFor="start-date">Start Date</Label>
                 <Input
@@ -873,7 +873,7 @@ const SimpleAssetReport: React.FC = () => {
 
           {/* Asset Selector for History Mode */}
           {viewMode === 'history' && (
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
               <Label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Asset for History View
               </Label>
@@ -916,8 +916,8 @@ const SimpleAssetReport: React.FC = () => {
           
           {/* Debug Info */}
           {currentOrganization && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-              <strong>Debug Info:</strong> Org: {currentOrganization.name} | Asset Types: {assetTypes.length} | 
+            <div className="mt-2 p-2 bg-gray-50 rounded-lg text-xs text-gray-600">
+              <strong>Debug:</strong> Org: {currentOrganization.name} | Types: {assetTypes.length} | 
               Selected: {selectedAssetTypes.join(', ')} | View: {viewMode} | Date: {dateRangeType}
               {currentTemplate && <span> | Template: {currentTemplate.name}</span>}
             </div>
@@ -928,10 +928,10 @@ const SimpleAssetReport: React.FC = () => {
       {/* Column Selector */}
       {showColumnSelector && formFields.length > 0 && (
         <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-base">
               <span className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-orange-600" />
+                <Settings className="h-4 w-4 text-orange-600" />
                 Select Columns to Include
               </span>
               <div className="flex items-center gap-2">
@@ -946,8 +946,8 @@ const SimpleAssetReport: React.FC = () => {
               </div>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <CardContent className="pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
               {formFields.map((field) => (
                 <div key={field.id} className="flex items-center space-x-2">
                   <div className="flex items-center space-x-2 flex-1">
@@ -974,7 +974,7 @@ const SimpleAssetReport: React.FC = () => {
             </div>
             <div className="mt-4 flex items-center justify-between">
               <p className="text-sm text-orange-600">
-                ✨ Click columns to select and order them | Preview shows first 3 assets
+                Click columns to select and order them | Preview shows first 3 assets
               </p>
               <Button
                 onClick={() => setShowPreview(!showPreview)}
@@ -993,9 +993,9 @@ const SimpleAssetReport: React.FC = () => {
       {/* Report Results */}
       {reportData.length > 0 && (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
+          <CardHeader className="pb-2">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 {viewMode === 'history' ? (
                   <History className="h-5 w-5 text-orange-600" />
                 ) : viewMode === 'comparison' ? (
@@ -1012,14 +1012,14 @@ const SimpleAssetReport: React.FC = () => {
                   </Badge>
                 )}
               </CardTitle>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                 <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
+                  <Users className="h-3 w-3" />
                   {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Generated {new Date().toLocaleString()}
+                  <Clock className="h-3 w-3" />
+                  {new Date().toLocaleString()}
                 </span>
                 {viewMode === 'history' && selectedAssetForHistory && (
                   <Badge variant="secondary">
@@ -1029,17 +1029,17 @@ const SimpleAssetReport: React.FC = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left p-3 font-semibold bg-gray-50">Asset Name</th>
+                    <th className="text-left p-2 font-semibold bg-gray-50 text-xs">Asset Name</th>
                     {viewMode === 'history' && (
-                      <th className="text-left p-3 font-semibold bg-gray-50">Submission Date</th>
+                      <th className="text-left p-2 font-semibold bg-gray-50 text-xs">Submission Date</th>
                     )}
                     {selectedFields.map((field) => (
-                      <th key={field.id} className="text-left p-3 font-semibold bg-gray-50">
+                      <th key={field.id} className="text-left p-2 font-semibold bg-gray-50 text-xs">
                         {field.label}
                       </th>
                     ))}
@@ -1048,9 +1048,9 @@ const SimpleAssetReport: React.FC = () => {
                 <tbody>
                   {previewData.map((row, index) => (
                     <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-3 font-medium text-blue-600">{row.asset_name}</td>
+                      <td className="p-2 font-medium text-blue-600 text-xs">{row.asset_name}</td>
                       {viewMode === 'history' && (
-                        <td className="p-3 text-sm text-gray-500">
+                        <td className="p-2 text-xs text-gray-500">
                           {row.submission_date ? 
                             new Date(row.submission_date).toLocaleString() : 
                             <span className="text-red-500">No data</span>
@@ -1058,7 +1058,7 @@ const SimpleAssetReport: React.FC = () => {
                         </td>
                       )}
                       {selectedFields.map((field) => (
-                        <td key={field.id} className="p-3 text-sm">
+                        <td key={field.id} className="p-2 text-xs">
                           {field.id === 'asset_type' ? (
                             <Badge variant="outline" className="text-xs">
                               {row.asset_type}
@@ -1085,41 +1085,32 @@ const SimpleAssetReport: React.FC = () => {
             </div>
             
             {showPreview && reportData.length > 3 && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg text-center">
-                <p className="text-sm text-blue-700">
-                  📋 Showing preview of first 3 {viewMode === 'history' ? 'submissions' : 'assets'}. 
+              <div className="mt-2 p-2 bg-blue-50 rounded-lg text-center">
+                <p className="text-xs text-blue-700">
+                  Showing preview of first 3 {viewMode === 'history' ? 'submissions' : 'assets'}. 
                   Click "Show All" above to see all {reportData.length} records, or export CSV for complete data.
                 </p>
               </div>
             )}
 
             {/* View Mode Specific Info */}
-            {viewMode === 'history' && (
-              <div className="mt-4 p-3 bg-orange-50 rounded-lg">
-                <p className="text-sm text-orange-700">
-                  🕐 <strong>History Mode:</strong> Showing all submissions for selected asset(s) within the date range. 
-                  Each row represents one form submission with its timestamp.
+            <div className="mt-2 p-2 rounded-lg bg-gray-50">
+              {viewMode === 'history' && (
+                <p className="text-xs text-orange-700">
+                  <strong>History Mode:</strong> All submissions for selected asset(s) within date range. Each row = one submission.
                 </p>
-              </div>
-            )}
-
-            {viewMode === 'comparison' && (
-              <div className="mt-4 p-3 bg-purple-50 rounded-lg">
-                <p className="text-sm text-purple-700">
-                  📊 <strong>Comparison Mode:</strong> Compare values across different time periods. 
-                  Perfect for analyzing trends and changes over time.
+              )}
+              {viewMode === 'comparison' && (
+                <p className="text-xs text-purple-700">
+                  <strong>Comparison Mode:</strong> Compare values across different time periods for trend analysis.
                 </p>
-              </div>
-            )}
-
-            {viewMode === 'latest' && (
-              <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                <p className="text-sm text-green-700">
-                  ✅ <strong>Latest Mode:</strong> Shows the most recent submission for each asset. 
-                  Ideal for current inventory status and monthly reports.
+              )}
+              {viewMode === 'latest' && (
+                <p className="text-xs text-green-700">
+                  <strong>Latest Mode:</strong> Most recent submission per asset. Ideal for current inventory status.
                 </p>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1127,18 +1118,18 @@ const SimpleAssetReport: React.FC = () => {
       {/* Enhanced Empty State */}
       {!isLoading && reportData.length === 0 && (
         <Card className="border-dashed border-2 border-gray-300">
-          <CardContent className="flex flex-col items-center justify-center py-12">
+          <CardContent className="flex flex-col items-center justify-center py-8">
             {viewMode === 'history' ? (
               <History className="h-16 w-16 text-gray-400 mb-4" />
             ) : viewMode === 'comparison' ? (
               <CalendarDays className="h-16 w-16 text-gray-400 mb-4" />
             ) : (
-              <FileText className="h-16 w-16 text-gray-400 mb-4" />
+              <FileText className="h-12 w-12 text-gray-400 mb-3" />
             )}
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">
+            <h3 className="text-base font-semibold text-gray-600 mb-2">
               No {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison Data' : 'Report'} Generated
             </h3>
-            <p className="text-gray-500 text-center max-w-md">
+            <p className="text-gray-500 text-center max-w-md text-sm">
               {viewMode === 'history' 
                 ? 'Select an asset and date range to view its submission history over time.'
                 : viewMode === 'comparison'

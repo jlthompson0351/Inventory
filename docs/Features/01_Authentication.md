@@ -43,3 +43,8 @@ This document provides a detailed overview of the authentication system in the B
 -   The mobile workflow uses a separate PIN-based authentication system. See `05_Features/04_Mobile_QR_Workflow.md` for more details.
 
 
+
+
+
+
+
