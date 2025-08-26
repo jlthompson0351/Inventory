@@ -21,7 +21,7 @@ import AssetInventoryHistory from "./pages/AssetInventoryHistory";
 import CreateAssetInventory from "./pages/CreateAssetInventory";
 import InventoryHistoryCorrection from "./pages/InventoryHistoryCorrection";
 import Reports from "./pages/Reports";
-import NewReportBuilder from "./pages/NewReportBuilder";
+
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 // import SystemAdmin from "./pages/SystemAdmin"; // Old import
