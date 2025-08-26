@@ -444,6 +444,23 @@ export default function SubmitForm() {
     try {
       setSubmitting(true);
       
+      // Re-fetch asset metadata right before submission to prevent using stale/cached data
+      let freshAssetMetadata = { ...assetMetadata }; // Start with existing state as a fallback
+      if (assetId) {
+        const { data: freshAsset, error: fetchError } = await supabase
+          .from('assets')
+          .select('metadata')
+          .eq('id', assetId)
+          .single();
+
+        if (fetchError) {
+          console.error("SubmitForm - Could not re-fetch fresh asset data on submit. Using potentially stale data.", fetchError);
+        } else if (freshAsset && typeof freshAsset.metadata === 'object' && freshAsset.metadata !== null) {
+          console.log("SubmitForm - Successfully re-fetched fresh asset metadata on submit.", freshAsset.metadata);
+          freshAssetMetadata = freshAsset.metadata as Record<string, any>;
+        }
+      }
+
       // Get asset type ID from multiple sources
       const submissionAssetTypeId = assetTypeId || fetchedAssetTypeId || prefillData.asset_type_id || form.asset_type_id;
       
@@ -532,28 +549,24 @@ export default function SubmitForm() {
                       }
                     }
                     
-                    // Create inventory history record
+                    // Create inventory history record using RPC to avoid user_id error
                     const userId = (await supabase.auth.getUser()).data.user?.id;
-                    const { error: historyError } = await supabase
-                      .from('inventory_history')
-                      .insert({
-                        inventory_item_id: inventoryItem.id,
-                        organization_id: workingOrganization.id,
-                        quantity: roundedQuantity, // Database expects integer
-                        event_type: 'audit',
-                        check_type: 'periodic',
-                        notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
-                        response_data: {
-                          ...data,
-                          exact_quantity: newQuantity
-                        },
-                        created_by: userId || null,
-                        created_at: new Date().toISOString(),
-                        check_date: new Date().toISOString(),
-                        month_year: new Date().toISOString().slice(0, 7),
-                        location: data.location || '',
-                        status: 'active'
-                      });
+                    const { error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+                      organization_id: workingOrganization.id,
+                      inventory_item_id: inventoryItem.id,
+                      quantity: roundedQuantity,
+                      event_type: 'audit',
+                      check_type: 'periodic',
+                      created_by: userId || null,
+                      condition: null,
+                      notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
+                      status: 'active',
+                      location: data.location || '',
+                      response_data: {
+                        ...data,
+                        exact_quantity: newQuantity
+                      }
+                    });
                       
                     if (historyError) {
                       console.error('Error creating inventory history:', historyError);
@@ -572,7 +585,8 @@ export default function SubmitForm() {
               workingOrganization.id,
               submissionAssetTypeId,
               assetId,
-              formType
+              formType,
+              freshAssetMetadata // Pass fresh metadata to the service
             );
           }
         }
@@ -589,7 +603,8 @@ export default function SubmitForm() {
           workingOrganization.id,
           submissionAssetTypeId,
           assetId, // Pass the asset ID if this is from a QR code scan
-          formType // Pass the form type to determine correct event_type
+          formType, // Pass the form type to determine correct event_type
+          freshAssetMetadata // Pass fresh metadata to the service
         );
         
         // For inventory forms, ensure inventory is updated
@@ -657,28 +672,24 @@ export default function SubmitForm() {
                     }
                   }
                   
-                  // Create inventory history record
+                  // Create inventory history record using RPC to avoid user_id error
                   const userId = (await supabase.auth.getUser()).data.user?.id;
-                  const { error: historyError } = await supabase
-                    .from('inventory_history')
-                    .insert({
-                      inventory_item_id: inventoryItem.id,
-                      organization_id: workingOrganization.id,
-                      quantity: roundedQuantity, // Database expects integer
-                      event_type: 'audit',
-                      check_type: 'periodic',
-                      notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
-                      response_data: {
-                        ...data,
-                        exact_quantity: newQuantity
-                      },
-                      created_by: userId || null,
-                      created_at: new Date().toISOString(),
-                      check_date: new Date().toISOString(),
-                      month_year: new Date().toISOString().slice(0, 7),
-                      location: data.location || '',
-                      status: 'active'
-                    });
+                  const { error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+                    organization_id: workingOrganization.id,
+                    inventory_item_id: inventoryItem.id,
+                    quantity: roundedQuantity,
+                    event_type: 'audit',
+                    check_type: 'periodic',
+                    created_by: userId || null,
+                    condition: null,
+                    notes: `Monthly inventory check via form: ${form.name}. Exact quantity: ${newQuantity} gallons`,
+                    status: 'active',
+                    location: data.location || '',
+                    response_data: {
+                      ...data,
+                      exact_quantity: newQuantity
+                    }
+                  });
                     
                   if (historyError) {
                     console.error('Error creating inventory history:', historyError);

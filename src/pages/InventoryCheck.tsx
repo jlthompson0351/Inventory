@@ -27,8 +27,9 @@ const conditionOptions = [
 function computeNewInventoryQuantity(
   baseQuantity: number, 
   formSchema: any, // { fields: [{id, inventory_action, type}, ...] }
-  formValues: any  // { field_id: value, ... }
-) {
+  formValues: any,  // { field_id: value, ... }
+  assetMetadata: any = {} // Asset metadata for formula calculations
+): { newQuantity: number; foundAction: boolean } {
   let newQuantity = baseQuantity;
   let foundAction = false;
   
@@ -36,17 +37,21 @@ function computeNewInventoryQuantity(
     return { newQuantity: baseQuantity, foundAction: false };
   }
 
+  // NOTE: Frontend version doesn't need formula evaluation since FormRenderer handles it
+  // This is kept for consistency but the frontend already has calculated values
+  const evaluatedFormValues = { ...formValues };
+
   const setActionField = formSchema.fields.find(
-    (field: any) => field.inventory_action === 'set' && typeof formValues[field.id] === 'number'
+    (field: any) => field.inventory_action === 'set' && typeof evaluatedFormValues[field.id] === 'number'
   );
 
   if (setActionField) {
-    newQuantity = formValues[setActionField.id];
+    newQuantity = evaluatedFormValues[setActionField.id];
     foundAction = true;
   } else { // Only process add/subtract if no 'set' action took definitive control
     for (const field of formSchema.fields) {
       const action = field.inventory_action;
-      const value = formValues[field.id];
+      const value = evaluatedFormValues[field.id];
 
       if (typeof value === 'number') {
         if (action === 'add') {

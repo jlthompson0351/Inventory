@@ -80,7 +80,7 @@ This document provides a complete reference for all custom database functions (R
 ### **Forms & Submissions**
 | Function Name | Return Type | Description |
 |---|---|---|
-| `calculate_form_formulas` | jsonb | Calculates the formula fields in a form submission. |
+| `calculate_form_formulas` | jsonb | **Authoritative Calculation Engine.** Calculates all formula fields in a form submission using a secure PostgreSQL-based evaluator. This is the single source of truth for all calculations, ensuring data consistency and leveraging database performance. It should be called by backend services after a form submission. |
 | `clone_form` | uuid | Clones an existing form. |
 | `create_default_forms_for_asset_type` | record | Creates default forms for a new asset type. |
 | `create_form_template` | uuid | Creates a new form template. |

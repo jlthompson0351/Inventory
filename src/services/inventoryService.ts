@@ -1089,10 +1089,12 @@ export const createAssetAndInitialInventory = async (
     // For simplicity, let's assume a base of 0 unless an explicit 'set' action or primary quantity field is found.
     let initialQuantity = 0; 
     if (intakeFormSchema && intakeFormData.response_data) {
-      const { newQuantity, foundAction } = computeNewInventoryQuantity(
+      // CRITICAL FIX: Pass asset metadata to enable formula calculations that reference asset data
+      const { newQuantity, foundAction } = await computeNewInventoryQuantity(
         0, // Start with a base of 0 for dynamic form contributions
         intakeFormSchema,
-        intakeFormData.response_data
+        intakeFormData.response_data,
+        assetData.metadata || {} // Pass asset metadata for formula evaluation
       );
       if (foundAction) {
         initialQuantity = newQuantity;
@@ -1232,11 +1234,18 @@ export async function getAllInventoryHistory(inventory_item_id: string) {
 // Helper to compute new inventory quantity based on inventory_action fields
 // This function is now more critical.
 // Base quantity can be the current quantity of an item before actions are applied.
-function computeNewInventoryQuantity(
+async function computeNewInventoryQuantity(
   baseQuantity: number, 
   formSchema: any, // { fields: [{id, inventory_action, type}, ...] }
-  formValues: any  // { field_id: value, ... }
-) {
+  formValues: any,  // { field_id: value, ... }
+  assetMetadata: any = {} // Asset metadata for formula calculations
+): Promise<{ newQuantity: number; foundAction: boolean }> {
+  console.log('--- [DEBUG] computeNewInventoryQuantity Triggered ---');
+  console.log(`[DEBUG] Received currentQuantity: ${baseQuantity}`);
+  console.log('[DEBUG] Received field schema for calculation:', JSON.stringify(formSchema, null, 2));
+  console.log('[DEBUG] Received formValues:', JSON.stringify(formValues, null, 2));
+  console.log('[DEBUG] Received assetMetadata:', JSON.stringify(assetMetadata, null, 2));
+
   let newQuantity = baseQuantity;
   let foundAction = false; // Renamed from 'found' for clarity
   
@@ -1244,20 +1253,109 @@ function computeNewInventoryQuantity(
     return { newQuantity: baseQuantity, foundAction: false };
   }
 
+  // CRITICAL FIX: Evaluate formula fields using asset metadata before processing inventory actions
+  // This ensures calculated fields that reference asset data are properly evaluated
+  const evaluatedFormValues = { ...formValues };
+  
+  // Create mapped fields context for asset data (same as frontend)
+  const mappedFields: Record<string, any> = {};
+  if (assetMetadata && typeof assetMetadata === 'object') {
+    Object.entries(assetMetadata).forEach(([key, value]) => {
+      mappedFields[`mapped.${key}`] = Number(value) || 0;
+    });
+  }
+  
+  // CRITICAL FIX: Also need to resolve conversion field names from asset type
+  // Asset metadata might have field_1, field_2, etc. but formulas reference actual field names
+  if (assetMetadata && assetMetadata.asset_id) {
+    try {
+      // Get asset details to find asset_type_id
+      // Use the already imported supabase instance
+      const { data: asset } = await supabase
+        .from('assets')
+        .select('asset_type_id')
+        .eq('id', assetMetadata.asset_id)
+        .single();
+      
+      if (asset?.asset_type_id) {
+        // Fetch asset type conversion fields to map field names properly
+        const { data: assetType } = await supabase
+          .from('asset_types')
+          .select('conversion_fields')
+          .eq('id', asset.asset_type_id)
+          .single();
+        
+        if (assetType?.conversion_fields && Array.isArray(assetType.conversion_fields)) {
+          console.log('🔧 Found conversion fields:', assetType.conversion_fields);
+          
+          // Use for...of instead of forEach to handle async properly
+          for (let index = 0; index < assetType.conversion_fields.length; index++) {
+            const conversionField = assetType.conversion_fields[index];
+            
+            // Try multiple approaches to find the value:
+            
+            // 1. Direct field name match (preferred)
+            if (conversionField.field_name && assetMetadata[conversionField.field_name] !== undefined) {
+              mappedFields[`mapped.${conversionField.field_name}`] = Number(assetMetadata[conversionField.field_name]) || 0;
+              console.log(`✅ Direct mapped ${conversionField.field_name} = ${assetMetadata[conversionField.field_name]}`);
+              continue;
+            }
+            
+            // 2. Try with convert_ prefix
+            const convertFieldName = `convert_${conversionField.field_name}`;
+            if (assetMetadata[convertFieldName] !== undefined) {
+              mappedFields[`mapped.${conversionField.field_name}`] = Number(assetMetadata[convertFieldName]) || 0;
+              console.log(`✅ Convert prefix mapped ${conversionField.field_name} = ${assetMetadata[convertFieldName]}`);
+              continue;
+            }
+            
+            // 3. Try generic field names (field_1, field_2, etc.) based on index or ID
+            const genericFieldName = `field_${index + 1}`;
+            if (assetMetadata[genericFieldName] !== undefined) {
+              mappedFields[`mapped.${conversionField.field_name}`] = Number(assetMetadata[genericFieldName]) || 0;
+              console.log(`✅ Generic field mapped ${conversionField.field_name} from ${genericFieldName} = ${assetMetadata[genericFieldName]}`);
+              continue;
+            }
+            
+            // 4. Try using the conversion field ID if it exists
+            if (conversionField.id && assetMetadata[conversionField.id] !== undefined) {
+              mappedFields[`mapped.${conversionField.field_name}`] = Number(assetMetadata[conversionField.id]) || 0;
+              console.log(`✅ ID mapped ${conversionField.field_name} from ${conversionField.id} = ${assetMetadata[conversionField.id]}`);
+              continue;
+            }
+            
+            console.log(`❌ Could not find value for conversion field ${conversionField.field_name}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading asset type conversion fields for backend formula evaluation:', error);
+    }
+  }
+  
+  // DEBUG: Log what we're working with
+  console.log('🔍 Backend Formula Debug:');
+  console.log('- Asset metadata:', assetMetadata);
+  console.log('- Mapped fields created:', mappedFields);
+  console.log('- Form values:', formValues);
+  
+  // NOTE: Formula evaluation now handled by frontend (real-time) and database (server-side)
+  // This eliminates duplicate calculation logic and import errors
+
   // First, check for any 'set' actions, as they take precedence.
   const setActionField = formSchema.fields.find(
-    (field: any) => field.inventory_action === 'set' && typeof formValues[field.id] === 'number'
+    (field: any) => field.inventory_action === 'set' && typeof evaluatedFormValues[field.id] === 'number'
   );
 
   if (setActionField) {
-    newQuantity = formValues[setActionField.id];
+    newQuantity = evaluatedFormValues[setActionField.id];
     foundAction = true;
   }
 
   // Process 'add' and 'subtract' actions
   for (const field of formSchema.fields) {
     const action = field.inventory_action;
-    const value = formValues[field.id];
+    const value = evaluatedFormValues[field.id];
 
     if (typeof value === 'number') {
       if (action === 'add') {
@@ -1314,10 +1412,18 @@ export const recordNewInventoryCheck = async (
     let finalQuantity = inventoryItem.quantity; // Start with current quantity
 
     if (checkData.form_schema && checkData.response_data) {
-      const { newQuantity, foundAction } = computeNewInventoryQuantity(
+      // Get asset metadata for formula calculations
+      const { data: asset } = await supabase
+        .from('assets')
+        .select('metadata')
+        .eq('id', inventoryItem.asset_id)
+        .single();
+      
+      const { newQuantity, foundAction } = await computeNewInventoryQuantity(
         inventoryItem.quantity, // Base is the current quantity of the item
         checkData.form_schema,
-        checkData.response_data
+        checkData.response_data,
+        asset?.metadata || {} // Pass asset metadata for formula evaluation
       );
       if (foundAction) {
         finalQuantity = newQuantity;
@@ -1406,15 +1512,23 @@ export const updateHistoricalInventoryCheck = async (
 
     let newQuantityForHistory = originalHistory.quantity;
     if (updatedFormData.form_schema && updatedFormData.response_data) {
+        // Get asset metadata for formula calculations
+        const { data: inventoryWithAsset } = await supabase
+          .from('inventory_items')
+          .select('asset_id, assets!inner(metadata)')
+          .eq('id', originalHistory.inventory_item_id)
+          .single();
+        
         // To accurately recalculate, we need the quantity *before* this specific historical event.
         // This is complex. For now, let's assume computeNewInventoryQuantity can take a base of 0
         // if the form contains a 'set' action, or it adjusts based on originalHistory.quantity if not.
         // This part needs careful thought on how to properly re-evaluate a point in time.
         // A simpler approach: the form used for editing *must* determine the final quantity.
-        const { newQuantity, foundAction } = computeNewInventoryQuantity(
+        const { newQuantity, foundAction } = await computeNewInventoryQuantity(
             originalHistory.quantity, // Or a re-fetched quantity before this event
             updatedFormData.form_schema, 
-            updatedFormData.response_data
+            updatedFormData.response_data,
+            inventoryWithAsset?.assets?.metadata || {} // Pass asset metadata for formula evaluation
         );
         if (foundAction) {
             newQuantityForHistory = newQuantity;

@@ -21,6 +21,24 @@ This document provides a detailed overview of the dynamic forms system in the Ba
 
 ---
 
+## 🏛️ **Calculation Architecture**
+
+To ensure accuracy, performance, and maintainability, the form calculation system operates on a two-tier model:
+
+1.  **Frontend (Real-time Preview)**:
+    *   **Technology**: `Math.js` (via the `safeEvaluator.ts` utility).
+    *   **Purpose**: Provides immediate, real-time feedback to the user as they enter data into forms. This happens client-side within the `FormRenderer.tsx` and `DynamicForm.tsx` components.
+    *   **Behavior**: This is for **preview only**. The results of this calculation are not considered authoritative and are not what is ultimately saved.
+
+2.  **Backend (Authoritative Calculation)**:
+    *   **Technology**: PostgreSQL Function (`calculate_form_formulas`).
+    *   **Purpose**: Acts as the single source of truth for all formula calculations. When a form is submitted, the backend services (e.g., `assetInventoryService.ts`) call this database RPC function.
+    *   **Behavior**: The database function re-evaluates all formulas using the submitted data and any relevant asset metadata. The result from this function is what is stored in the `inventory_history` and is considered the final, correct value.
+
+**This architecture prevents data drift, eliminates duplicate backend logic, and leverages the performance of PostgreSQL for complex calculations.**
+
+---
+
 ## 📂 **Code Implementation**
 
 -   **Frontend Service**: `formService.ts` (`src/services/formService.ts`)

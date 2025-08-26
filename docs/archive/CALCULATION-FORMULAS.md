@@ -1,6 +1,6 @@
 # Customizable Calculation Formulas
 
-This document explains the customizable calculation formulas feature in the Logistiq system.
+> ⚠️ **Outdated Document**: This document describes a previous version of the calculation engine. The information below has been updated for accuracy, but the authoritative documentation can be found in `docs/Features/05_Forms_and_Form_Builder.md` and `docs/SUPABASE-DATABASE-FUNCTIONS.md`.
 
 ## Overview
 
@@ -40,16 +40,17 @@ The system supports several types of calculation formulas:
    - Admin defines calculation formulas for specific fields in those forms
    - Formulas are saved in the asset type's `calculation_formulas` field
 
-2. **QR Code Scanning:**
-   - When a QR code is scanned, the system retrieves asset data with formulas
-   - Asset and formula data are passed to the form submission page
+2.  **QR Code Scanning & Form Submission:**
+    - When a form is submitted, the raw user input and the form's schema are sent to the backend services.
 
-3. **Form Rendering:**
-   - When the form loads, calculation formulas are applied to pre-fill calculated fields
-   - The form displays with both manually entered and calculated values
+3.  **Backend Processing:**
+    - The backend service (e.g., `assetInventoryService.ts`) calls the `calculate_form_formulas` PostgreSQL function.
+    - The database function evaluates all formulas using the raw input and any necessary asset metadata, returning the final, calculated values.
 
-4. **Form Submission:**
-   - When the form is submitted, both user-entered and calculated values are saved
+4.  **Data Storage:**
+    - The backend service takes the authoritative results from the database function.
+    - It then uses these calculated values to process inventory actions (`add`, `subtract`, `set`).
+    - The final inventory quantity and the full `response_data` (containing both raw inputs and calculated results) are saved to the `inventory_history` table.
 
 ## Example Use Cases
 
@@ -91,7 +92,11 @@ For a paint called "B18" that needs custom calculations:
 
 ## Technical Implementation
 
-The formulas are stored in a JSONB object with the following structure:
+The authoritative calculation engine is the `calculate_form_formulas` PostgreSQL function. This function takes the form schema and submission data and returns a JSON object with the calculated values.
+
+The frontend uses `Math.js` via `safeEvaluator.ts` to provide a real-time **preview** of calculations to the user, but these frontend calculations are **not** what is saved to the database.
+
+The `calculation_formulas` JSONB object in the `asset_types` table stores metadata about formulas, but the evaluation logic resides entirely within the database function.
 
 ```json
 {
@@ -106,42 +111,35 @@ This structure allows for flexibility in formula types while maintaining a consi
 
 ### Overview
 
-The system now fully supports decimal values in calculations, particularly important for liquid inventory measurements (e.g., gallons, liters).
+The system now fully supports decimal values in calculations. The authoritative PostgreSQL functions and the frontend `Math.js` evaluator both handle decimal precision correctly.
 
 ### Implementation Details
 
-1. **Form Input:**
-   - Forms accept decimal values (e.g., 44.20 gallons)
-   - Calculations preserve full decimal precision during processing
+1.  **Form Input & Calculation:**
+    - Forms accept and process decimal values with full precision.
+    - The database function `calculate_form_formulas` performs calculations using numeric types that preserve decimal accuracy.
 
-2. **Database Storage:**
-   - Inventory quantity columns store integer values (database constraint)
-   - System automatically rounds decimal values for storage (e.g., 44.20 → 44)
-   - Exact decimal values preserved in multiple locations:
-     - Asset metadata: `exact_quantity_gallons`
-     - Inventory history: `response_data.exact_quantity`
-     - History notes: "Exact quantity: 44.20 gallons"
+2.  **Database Storage:**
+    - For compatibility with other systems, the primary `inventory_items.quantity` column may store a rounded integer value.
+    - The **exact decimal result** of any calculation is always preserved in the `response_data` JSONB field within the `inventory_history` table, ensuring a complete and accurate audit trail.
 
-3. **Display and Reporting:**
-   - UI shows rounded integer values in inventory cards
-   - Forms and reports can access exact decimal values from metadata
-   - Historical precision maintained for audit trails
+3.  **Display and Reporting:**
+    - The primary UI may display the rounded integer for simplicity.
+    - Detailed views, history, and reports should pull the exact decimal value from the `response_data` field to ensure accurate reporting.
 
 ### Example Workflow
 
-1. **User enters:** 44.20 gallons in form
-2. **System stores:**
-   - `inventory_items.quantity`: 44 (rounded)
-   - `assets.metadata.exact_quantity_gallons`: 44.20
-   - `inventory_history.response_data`: { "total_gallons": 44.20, "exact_quantity": 44.20 }
-3. **Display shows:** "44 units" with exact value available for detailed views
+1.  **User enters:** `44.20` gallons in a form. The frontend preview shows the calculated result in real-time.
+2.  **On submission:** The backend calls the database function, which calculates the final value, preserving the `44.20` precision.
+3.  **System stores:**
+    - `inventory_items.quantity`: `44` (rounded, for legacy compatibility)
+    - `inventory_history.response_data`: `{ "total_gallons": 44.20, ... }` (exact value is preserved)
+4.  **Display shows:** "44 units" on the main card, but a detailed view of the history event will show the exact `44.20` value from the `response_data`.
 
 ### Best Practices
 
-- Always use decimal-aware calculations for liquid measurements
-- Reference `exact_quantity_gallons` from metadata for precise reporting
-- Include units in field labels to clarify measurement type
-- Consider displaying both rounded and exact values in critical reports
+- For all precise reporting and auditing, **always** use the values stored within the `response_data` field in the `inventory_history` table.
+- The primary `quantity` field on `inventory_items` should be considered a quick-reference summary, not the authoritative historical value.
 
 ### Future Enhancements
 

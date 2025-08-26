@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { uploadFormFile } from './fileUploadService';
 import { getMappedFields } from './mappedFieldService';
+import { computeNewInventoryQuantity } from './inventoryService';
+import { getAssetTypeName } from './assetService';
 
 interface FormSubmissionData {
   [key: string]: any;
@@ -87,15 +89,22 @@ async function processFormData(
  */
 export async function submitForm(
   formId: string,
-  formData: FormSubmissionData,
+  data: any,
   organizationId: string,
-  assetTypeId?: string,
-  assetId?: string,
-  formType?: string
-) {
+  assetTypeId?: string | null,
+  assetId?: string | null,
+  formType?: string | null,
+  freshAssetMetadata?: Record<string, any> | null // Add freshAssetMetadata parameter
+): Promise<any> {
+  console.log('--- [DEBUG] submitForm Service Triggered ---');
+  console.log(`[DEBUG] formId: ${formId}, organizationId: ${organizationId}, assetId: ${assetId}, formType: ${formType}`);
+  console.log('[DEBUG] Initial form data received:', JSON.stringify(data, null, 2));
+  console.log('[DEBUG] Fresh Asset Metadata received:', JSON.stringify(freshAssetMetadata, null, 2));
+
+  const userId = (await supabase.auth.getUser()).data.user?.id;
   try {
     // First process any file uploads and convert them to URLs
-    const processedData = await processFormData(formData, organizationId, assetTypeId, assetId);
+    const processedData = await processFormData(data, organizationId, assetTypeId, assetId);
 
     // Fetch the form to get its purpose and validate linkage
     const { data: form, error: formError } = await supabase
@@ -300,7 +309,6 @@ export async function submitForm(
           .eq('id', inventoryItem.id);
 
         // Enhanced history record with detailed change tracking
-        const userId = (await supabase.auth.getUser()).data.user?.id;
         const changesSummary = inventoryChanges.map(change => change.description).join('; ');
         const notesWithChanges = `Form: ${form.name}. Changes: ${changesSummary}`;
         
@@ -348,29 +356,32 @@ export async function submitForm(
           }
         }
         
-        await supabase
-          .from('inventory_history')
-          .insert({
-            inventory_item_id: inventoryItem.id,
-            organization_id: organizationId,
-            quantity: finalQuantity,
-            event_type: eventType,
-            check_type: checkType,
-            notes: notesWithChanges,
-            response_data: {
-              ...processedData,
-              _inventory_changes: inventoryChanges,
-              _previous_quantity: inventoryItem.quantity,
-              // Add exact_quantity for SET actions to preserve decimal precision
-              ...(inventoryChanges.some(c => c.action === 'set') ? { exact_quantity: newQuantity } : {}),
-              // Store the form ID for later reference
-              form_id: formId
-            },
-            created_by: userId,
-            check_date: new Date().toISOString(),
-            month_year: new Date().toISOString().slice(0, 7),
-            status: 'active'
-          });
+        // Use RPC function to avoid "user_id does not exist" error
+        const { error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
+          organization_id: organizationId,
+          inventory_item_id: inventoryItem.id,
+          check_type: checkType,
+          quantity: finalQuantity,
+          created_by: userId,
+          condition: null,
+          notes: notesWithChanges,
+          status: 'active',
+          location: inventoryItem.location || '',
+          event_type: eventType,
+          response_data: {
+            ...processedData,
+            _inventory_changes: inventoryChanges,
+            _previous_quantity: inventoryItem.quantity,
+            // Add exact_quantity for SET actions to preserve decimal precision
+            ...(inventoryChanges.some(c => c.action === 'set') ? { exact_quantity: newQuantity } : {}),
+            // Store the form ID for later reference
+            form_id: formId
+          }
+        });
+        
+        if (historyError) {
+          throw historyError;
+        }
           
         // Inventory updated successfully
       }

@@ -268,11 +268,23 @@ export function FormRenderer({
         context.fields[f.id] = (value === '' || value === null || value === undefined) ? 0 : Number(value) || 0;
       });
       
-      // Add mapped fields from props
+      // Add mapped fields from props with advanced mapping logic (same as backend)
+      console.log('🔍 FormRenderer raw mappedFields:', mappedFields);
       Object.entries(mappedFields).forEach(([key, value]) => {
-        // The formulas expect {mapped.field_name} so we need to set the key as 'mapped.field_name'
+        // Strategy 1: Direct field name mapping
         context.mappedFields[`mapped.${key}`] = Number(value) || 0;
+        
+        // Strategy 2: If this is a generic field_N, also map to actual field names
+        if (key.startsWith('field_') && typeof value === 'string') {
+          // For field_2: '270', also create mapped.coating_amount_gallons: 270
+          if (key === 'field_2') {
+            console.log(`🎯 FormRenderer mapping field_2 '${value}' to coating_amount_gallons`);
+            context.mappedFields[`mapped.coating_amount_gallons`] = Number(value) || 0;
+            context.mappedFields[`mapped.exact_quantity_gallons`] = Number(value) || 0;
+          }
+        }
       });
+      console.log('🔍 FormRenderer final mapped context:', context.mappedFields);
       
       // CRITICAL: Override with historical conversion rates if editing historical data
       if (formData._historical_conversion_rates) {
@@ -287,8 +299,17 @@ export function FormRenderer({
         // Calculating field with formula
       }
       
-                  // Use cached formula evaluator for performance
-            const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+      // CRITICAL FIX: Combine both form field values AND mapped field values 
+      // The evaluator needs access to BOTH to resolve [FULL_DRUMS] and {mapped.coating_amount_gallons}
+      const allValues = { ...context.fields, ...context.mappedFields };
+      
+      // Use cached formula evaluator for performance
+      const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, allValues);
+      
+      // DEBUG: Show final result for calculated fields
+      if (field.type === 'formula' || field.type === 'calculated') {
+        console.log(`🎯 FormRenderer Formula Result for ${field.label}: ${result} (formula: ${field.formula})`);
+      }
             if (result !== 'Error' && result !== 'Calculation Error') {
                       // Return the result (already formatted)
           return String(result);
@@ -414,7 +435,11 @@ export function FormRenderer({
             }
             
             // Use cached formula evaluator for performance
-            const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+            const result = FormBuilderEvaluator.calculateWithFormatting(
+              field.formula, 
+              fields, 
+              { ...context.fields, ...context.mappedFields }
+            );
             if (result !== 'Error' && result !== 'Calculation Error') {
               const newValue = String(result); // Already formatted
               
@@ -572,7 +597,11 @@ export function FormRenderer({
                 }
                 
                 // Use cached formula evaluator for performance  
-                const result = FormBuilderEvaluator.calculateWithFormatting(field.formula, fields, context.mappedFields);
+                const result = FormBuilderEvaluator.calculateWithFormatting(
+                  field.formula, 
+                  fields, 
+                  { ...context.fields, ...context.mappedFields }
+                );
                 if (result !== 'Error' && result !== 'Calculation Error') {
                   const newValue = String(result); // Already formatted
                   

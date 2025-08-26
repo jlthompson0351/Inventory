@@ -276,108 +276,79 @@ export const FormBuilderEvaluator = {
     return sampleResult;
   },
 
-  // Line 762 replacement: Actual calculation with formatting (supports both {field_1} and [Field Name] syntax)
+  /**
+   * Main calculation function, with hyper-detailed logging
+   */
   calculateWithFormatting(formula: string, formFields: FormField[], mockValues: Record<string, any>): string {
-    if (!formula || formula.trim() === '') {
-      return "No formula";
-    }
-    
+    console.log(`🔥🔥🔥 NEW EVALUATOR CODE IS RUNNING! 🔥🔥🔥`);
+    console.log(`--- [Evaluator] Start Formula Evaluation ---`);
+    console.log(`[Evaluator] Initial Formula: "${formula}"`);
+    console.log(`[Evaluator] Mock Values Received:`, JSON.stringify(mockValues, null, 2));
+
     let processedFormula = formula;
     try {
-      // First, replace bracket syntax [Field Name] with values
-      const bracketMatches = formula.match(/\[[^\]]+\]/g) || [];
-      bracketMatches.forEach(match => {
-        const fieldName = match.slice(1, -1);
-        let value = 0;
+      // Create a regex to find all placeholders like {field_id} or {mapped.name}
+      const placeholderRegex = /\{([a-zA-Z0-9_.]+)\}/g;
+      
+      processedFormula = formula.replace(placeholderRegex, (match, key) => {
+        console.log(`[Evaluator] Found placeholder: ${match}`);
         
-        // Check if it's an asset field like [Asset.Field Name]
-        if (fieldName.includes('.')) {
-          const [source, fieldLabel] = fieldName.split('.', 2);
-          const mappedKey = `mapped.${fieldLabel}`;
-          if (mockValues[mappedKey] !== undefined) {
-            value = parseFloat(mockValues[mappedKey]) || 0;
+        // Check if the key exists in mockValues
+        if (Object.prototype.hasOwnProperty.call(mockValues, key)) {
+          const value = mockValues[key];
+          const numericValue = parseFloat(value);
+
+          if (isNaN(numericValue)) {
+            console.warn(`[Evaluator] Value for key "${key}" is not a number: "${value}". Replacing with 0.`);
+            return '0';
+          } else {
+            console.log(`[Evaluator] Replacing ${match} with value: ${numericValue}`);
+            return String(numericValue);
           }
         } else {
-          // Regular form field [Field Name]
-          const field = formFields.find(f => f.label === fieldName);
-          if (field && mockValues[field.id] !== undefined) {
-            value = parseFloat(mockValues[field.id]) || 0;
+          // A special case for bracket syntax if ever needed, but brace is primary
+          const bracketKey = key.replace(/_/g, ' ');
+          if (Object.prototype.hasOwnProperty.call(mockValues, bracketKey)) {
+             const value = mockValues[bracketKey];
+             const numericValue = parseFloat(value);
+             if (isNaN(numericValue)) {
+                console.warn(`[Evaluator] Bracket-syntax value for key "${bracketKey}" is not a number: "${value}". Replacing with 0.`);
+                return '0';
+             } else {
+                console.log(`[Evaluator] Bracket-syntax replacing ${match} with value: ${numericValue}`);
+                return String(numericValue);
+             }
           }
         }
         
-        processedFormula = processedFormula.replace(match, String(value));
+        console.warn(`[Evaluator] No value found for placeholder ${match}. Replacing with 0.`);
+        return '0';
       });
+
+      console.log(`[Evaluator] Final expression to be evaluated: "${processedFormula}"`);
       
-      // Then replace legacy brace syntax for backward compatibility
-      for (const key in mockValues) {
-        const value = mockValues[key];
-        if (value !== '' && value !== undefined && value !== null) {
-          const val = parseFloat(value as string);
-          if (!isNaN(val)) {
-            // Handle mapped fields like {mapped.field_name}
-            if (key.startsWith('mapped.')) {
-              processedFormula = processedFormula.replace(new RegExp(`\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), String(val));
-            } else {
-              // Handle regular form fields like {field_1}
-              processedFormula = processedFormula.replace(new RegExp(`\\{${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'g'), String(val));
-            }
-          }
-        }
+      // Remove any leftover placeholders that were not found, replacing them with 0
+      const finalCleanedFormula = processedFormula.replace(placeholderRegex, '0');
+      if(finalCleanedFormula !== processedFormula) {
+        console.log(`[Evaluator] Cleaned up leftover placeholders. Final expression: "${finalCleanedFormula}"`);
       }
 
-      // Handle form fields that don't have mock values
-      formFields.forEach(cf => {
-        if (processedFormula.includes(`{${cf.id}}`)) {
-          const mockValue = mockValues[cf.id];
-          if (mockValue !== undefined && mockValue !== '' && mockValue !== null) {
-            const val = parseFloat(mockValue as string);
-            if (!isNaN(val)) {
-              processedFormula = processedFormula.replace(new RegExp(`\\{${cf.id}\\}`, 'g'), String(val));
-            }
-          } else {
-            // Use placeholder value or default to 1
-            const placeholderVal = parseFloat(cf.placeholder || '1');
-            const defaultVal = isNaN(placeholderVal) ? 1 : placeholderVal; 
-            processedFormula = processedFormula.replace(new RegExp(`\\{${cf.id}\\}`, 'g'), String(defaultVal));
-          }
-        }
-      });
-      
-      // Replace any remaining field references with 0
-      processedFormula = processedFormula.replace(/\{([a-zA-Z0-9_.]+)\}/g, '0');
-      
-      // Clean up the formula
-      processedFormula = processedFormula.trim().replace(/\s+/g, ' ');
-      
-      // Validation checks
-      if (/[+\-*/]\s*$/.test(processedFormula)) {
-        return "Incomplete formula";
+      const result = safeEval(finalCleanedFormula);
+
+      if (result === undefined) {
+        console.error(`[Evaluator] Evaluation returned undefined for expression: "${finalCleanedFormula}"`);
+        return 'Calculation Error';
       }
-      
-      const openParens = (processedFormula.match(/\(/g) || []).length;
-      const closeParens = (processedFormula.match(/\)/g) || []).length;
-      if (openParens !== closeParens) {
-        return "Unmatched parentheses";
-      }
-      
-      if (!processedFormula || processedFormula.trim() === '') {
-        return "Empty formula";
-      }
-  
-      // Use safe evaluator instead of eval()
-      const result = safeEvaluator.evaluate(processedFormula);
-      
-      if (result === undefined || typeof result !== 'number' || isNaN(result)) {
-        return "Invalid result";
-      }
-      
-      // Format the result nicely
-      return Number(result).toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 4
-      });
-    } catch (e) {
-      return "Calculation Error";
+
+      console.log(`[Evaluator] Raw evaluation result: ${result}`);
+      const formattedResult = result.toFixed(2);
+      console.log(`[Evaluator] Formatted result: ${formattedResult}`);
+      console.log(`--- [Evaluator] End Formula Evaluation ---`);
+      return formattedResult;
+    } catch (e: any) {
+      console.error('[Evaluator] CRITICAL ERROR during formula evaluation:', e);
+      console.log(`--- [Evaluator] End Formula Evaluation with ERROR ---`);
+      return 'Error';
     }
   },
 
