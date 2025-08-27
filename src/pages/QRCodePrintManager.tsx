@@ -6,17 +6,21 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
-import { Download, Printer, Search, Grid, List, ChevronUp, ChevronDown } from "lucide-react";
+import { Download, Printer, Search, Grid, List, ChevronUp, ChevronDown, Filter, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
+import { getAssetTypes, type AssetType } from "@/services/assetTypeService";
 
 interface Asset {
   id: string;
   name: string;
   barcode: string;
+  asset_type_id: string;
   asset_type_name: string;
   organization_id: string;
 }
@@ -41,9 +45,13 @@ const PAPER_SIZES = [
 
 export default function QRCodePrintManager() {
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadingAssetTypes, setLoadingAssetTypes] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [qrSize, setQrSize] = useState('1');
@@ -51,22 +59,41 @@ export default function QRCodePrintManager() {
   const [showAssetNames, setShowAssetNames] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
 
   useEffect(() => {
-    fetchAssets();
-  }, []);
+    if (currentOrganization) {
+      fetchAssets();
+      fetchAssetTypes();
+    }
+  }, [currentOrganization]);
 
   useEffect(() => {
-    // Filter assets based on search term
-    const filtered = assets.filter(asset =>
-      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.asset_type_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filter assets based on search term and selected asset types
+    let filtered = assets;
+    
+    // Apply text search filter
+    if (searchTerm) {
+      filtered = filtered.filter(asset =>
+        asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.asset_type_name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Apply asset type filter
+    if (selectedAssetTypes.size > 0) {
+      filtered = filtered.filter(asset =>
+        selectedAssetTypes.has(asset.asset_type_id)
+      );
+    }
+    
     setFilteredAssets(filtered);
-  }, [assets, searchTerm]);
+  }, [assets, searchTerm, selectedAssetTypes]);
 
   const fetchAssets = async () => {
+    if (!currentOrganization) return;
+    
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -75,9 +102,11 @@ export default function QRCodePrintManager() {
           id,
           name,
           barcode,
+          asset_type_id,
           organization_id,
-          asset_types(name)
+          asset_types(id, name)
         `)
+        .eq('organization_id', currentOrganization.id)
         .eq('is_deleted', false)
         .order('name');
 
@@ -87,6 +116,7 @@ export default function QRCodePrintManager() {
         id: asset.id,
         name: asset.name,
         barcode: asset.barcode || '',
+        asset_type_id: asset.asset_type_id || '',
         asset_type_name: asset.asset_types?.name || 'Unknown',
         organization_id: asset.organization_id
       })) || [];
@@ -97,6 +127,21 @@ export default function QRCodePrintManager() {
       toast.error('Failed to load assets');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchAssetTypes = async () => {
+    if (!currentOrganization) return;
+    
+    try {
+      setLoadingAssetTypes(true);
+      const types = await getAssetTypes(currentOrganization.id);
+      setAssetTypes(types);
+    } catch (error) {
+      console.error('Error fetching asset types:', error);
+      toast.error('Failed to load asset types');
+    } finally {
+      setLoadingAssetTypes(false);
     }
   };
 
@@ -116,6 +161,29 @@ export default function QRCodePrintManager() {
 
   const clearSelection = () => {
     setSelectedAssets(new Set());
+  };
+
+  const toggleAssetTypeSelection = (assetTypeId: string) => {
+    const newSelected = new Set(selectedAssetTypes);
+    if (newSelected.has(assetTypeId)) {
+      newSelected.delete(assetTypeId);
+    } else {
+      newSelected.add(assetTypeId);
+    }
+    setSelectedAssetTypes(newSelected);
+  };
+
+  const selectAllAssetTypes = () => {
+    setSelectedAssetTypes(new Set(assetTypes.map(type => type.id)));
+  };
+
+  const clearAssetTypeSelection = () => {
+    setSelectedAssetTypes(new Set());
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedAssetTypes(new Set());
   };
 
   const calculateLayout = () => {
@@ -359,17 +427,132 @@ export default function QRCodePrintManager() {
                 className="pl-10"
               />
             </div>
+            
+            {/* Asset Type Filter */}
+            <div>
+              <Label className="text-xs mb-2 block">Filter by Asset Type</Label>
+              <Popover open={filterDropdownOpen} onOpenChange={setFilterDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-between h-8"
+                    disabled={loadingAssetTypes}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Filter className="h-3 w-3" />
+                      {selectedAssetTypes.size === 0 
+                        ? 'All Types' 
+                        : selectedAssetTypes.size === 1 
+                        ? assetTypes.find(t => selectedAssetTypes.has(t.id))?.name || '1 selected'
+                        : `${selectedAssetTypes.size} types selected`
+                      }
+                    </span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="p-3 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Asset Types</span>
+                      {selectedAssetTypes.size > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearAssetTypeSelection}
+                          className="h-6 px-2 text-xs"
+                        >
+                          Clear
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllAssetTypes}
+                        className="flex-1 h-7 text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearAssetTypeSelection}
+                        className="flex-1 h-7 text-xs"
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {loadingAssetTypes ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        Loading asset types...
+                      </div>
+                    ) : assetTypes.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No asset types found
+                      </div>
+                    ) : (
+                      assetTypes.map(assetType => (
+                        <div
+                          key={assetType.id}
+                          className="flex items-center space-x-2 p-2 hover:bg-accent cursor-pointer"
+                          onClick={() => toggleAssetTypeSelection(assetType.id)}
+                        >
+                          <Checkbox
+                            checked={selectedAssetTypes.has(assetType.id)}
+                            onCheckedChange={() => toggleAssetTypeSelection(assetType.id)}
+                          />
+                          <div className="flex items-center gap-2 flex-1">
+                            {assetType.color && (
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: assetType.color }}
+                              />
+                            )}
+                            <span className="text-sm">{assetType.name}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
             <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={viewMode === 'grid' ? () => setViewMode('list') : () => setViewMode('grid')}
-              >
-                {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
-              </Button>
-              <Badge variant="secondary">
-                {filteredAssets.length} assets
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={viewMode === 'grid' ? () => setViewMode('list') : () => setViewMode('grid')}
+                >
+                  {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+                </Button>
+                {(searchTerm || selectedAssetTypes.size > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="h-8 px-2"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear Filters
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant="secondary">
+                  {filteredAssets.length} assets
+                </Badge>
+                {selectedAssetTypes.size > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {selectedAssetTypes.size} type{selectedAssetTypes.size !== 1 ? 's' : ''} filtered
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
