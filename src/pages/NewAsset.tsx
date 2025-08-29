@@ -108,7 +108,7 @@ export default function NewAsset() {
     parent_asset_id: z.string().optional(),
     location: z.string().optional(),
     location_details: z.string().optional(),
-    cost: z.number().optional(),
+    cost: z.number().default(0),
     unit_type: z.string().optional(),
     current_inventory: z.number().default(0),
   });
@@ -125,7 +125,7 @@ export default function NewAsset() {
       parent_asset_id: "",
       location: "",
       location_details: "",
-      cost: undefined,
+      cost: 0,
       unit_type: "",
       current_inventory: 0,
     },
@@ -382,8 +382,10 @@ export default function NewAsset() {
       }
       
       // Add cost and unit type to metadata
-      if (values.cost !== undefined) {
+      if (values.cost > 0) {
         metadata.cost = values.cost;
+      } else {
+        metadata.cost = 0; // Always include cost, default to 0
       }
       
       if (values.unit_type) {
@@ -570,7 +572,7 @@ export default function NewAsset() {
         parent_asset_id: data.parent_asset_id || "",
         location: metadataObject.location || "",
         location_details: metadataObject.location_details || "",
-        cost: metadataObject.cost,
+        cost: metadataObject.cost || 0,
         unit_type: metadataObject.unit_type || "",
         current_inventory: metadataObject.current_inventory || 0,
       });
@@ -631,7 +633,7 @@ export default function NewAsset() {
       if (Object.keys(metadataObject).length > 0) {
         form.setValue('location', metadataObject.location || "");
         form.setValue('location_details', metadataObject.location_details || "");
-        form.setValue('cost', metadataObject.cost);
+        form.setValue('cost', metadataObject.cost || 0);
         form.setValue('unit_type', metadataObject.unit_type || "");
         form.setValue('current_inventory', metadataObject.current_inventory || 0);
 
@@ -651,7 +653,7 @@ export default function NewAsset() {
         // If metadata is not an object or is null, set defaults for form values
         form.setValue('location', "");
         form.setValue('location_details', "");
-        form.setValue('cost', undefined);
+        form.setValue('cost', 0);
         form.setValue('unit_type', "");
         form.setValue('current_inventory', 0);
         setFormValues({});
@@ -1021,8 +1023,8 @@ export default function NewAsset() {
                                 type="number" 
                                 placeholder="Enter cost" 
                                 {...field}
-                                value={field.value === undefined ? '' : field.value}
-                                onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                                value={field.value || ''}
+                                onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                               />
                             </FormControl>
                             <FormDescription>

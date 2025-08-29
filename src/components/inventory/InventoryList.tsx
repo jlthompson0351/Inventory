@@ -37,10 +37,15 @@ interface InventoryItem {
     name: string;
     color: string;
   };
+  inventory_price_history?: Array<{
+    unit_type?: string;
+    effective_date: string;
+  }>;
   // Inventory-specific metadata
   last_check_date?: string;
   monthly_usage?: number;
   stock_level?: 'low' | 'normal' | 'high';
+  unit_type?: string; // The current/latest unit type
 }
 
 interface InventoryListProps {
@@ -68,15 +73,31 @@ export default function InventoryList({
       
       if (data) {
         // Process and enrich inventory data with metadata
-        const enrichedItems = data.map(item => ({
-          ...item,
-          // Calculate stock level based on quantity
-          stock_level: getStockLevel(item.quantity),
-          // Calculate days since last update
-          last_check_date: item.updated_at,
-          // Mock monthly usage calculation (you can replace with real data)
-          monthly_usage: Math.floor(Math.random() * 20) + 1
-        }));
+        const enrichedItems = data.map(item => {
+          // Extract the latest unit type from price history
+          let unitType = 'units'; // Default fallback
+          if (item.inventory_price_history && item.inventory_price_history.length > 0) {
+            // Sort by effective_date descending to get the latest
+            const sortedHistory = item.inventory_price_history
+              .sort((a, b) => new Date(b.effective_date).getTime() - new Date(a.effective_date).getTime());
+            const latestHistory = sortedHistory[0];
+            if (latestHistory.unit_type) {
+              unitType = latestHistory.unit_type;
+            }
+          }
+          
+          return {
+            ...item,
+            // Calculate stock level based on quantity
+            stock_level: getStockLevel(item.quantity),
+            // Calculate days since last update
+            last_check_date: item.updated_at,
+            // Mock monthly usage calculation (you can replace with real data)
+            monthly_usage: Math.floor(Math.random() * 20) + 1,
+            // Set the extracted unit type
+            unit_type: unitType
+          };
+        });
         
         setInventoryItems(enrichedItems);
       }
@@ -193,7 +214,7 @@ export default function InventoryList({
               variant="outline"
               className={`${getStockLevelColor(item.stock_level || 'normal')} mb-2 w-fit font-semibold`}
             >
-              {item.quantity} units
+              {item.quantity} {item.unit_type || 'units'}
             </Badge>
             
             {/* Asset Type and Category */}

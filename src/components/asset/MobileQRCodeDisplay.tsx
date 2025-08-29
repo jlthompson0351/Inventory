@@ -6,7 +6,8 @@ import {
   Copy, 
   ExternalLink,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -203,6 +204,18 @@ const MobileQRCodeDisplay = ({
     window.open(qrData.mobile_url, '_blank');
   };
 
+  const handleOpenUrl = () => {
+    if (!qrData) return;
+    window.open(qrData.mobile_url, '_blank');
+  };
+
+  const handleOpenMobileTest = () => {
+    if (!qrData) return;
+    // Open mobile test interface with mobile viewport simulation
+    const mobileTestUrl = `/mobile-test/asset/${assetId}`;
+    window.open(mobileTestUrl, '_blank', 'width=375,height=667,scrollbars=yes,resizable=yes');
+  };
+
   if (isLoading) {
     return (
       <Card className={className}>
@@ -308,6 +321,29 @@ const MobileQRCodeDisplay = ({
               >
                 <ExternalLink className="h-3 w-3 mr-1" />
                 Test
+              </Button>
+            </div>
+
+            {/* New testing buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenUrl}
+                className="text-xs"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                URL
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenMobileTest}
+                className="text-xs bg-blue-50 hover:bg-blue-100 border-blue-200"
+              >
+                <Smartphone className="h-3 w-3 mr-1" />
+                Mobile
               </Button>
             </div>
 

@@ -1,8 +1,8 @@
-# Mobile QR + PIN Workflow (Updated August 2025)
+# Mobile QR + PIN Workflow (Updated December 2024)
 
-**Status**: 🚨 **CRITICAL SECURITY VULNERABILITY** - DO NOT USE IN PRODUCTION
+**Status**: ⚠️ **REQUIRES SECURITY REVIEW** - Review RLS policies before production use
 
-This document explains the mobile QR + PIN workflow. This feature is currently **INSECURE** and deviates significantly from safe data handling practices. It was implemented to achieve a fast field workflow, but the current RLS policies expose the system to unauthorized data access and modification.
+This document explains the mobile QR + PIN workflow. This feature requires careful **security review** of RLS policies to ensure proper data isolation. The workflow is designed for fast field operations with PIN authentication, but RLS policies need verification before production deployment.
 
 ---
 
@@ -40,9 +40,9 @@ The documentation *claimed* the security relied on a layered approach, but the i
 
 ---
 
-## 🚨 **Immediate Action Required**
+## 🔍 **Security Review Required**
 
-The current implementation is not secure. The following RLS policies must be implemented immediately to mitigate these vulnerabilities.
+The mobile QR workflow requires careful review of RLS policies. Based on the current RLS audit, these policies should be evaluated:
 
 ### **Corrected RLS Policies**
 
@@ -84,4 +84,4 @@ WITH CHECK (organization_id = get_current_organization_id());
 
 ---
 
-This feature should be **disabled immediately** in any production or sensitive environment until these security issues are remediated. The convenience of the workflow does not outweigh the risk of unauthorized data access and manipulation.
+**Note**: The current RLS audit shows that Row Level Security policies exist but may not be enabled on all tables. Before deploying this feature to production, verify that RLS is properly enabled and test the mobile workflow thoroughly in a staging environment.

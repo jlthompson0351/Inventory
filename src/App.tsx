@@ -50,6 +50,7 @@ import SubmitForm from "./pages/SubmitForm";
 import InventoryCheck from "./pages/InventoryCheck";
 import QRScanHandler from "./pages/QRScanHandler";
 import MobileAssetWorkflow from "./pages/MobileAssetWorkflow";
+import MobileTestWorkflow from "./pages/MobileTestWorkflow";
 
 // New inventory workflow pages
 import InventoryAddSelectionPage from "./pages/InventoryAddSelection";
@@ -138,6 +139,9 @@ const AppRoutes = () => {
         
         {/* Mobile QR Workflow - accessible without traditional login (uses PIN) */}
         <Route path="/mobile/asset/:assetId" element={<MobileAssetWorkflow />} />
+        
+        {/* Mobile Testing Interface - accessible to authenticated users for debugging */}
+        <Route path="/mobile-test/asset/:assetId" element={<MobileTestWorkflow />} />
         
         {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
         <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />

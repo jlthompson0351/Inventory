@@ -141,15 +141,17 @@ const SimpleAssetReport: React.FC = () => {
 
   const loadAssetTypes = async () => {
     try {
-      const { data, error } = await supabase
+      // @ts-ignore - Temporary workaround for TypeScript deep instantiation issue
+      const result = await supabase
         .from('asset_types')
         .select('id, name, color')
         .eq('organization_id', currentOrganization!.id)
         .eq('is_deleted', false)
-        .order('name') as { data: any[] | null; error: any };
+        .order('name');
 
-      if (error) throw error;
-      setAssetTypes(data || []);
+      if (result.error) throw result.error;
+      const typedData: AssetType[] = result.data || [];
+      setAssetTypes(typedData);
     } catch (error: any) {
       toast.error('Failed to load asset types: ' + error.message);
     }
@@ -246,7 +248,7 @@ const SimpleAssetReport: React.FC = () => {
           )
         `)
         .eq('organization_id', currentOrganization.id)
-        .eq('is_deleted', false) as { data: any[] | null; error: any };
+        .eq('is_deleted', false);
 
       // Apply additional filters after the base query
       let filteredData = data;
@@ -625,345 +627,450 @@ const SimpleAssetReport: React.FC = () => {
   const previewData = showPreview ? reportData.slice(0, 3) : reportData; // Limit to 3 for preview
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Advanced Asset Reporting
-          </h1>
-          <p className="text-gray-600 text-sm">
-            Complete reporting system with templates, flexible date ranges, and asset history
-          </p>
-        </div>
+    <div className="space-y-6">
+      {/* Enhanced Header */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-6">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+          <div className="flex-1">
+            <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              Advanced Asset Reporting
+            </h2>
+            <p className="text-gray-600 text-base lg:text-lg leading-relaxed">
+              Complete reporting system with templates, flexible date ranges, and asset history analysis
+            </p>
+            <div className="flex flex-wrap items-center gap-4 mt-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Real-time Data</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Export Ready</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm text-gray-600">Template Support</span>
+              </div>
+            </div>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          {savedTemplates.length > 0 && (
-            <Select value="" onValueChange={(value) => {
-              const template = savedTemplates.find(t => t.id === value);
-              if (template) loadTemplate(template);
-            }}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Load Template..." />
-              </SelectTrigger>
-              <SelectContent>
-                {savedTemplates.map((template) => (
-                  <SelectItem key={template.id} value={template.id!}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{template.name}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTemplate(template.id!);
-                        }}
-                        className="h-4 w-4 p-0 ml-2"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {formFields.length > 0 && (
-            <>
-              <Button
-                onClick={() => setShowSaveTemplate(!showSaveTemplate)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                Save Template
-              </Button>
-              <Button
-                onClick={() => setShowColumnSelector(!showColumnSelector)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                Columns ({selectedFields.length}/{formFields.length})
-              </Button>
-            </>
-          )}
-          <Button
-            onClick={exportToCSV}
-            disabled={isExporting || reportData.length === 0 || selectedFields.length === 0}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            {isExporting ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 min-w-fit">
+            {savedTemplates.length > 0 && (
+              <Select value="" onValueChange={(value) => {
+                const template = savedTemplates.find(t => t.id === value);
+                if (template) loadTemplate(template);
+              }}>
+                <SelectTrigger className="w-56 h-11 bg-white/80 backdrop-blur-sm border-2 border-blue-200 hover:border-blue-300 transition-colors">
+                  <SelectValue placeholder="📋 Load Template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedTemplates.map((template) => (
+                    <SelectItem key={template.id} value={template.id!}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{template.name}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteTemplate(template.id!);
+                          }}
+                          className="h-4 w-4 p-0 ml-2"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
-            Export CSV
-          </Button>
+            
+            {formFields.length > 0 && (
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                  variant="outline"
+                  className="h-11 bg-white/80 backdrop-blur-sm border-2 border-green-200 hover:border-green-300 hover:bg-green-50 transition-all duration-200 flex items-center gap-2"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Template
+                </Button>
+                <Button
+                  onClick={() => setShowColumnSelector(!showColumnSelector)}
+                  variant="outline"
+                  className="h-11 bg-white/80 backdrop-blur-sm border-2 border-orange-200 hover:border-orange-300 hover:bg-orange-50 transition-all duration-200 flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Columns ({selectedFields.length}/{formFields.length})
+                </Button>
+              </div>
+            )}
+            
+            <Button
+              onClick={exportToCSV}
+              disabled={isExporting || reportData.length === 0 || selectedFields.length === 0}
+              className="h-11 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+            >
+              {isExporting ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Export CSV
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Save Template Modal */}
+      {/* Enhanced Save Template Modal */}
       {showSaveTemplate && (
-        <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Save className="h-4 w-4 text-green-600" />
-              Save Report Template
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-2">
-            <div>
-              <Label htmlFor="template-name">Template Name *</Label>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6">
+            <div className="flex items-center gap-3">
+              <Save className="h-6 w-6 text-white" />
+              <h3 className="text-xl font-bold text-white">Save Report Template</h3>
+            </div>
+            <p className="text-green-100 mt-2">Save your current configuration for future use</p>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="template-name" className="text-base font-semibold text-gray-800">Template Name *</Label>
               <Input
                 id="template-name"
                 value={newTemplateName}
                 onChange={(e) => setNewTemplateName(e.target.value)}
                 placeholder="e.g., Monthly Paint Inventory"
+                className="h-12 border-2 border-gray-200 focus:border-green-400"
               />
             </div>
-            <div>
-              <Label htmlFor="template-description">Description</Label>
+            <div className="space-y-3">
+              <Label htmlFor="template-description" className="text-base font-semibold text-gray-800">Description (Optional)</Label>
               <Input
                 id="template-description"
                 value={newTemplateDescription}
                 onChange={(e) => setNewTemplateDescription(e.target.value)}
                 placeholder="e.g., Standard monthly report for paint assets"
+                className="h-12 border-2 border-gray-200 focus:border-green-400"
               />
             </div>
-            <div className="flex gap-2">
-              <Button onClick={saveTemplate} className="flex items-center gap-2">
-                <Save className="h-4 w-4" />
+            <div className="flex gap-4 pt-4">
+              <Button 
+                onClick={saveTemplate} 
+                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Save className="h-4 w-4 mr-2" />
                 Save Template
               </Button>
-              <Button variant="outline" onClick={() => setShowSaveTemplate(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSaveTemplate(false)}
+                className="px-8 py-3 rounded-xl border-2 border-gray-300 hover:border-gray-400"
+              >
                 Cancel
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Advanced Controls */}
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Target className="h-4 w-4 text-purple-600" />
-            Report Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-2">
-          {/* View Mode Selector */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label className="block text-sm font-medium text-gray-700 mb-2">
+      {/* Enhanced Configuration Section */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6">
+          <div className="flex items-center gap-3">
+            <Target className="h-6 w-6 text-white" />
+            <h3 className="text-xl font-bold text-white">Report Configuration</h3>
+          </div>
+          <p className="text-purple-100 mt-2">Configure your report parameters for customized data analysis</p>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          {/* Primary Controls Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-3">
+              <Label className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-purple-600" />
                 View Mode
               </Label>
               <Select value={viewMode} onValueChange={(value: 'latest' | 'history' | 'comparison') => setViewMode(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-purple-300 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="latest">
-                    <span className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Latest Submissions
+                    <span className="flex items-center gap-3 py-1">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <p className="font-medium">Latest Submissions</p>
+                        <p className="text-xs text-gray-500">Most recent data per asset</p>
+                      </div>
                     </span>
                   </SelectItem>
                   <SelectItem value="history">
-                    <span className="flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      Historical View
+                    <span className="flex items-center gap-3 py-1">
+                      <History className="h-4 w-4 text-orange-600" />
+                      <div>
+                        <p className="font-medium">Historical View</p>
+                        <p className="text-xs text-gray-500">Timeline of all submissions</p>
+                      </div>
                     </span>
                   </SelectItem>
                   <SelectItem value="comparison">
-                    <span className="flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4" />
-                      Period Comparison
+                    <span className="flex items-center gap-3 py-1">
+                      <CalendarDays className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="font-medium">Period Comparison</p>
+                        <p className="text-xs text-gray-500">Compare across time periods</p>
+                      </div>
                     </span>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-3">
+              <Label className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-purple-600" />
                 Date Range
               </Label>
               <Select value={dateRangeType} onValueChange={(value: typeof dateRangeType) => setDateRangeType(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-purple-300 transition-colors">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="current_month">Current Month</SelectItem>
-                  <SelectItem value="last_week">Last 7 Days</SelectItem>
-                  <SelectItem value="last_month">Last Month</SelectItem>
-                  <SelectItem value="last_3_months">Last 3 Months</SelectItem>
-                  <SelectItem value="all_time">All Time</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
+                  <SelectItem value="current_month">📅 Current Month</SelectItem>
+                  <SelectItem value="last_week">🗓️ Last 7 Days</SelectItem>
+                  <SelectItem value="last_month">📆 Last Month</SelectItem>
+                  <SelectItem value="last_3_months">🗓️ Last 3 Months</SelectItem>
+                  <SelectItem value="all_time">⏰ All Time</SelectItem>
+                  <SelectItem value="custom">🎯 Custom Range</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-3">
+              <Label className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <Filter className="h-4 w-4 text-purple-600" />
                 Asset Types
               </Label>
               <Select value={selectedAssetTypes[0] || 'all'} onValueChange={(value) => setSelectedAssetTypes([value])}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 bg-white border-2 border-gray-200 hover:border-purple-300 transition-colors">
                   <SelectValue placeholder="Select asset type..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"></div>
-                      All Asset Types
+                    <span className="flex items-center gap-3 py-1">
+                      <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"></div>
+                      <div>
+                        <p className="font-medium">All Asset Types</p>
+                        <p className="text-xs text-gray-500">Include all available types</p>
+                      </div>
                     </span>
                   </SelectItem>
                   {assetTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-3 py-1">
                         <div 
-                          className="w-3 h-3 rounded-full" 
+                          className="w-4 h-4 rounded-full shadow-sm" 
                           style={{ backgroundColor: type.color }}
                         ></div>
-                        {type.name}
+                        <div>
+                          <p className="font-medium">{type.name}</p>
+                          <p className="text-xs text-gray-500">Filter by this type</p>
+                        </div>
                       </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {assetTypes.length === 0 && (
-                <p className="text-xs text-red-500 mt-1">
-                  No asset types found. Please create asset types first.
-                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-600 font-medium">
+                    ⚠️ No asset types found. Please create asset types first.
+                  </p>
+                </div>
               )}
               {assetTypes.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Found {assetTypes.length} asset types
-                </p>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                  <p className="text-sm text-green-700">
+                    ✅ Found {assetTypes.length} asset types available
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
           {/* Custom Date Range */}
           {dateRangeType === 'custom' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div>
-                <Label htmlFor="start-date">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                />
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarDays className="h-5 w-5 text-blue-600" />
+                <h4 className="text-lg font-semibold text-blue-800">Custom Date Range</h4>
               </div>
-              <div>
-                <Label htmlFor="end-date">End Date</Label>
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="start-date" className="text-base font-medium text-gray-700">Start Date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="h-12 border-2 border-blue-200 focus:border-blue-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-date" className="text-base font-medium text-gray-700">End Date</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="h-12 border-2 border-blue-200 focus:border-blue-400"
+                  />
+                </div>
               </div>
             </div>
           )}
 
           {/* Asset Selector for History Mode */}
           {viewMode === 'history' && (
-            <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-              <Label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Asset for History View
-              </Label>
-              <Select value={selectedAssetForHistory} onValueChange={setSelectedAssetForHistory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose an asset to view its history..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {reportData.map((asset, index) => (
-                    <SelectItem key={index} value={asset.asset_name}>
-                      {asset.asset_name} ({asset.asset_type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <History className="h-5 w-5 text-orange-600" />
+                <h4 className="text-lg font-semibold text-orange-800">Asset Selection for History View</h4>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-base font-medium text-gray-700">
+                  Select Asset for History View
+                </Label>
+                <Select value={selectedAssetForHistory} onValueChange={setSelectedAssetForHistory}>
+                  <SelectTrigger className="h-12 border-2 border-orange-200 focus:border-orange-400">
+                    <SelectValue placeholder="Choose an asset to view its history..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportData.map((asset, index) => (
+                      <SelectItem key={index} value={asset.asset_name}>
+                        <span className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                          {asset.asset_name} ({asset.asset_type})
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 
-          {/* Generate Button */}
-          <div className="flex justify-center">
-            <Button 
-              onClick={generateReport}
-              disabled={isLoading || !currentOrganization?.id}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 px-12 py-3 text-lg"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Target className="mr-2 h-5 w-5" />
-                  Generate {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison' : 'Report'}
-                </>
-              )}
-            </Button>
+          {/* Enhanced Generate Button Section */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-8">
+            <div className="text-center space-y-4">
+              <h4 className="text-xl font-bold text-gray-800">Ready to Generate Your Report?</h4>
+              <p className="text-gray-600">Click the button below to create your customized inventory report</p>
+              
+              <Button 
+                onClick={generateReport}
+                disabled={isLoading || !currentOrganization?.id}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-200 px-16 py-4 text-lg font-semibold rounded-xl"
+                size="lg"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="mr-3 h-6 w-6 animate-spin" />
+                    Generating Report...
+                  </>
+                ) : (
+                  <>
+                    <Target className="mr-3 h-6 w-6" />
+                    Generate {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison' : 'Report'}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
           
-          {/* Debug Info */}
+          {/* System Status Info */}
           {currentOrganization && (
-            <div className="mt-2 p-2 bg-gray-50 rounded-lg text-xs text-gray-600">
-              <strong>Debug:</strong> Org: {currentOrganization.name} | Types: {assetTypes.length} | 
-              Selected: {selectedAssetTypes.join(', ')} | View: {viewMode} | Date: {dateRangeType}
-              {currentTemplate && <span> | Template: {currentTemplate.name}</span>}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Settings className="h-4 w-4 text-gray-600" />
+                <span className="font-medium text-gray-700">System Status</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Organization:</span>
+                  <p className="font-medium text-gray-800">{currentOrganization.name}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Asset Types:</span>
+                  <p className="font-medium text-gray-800">{assetTypes.length} available</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">View Mode:</span>
+                  <p className="font-medium text-gray-800 capitalize">{viewMode}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Date Range:</span>
+                  <p className="font-medium text-gray-800">{dateRangeType.replace('_', ' ')}</p>
+                </div>
+              </div>
+              {currentTemplate && (
+                <div className="mt-3 p-2 bg-blue-100 rounded-lg">
+                  <span className="text-blue-700 font-medium">📋 Template: {currentTemplate.name}</span>
+                </div>
+              )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Column Selector */}
+      {/* Enhanced Column Selector */}
       {showColumnSelector && formFields.length > 0 && (
-        <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-orange-600" />
-                Select Columns to Include
-              </span>
-              <div className="flex items-center gap-2">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-orange-600 to-yellow-600 p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Settings className="h-6 w-6 text-white" />
+                <div>
+                  <h3 className="text-xl font-bold text-white">Column Selection</h3>
+                  <p className="text-orange-100">Choose which data columns to include in your report</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
                 <Checkbox
                   id="select-all"
                   checked={selectedFields.length === formFields.length}
                   onCheckedChange={toggleAllColumns}
+                  className="border-white"
                 />
-                <label htmlFor="select-all" className="text-sm font-normal">
-                  Select All ({formFields.length})
+                <label htmlFor="select-all" className="text-white font-medium cursor-pointer">
+                  Select All ({formFields.length} columns)
                 </label>
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+            </div>
+          </div>
+          
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {formFields.map((field) => (
-                <div key={field.id} className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-2 flex-1">
+                <div key={field.id} className="bg-white rounded-xl border-2 border-gray-200 hover:border-orange-300 p-4 transition-all duration-200 hover:shadow-md">
+                  <div className="flex items-center space-x-3">
                     <Checkbox
                       id={field.id}
                       checked={field.selected}
                       onCheckedChange={() => toggleColumn(field.id)}
+                      className="w-5 h-5"
                     />
                     {field.selected && field.order && (
-                      <span className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-xs font-bold rounded-full">
+                      <span className="flex items-center justify-center w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-bold rounded-full shadow-md">
                         {field.order}
                       </span>
                     )}
                     <label
                       htmlFor={field.id}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      className="text-sm font-medium text-gray-800 cursor-pointer flex-1 leading-relaxed"
                       onClick={() => toggleColumn(field.id)}
                     >
                       {field.label}
@@ -972,173 +1079,269 @@ const SimpleAssetReport: React.FC = () => {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-orange-600">
-                Click columns to select and order them | Preview shows first 3 assets
-              </p>
+            
+            <div className="mt-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-orange-800">
+                  📊 Selected: {selectedFields.length} of {formFields.length} columns
+                </p>
+                <p className="text-xs text-orange-600">
+                  Click columns to select them. Numbers show the order they'll appear in your report.
+                </p>
+              </div>
               <Button
                 onClick={() => setShowPreview(!showPreview)}
                 variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
+                className="bg-white border-2 border-orange-300 hover:border-orange-400 hover:bg-orange-50 transition-all duration-200"
               >
-                {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {showPreview ? 'Show All' : 'Show Preview'}
+                {showPreview ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                {showPreview ? 'Show All Data' : 'Show Preview Only'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Report Results */}
+      {/* Enhanced Report Results */}
       {reportData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                {viewMode === 'history' ? (
-                  <History className="h-5 w-5 text-orange-600" />
-                ) : viewMode === 'comparison' ? (
-                  <CalendarDays className="h-5 w-5 text-purple-600" />
-                ) : (
-                  <Calendar className="h-5 w-5 text-green-600" />
-                )}
-                {viewMode === 'history' ? 'Asset History Report' : 
-                 viewMode === 'comparison' ? 'Period Comparison Report' : 
-                 'Asset Inventory Report'}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-green-600 p-6">
+            <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                  {viewMode === 'history' ? (
+                    <History className="h-6 w-6 text-white" />
+                  ) : viewMode === 'comparison' ? (
+                    <CalendarDays className="h-6 w-6 text-white" />
+                  ) : (
+                    <Calendar className="h-6 w-6 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xl lg:text-2xl font-bold text-white">
+                    {viewMode === 'history' ? 'Asset History Report' : 
+                     viewMode === 'comparison' ? 'Period Comparison Report' : 
+                     'Asset Inventory Report'}
+                  </h3>
+                  <p className="text-blue-100">
+                    Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-white" />
+                    <span className="text-white font-medium">
+                      {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
+                    </span>
+                  </div>
+                </div>
+                
                 {showPreview && reportData.length > 3 && (
-                  <Badge variant="outline" className="ml-2">
-                    Preview: {previewData.length} of {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
+                  <Badge className="bg-yellow-500 text-yellow-900 border-0">
+                    Preview: {previewData.length} of {reportData.length}
                   </Badge>
                 )}
-              </CardTitle>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {new Date().toLocaleString()}
-                </span>
+                
                 {viewMode === 'history' && selectedAssetForHistory && (
-                  <Badge variant="secondary">
+                  <Badge className="bg-orange-500 text-orange-900 border-0">
                     Viewing: {selectedAssetForHistory}
                   </Badge>
                 )}
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b-2 border-gray-200">
-                    <th className="text-left p-2 font-semibold bg-gray-50 text-xs">Asset Name</th>
-                    {viewMode === 'history' && (
-                      <th className="text-left p-2 font-semibold bg-gray-50 text-xs">Submission Date</th>
-                    )}
-                    {selectedFields.map((field) => (
-                      <th key={field.id} className="text-left p-2 font-semibold bg-gray-50 text-xs">
-                        {field.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.map((row, index) => (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-2 font-medium text-blue-600 text-xs">{row.asset_name}</td>
+          </div>
+          
+          <div className="p-6">
+            {/* Enhanced Table */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200">
+                      <th className="text-left p-4 font-bold text-gray-800 text-sm">Asset Name</th>
                       {viewMode === 'history' && (
-                        <td className="p-2 text-xs text-gray-500">
-                          {row.submission_date ? 
-                            new Date(row.submission_date).toLocaleString() : 
-                            <span className="text-red-500">No data</span>
-                          }
-                        </td>
+                        <th className="text-left p-4 font-bold text-gray-800 text-sm">Submission Date</th>
                       )}
                       {selectedFields.map((field) => (
-                        <td key={field.id} className="p-2 text-xs">
-                          {field.id === 'asset_type' ? (
-                            <Badge variant="outline" className="text-xs">
-                              {row.asset_type}
-                            </Badge>
-                          ) : field.id === 'last_updated' ? (
-                            <span className="text-gray-500">
-                              {row.submission_date ? 
-                                new Date(row.submission_date).toLocaleDateString() : 
-                                <span className="text-red-500">No data</span>
-                              }
-                            </span>
-                          ) : field.id === 'last_month_total' ? (
-                            row.last_month_total || <span className="text-gray-400">No data</span>
-                          ) : (
-                            renderFieldValue(row.latest_submission[field.id]) || 
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
+                        <th key={field.id} className="text-left p-4 font-bold text-gray-800 text-sm">
+                          {field.label}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150">
+                        <td className="p-4 font-semibold text-blue-700">{row.asset_name}</td>
+                        {viewMode === 'history' && (
+                          <td className="p-4 text-gray-600">
+                            {row.submission_date ? 
+                              new Date(row.submission_date).toLocaleString() : 
+                              <span className="text-red-500 font-medium">No data</span>
+                            }
+                          </td>
+                        )}
+                        {selectedFields.map((field) => (
+                          <td key={field.id} className="p-4">
+                            {field.id === 'asset_type' ? (
+                              <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700">
+                                {row.asset_type}
+                              </Badge>
+                            ) : field.id === 'last_updated' ? (
+                              <span className="text-gray-600">
+                                {row.submission_date ? 
+                                  new Date(row.submission_date).toLocaleDateString() : 
+                                  <span className="text-red-500">No data</span>
+                                }
+                              </span>
+                            ) : field.id === 'last_month_total' ? (
+                              <span className="font-medium text-green-700">
+                                {row.last_month_total || <span className="text-gray-400">No data</span>}
+                              </span>
+                            ) : (
+                              <span className="text-gray-700">
+                                {renderFieldValue(row.latest_submission[field.id]) || 
+                                <span className="text-gray-400">-</span>}
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
             
+            {/* Enhanced Preview Notice */}
             {showPreview && reportData.length > 3 && (
-              <div className="mt-2 p-2 bg-blue-50 rounded-lg text-center">
-                <p className="text-xs text-blue-700">
-                  Showing preview of first 3 {viewMode === 'history' ? 'submissions' : 'assets'}. 
-                  Click "Show All" above to see all {reportData.length} records, or export CSV for complete data.
-                </p>
+              <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <Eye className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-800">
+                      Preview Mode Active
+                    </p>
+                    <p className="text-sm text-blue-600">
+                      Showing first {previewData.length} of {reportData.length} {viewMode === 'history' ? 'submissions' : 'assets'}. 
+                      Use "Show All Data" button above or export CSV for complete results.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* View Mode Specific Info */}
-            <div className="mt-2 p-2 rounded-lg bg-gray-50">
-              {viewMode === 'history' && (
-                <p className="text-xs text-orange-700">
-                  <strong>History Mode:</strong> All submissions for selected asset(s) within date range. Each row = one submission.
-                </p>
-              )}
-              {viewMode === 'comparison' && (
-                <p className="text-xs text-purple-700">
-                  <strong>Comparison Mode:</strong> Compare values across different time periods for trend analysis.
-                </p>
-              )}
-              {viewMode === 'latest' && (
+            {/* Enhanced View Mode Info */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={`p-4 rounded-xl border-2 ${viewMode === 'latest' ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-green-600" />
+                  <span className="font-medium text-green-800">Latest Mode</span>
+                </div>
                 <p className="text-xs text-green-700">
-                  <strong>Latest Mode:</strong> Most recent submission per asset. Ideal for current inventory status.
+                  Most recent submission per asset. Ideal for current inventory status.
                 </p>
-              )}
+              </div>
+              
+              <div className={`p-4 rounded-xl border-2 ${viewMode === 'history' ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <History className="h-4 w-4 text-orange-600" />
+                  <span className="font-medium text-orange-800">History Mode</span>
+                </div>
+                <p className="text-xs text-orange-700">
+                  All submissions for selected asset(s) within date range. Each row = one submission.
+                </p>
+              </div>
+              
+              <div className={`p-4 rounded-xl border-2 ${viewMode === 'comparison' ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarDays className="h-4 w-4 text-purple-600" />
+                  <span className="font-medium text-purple-800">Comparison Mode</span>
+                </div>
+                <p className="text-xs text-purple-700">
+                  Compare values across different time periods for trend analysis.
+                </p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Enhanced Empty State */}
       {!isLoading && reportData.length === 0 && (
-        <Card className="border-dashed border-2 border-gray-300">
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            {viewMode === 'history' ? (
-              <History className="h-16 w-16 text-gray-400 mb-4" />
-            ) : viewMode === 'comparison' ? (
-              <CalendarDays className="h-16 w-16 text-gray-400 mb-4" />
-            ) : (
-              <FileText className="h-12 w-12 text-gray-400 mb-3" />
-            )}
-            <h3 className="text-base font-semibold text-gray-600 mb-2">
-              No {viewMode === 'history' ? 'History' : viewMode === 'comparison' ? 'Comparison Data' : 'Report'} Generated
-            </h3>
-            <p className="text-gray-500 text-center max-w-md text-sm">
-              {viewMode === 'history' 
-                ? 'Select an asset and date range to view its submission history over time.'
-                : viewMode === 'comparison'
-                ? 'Configure your comparison settings and date ranges to analyze trends.'
-                : 'Configure your settings and click "Generate Report" to see your asset data.'
-              }
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-dashed border-gray-300 overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-100 to-blue-100 p-6 text-center">
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6">
+                {viewMode === 'history' ? (
+                  <div className="p-4 bg-orange-500 rounded-full inline-block mb-4">
+                    <History className="h-12 w-12 text-white" />
+                  </div>
+                ) : viewMode === 'comparison' ? (
+                  <div className="p-4 bg-purple-500 rounded-full inline-block mb-4">
+                    <CalendarDays className="h-12 w-12 text-white" />
+                  </div>
+                ) : (
+                  <div className="p-4 bg-blue-500 rounded-full inline-block mb-4">
+                    <FileText className="h-12 w-12 text-white" />
+                  </div>
+                )}
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                No {viewMode === 'history' ? 'History Data' : viewMode === 'comparison' ? 'Comparison Data' : 'Report'} Generated Yet
+              </h3>
+              
+              <div className="space-y-3 text-gray-600">
+                {viewMode === 'history' ? (
+                  <>
+                    <p className="text-lg">Ready to explore your asset history?</p>
+                    <p>Select an asset and date range above to view its submission timeline and track changes over time.</p>
+                  </>
+                ) : viewMode === 'comparison' ? (
+                  <>
+                    <p className="text-lg">Ready to compare time periods?</p>
+                    <p>Configure your comparison settings and date ranges above to analyze trends and patterns in your data.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg">Ready to generate your first report?</p>
+                    <p>Configure your report settings above and click the "Generate Report" button to see your asset data in action.</p>
+                  </>
+                )}
+              </div>
+              
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-white font-bold">1</span>
+                  </div>
+                  <p className="font-medium text-gray-800">Configure Settings</p>
+                  <p className="text-gray-600">Choose view mode, date range, and asset types</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
+                  <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-white font-bold">2</span>
+                  </div>
+                  <p className="font-medium text-gray-800">Generate Report</p>
+                  <p className="text-gray-600">Click the generate button to create your report</p>
+                </div>
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-4">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <span className="text-white font-bold">3</span>
+                  </div>
+                  <p className="font-medium text-gray-800">Analyze & Export</p>
+                  <p className="text-gray-600">Review data and export to CSV if needed</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

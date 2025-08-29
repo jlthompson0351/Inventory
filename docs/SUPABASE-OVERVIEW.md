@@ -9,7 +9,7 @@ This document provides a high-level overview of the Supabase backend for the Bar
 -   **PostgreSQL Database**: The relational database for all application data.
 -   **Authentication**: Manages user sign-up, login, and session management.
 -   **Storage**: Used for file uploads, primarily user and organization avatars.
--   **Edge Functions**: Serverless functions for custom backend logic (e.g., admin user creation).
+-   **Edge Functions**: Fully deployed serverless functions providing secure admin operations with service role permissions.
 -   **Row-Level Security (RLS)**: Enforces data access policies at the database level, ensuring organization-based data isolation.
 
 ---
@@ -43,6 +43,8 @@ This document provides a high-level overview of the Supabase backend for the Bar
 -   **[Database Functions](./SUPABASE-DATABASE-FUNCTIONS.md)**: Reference for all custom PostgreSQL functions (RPCs).
 -   **[Security & RLS Policies](./SUPABASE-SECURITY.md)**: A complete breakdown of all Row-Level Security policies.
 -   **[Migrations Guide](./SUPABASE-MIGRATIONS-GUIDE.md)**: Instructions for applying and managing database schema changes.
+-   **[Edge Functions Guide](../MASTERKEY-EDGE-FUNCTIONS.md)**: Complete documentation of deployed edge functions for admin operations.
+-   **[Edge Functions Audit](../EDGE_FUNCTIONS_AUDIT.md)**: Comprehensive audit results showing all functions are working correctly.
 
 ---
 
@@ -75,4 +77,26 @@ const { data: { session } } = await supabase.auth.getSession();
 const { data, error } = await supabase.storage
   .from('organization-avatars')
   .upload(`public/${filePath}`, file);
+```
+
+### **Edge Functions**
+```typescript
+// Call admin user creation function (requires admin auth)
+const { data, error } = await supabase.functions.invoke('admin-create-user', {
+  body: {
+    email: 'user@example.com',
+    password: 'tempPassword',
+    fullName: 'John Doe',
+    role: 'member',
+    organizationId: 'org-uuid'
+  }
+});
+
+// Call admin user deletion function (requires admin auth)
+const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+  body: {
+    userId: 'user-uuid',
+    organizationId: 'org-uuid'
+  }
+});
 ```

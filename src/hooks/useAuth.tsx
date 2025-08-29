@@ -80,8 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Separate function to fetch user data - NOT called inside onAuthStateChange
   const fetchUserData = async (currentUser: User) => {
-    // fetchUserData started
-    
     // Prevent multiple simultaneous calls
     if (isFetchingUserData.current) {
       // fetchUserData already in progress, skipping
@@ -133,12 +131,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .single();
 
         if (membershipError) {
-                      // Membership fetch failed
           setMembership(null);
           setOrganization(null);
         } else {
-          // Setting membership data
-          
           // Set membership
           setMembership({
             id: membershipData.id,
@@ -156,10 +151,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               .single();
 
             if (orgError) {
-              // Organization fetch failed
               setOrganization(null);
             } else {
-              // Setting organization data
               const orgWithDefaults = {
                 ...orgData,
                 owner_id: null

@@ -47,7 +47,8 @@ export const getInventoryItems = async (
       // First, try to find inventory items with this asset_id
       const assetQuery = supabase
         .from('inventory_items')
-        .select(`*, asset_type:asset_types(id, name, color)`)
+        .select(`*, asset_type:asset_types(id, name, color), 
+                inventory_price_history(unit_type, effective_date)`)
         .eq('organization_id', organizationId)
         .eq('asset_id', assetId);
         
@@ -63,7 +64,8 @@ export const getInventoryItems = async (
       // If no results by asset_id, try direct inventory item ID match
       const directQuery = supabase
         .from('inventory_items')
-        .select(`*, asset_type:asset_types(id, name, color)`)
+        .select(`*, asset_type:asset_types(id, name, color), 
+                inventory_price_history(unit_type, effective_date)`)
         .eq('organization_id', organizationId)
         .eq('id', assetId);
         
@@ -84,7 +86,8 @@ export const getInventoryItems = async (
     // If no assetId provided, get all inventory items for the org
     const query = supabase
       .from('inventory_items')
-      .select(`*, asset_type:asset_types(id, name, color)`)
+      .select(`*, asset_type:asset_types(id, name, color), 
+              inventory_price_history(unit_type, effective_date)`)
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
       
@@ -519,16 +522,19 @@ export const generateBarcode = async (
 export const updateInventoryItemPrice = async (
   supabaseClient: ReturnType<typeof createClient<Database>>,
   id: string,
-  price: number,
+  price: number | null | undefined,
   currency: string = 'USD',
   notes?: string,
   submissionId?: string
 ): Promise<void> => {
+  // Default price to 0 if null/undefined to prevent database issues
+  const safePrice = price ?? 0;
+  
   // First, update the inventory item with the new price
   const { error: updateError } = await supabaseClient
     .from('inventory_items')
     .update({ 
-      current_price: price,
+      current_price: safePrice,
       currency,
       updated_at: new Date().toISOString()
     })
@@ -557,7 +563,7 @@ export const updateInventoryItemPrice = async (
     .insert({
       inventory_item_id: id,
       organization_id: item.organization_id,
-      price,
+      price: safePrice,
       currency,
       notes,
       submission_id: submissionId
@@ -1177,19 +1183,30 @@ export const createAssetAndInitialInventory = async (
       throw historyError;
     }
 
-    // 4. Log initial price if cost is available in assetData.metadata
-    if (assetData.metadata && typeof assetData.metadata.cost === 'number' && inventoryItem && inventoryItem.id) {
+    // 4. Always create initial price history record (default to $0 if no cost provided)
+    if (inventoryItem && inventoryItem.id) {
       try {
+        // Get cost from metadata, default to 0 if not provided
+        const initialCost = (assetData.metadata && typeof assetData.metadata.cost === 'number') 
+          ? assetData.metadata.cost 
+          : 0;
+        
+        const currency = (assetData.metadata && assetData.metadata.currency) 
+          ? assetData.metadata.currency 
+          : 'USD';
+        
         await supabase
           .from('inventory_price_history')
           .insert({
             inventory_item_id: inventoryItem.id,
             organization_id: organizationId,
-            price: assetData.metadata.cost,
-            currency: assetData.metadata.currency || 'USD', // Assuming currency might also be in metadata or default
+            price: initialCost,
+            currency: currency,
             effective_date: now.toISOString(),
             created_by: userId,
-            notes: 'Initial purchase price from asset creation'
+            notes: initialCost > 0 
+              ? 'Initial purchase price from asset creation' 
+              : 'Initial price record (no cost specified)'
           });
       } catch (priceHistoryError) {
         // Error creating initial inventory price history record

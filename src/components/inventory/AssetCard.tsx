@@ -116,7 +116,7 @@ export default function AssetCard({ asset, onEdit, onDelete, onGenerateQR }: Ass
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow h-full min-h-[280px]" style={{ transform: 'scale(1.1)' }}>
+    <Card className="overflow-hidden hover:shadow-lg transition-all duration-200 h-full min-h-[280px] border border-border/50 bg-card">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start mb-2">
           <CardTitle className="text-base line-clamp-1" title={asset.name}>

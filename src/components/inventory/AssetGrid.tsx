@@ -143,7 +143,6 @@ export default function AssetGrid({
   // Create a memoized fetch function
   const fetchAssets = useCallback(async (force = false) => {
     if (!organizationId) {
-      // No organizationId provided, skipping fetch
       setAssets([]);
       hasFetched.current = true;
       return;
@@ -191,7 +190,6 @@ export default function AssetGrid({
       const { data, error } = await query.order('name', { ascending: true });
       
       if (fetchId !== currentFetchId.current) {
-        // Fetch was superseded, discarding results
         return;
       }
       
@@ -205,7 +203,6 @@ export default function AssetGrid({
       }
       
       if (!data) {
-        // No asset data returned
         if (isMounted.current) {
           setAssets([]);
           setLoading(false);
@@ -214,7 +211,6 @@ export default function AssetGrid({
       }
       
       const processedAssets = processAssetData(data);
-      // Processed assets
       
       // Cache the results
       assetsCache.set(cacheKey, { 
