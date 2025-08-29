@@ -6,19 +6,21 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
-import { Download, Printer, Search, Grid, List, ChevronUp, ChevronDown } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Download, Printer, Search, Grid, List, ChevronUp, ChevronDown, Filter, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getAssetTypes, AssetType } from "@/services/assetTypeService";
+import { useOrganization } from "@/hooks/useOrganization";
+import { getAssetTypes, type AssetType } from "@/services/assetTypeService";
 
 interface Asset {
   id: string;
   name: string;
   barcode: string;
+  asset_type_id: string;
   asset_type_name: string;
   organization_id: string;
 }
@@ -42,10 +44,14 @@ const PAPER_SIZES = [
 ];
 
 export default function QRCodePrintManager() {
-  const { user, organization } = useAuth();
+  const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadingAssetTypes, setLoadingAssetTypes] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [qrSize, setQrSize] = useState('1');
@@ -53,43 +59,41 @@ export default function QRCodePrintManager() {
   const [showAssetNames, setShowAssetNames] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Asset type filtering state
-  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
-  const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set());
-  const [showAllAssetTypes, setShowAllAssetTypes] = useState(true);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
 
   useEffect(() => {
-    fetchAssets();
-  }, []);
-
-  useEffect(() => {
-    if (organization?.id) {
+    if (currentOrganization) {
+      fetchAssets();
       fetchAssetTypes();
     }
-  }, [organization?.id]);
+  }, [currentOrganization]);
 
   useEffect(() => {
-    // Filter assets based on search term and asset type
-    let filtered = assets.filter(asset =>
-      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.asset_type_name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    // Apply asset type filter if not showing all
-    if (!showAllAssetTypes && selectedAssetTypes.size > 0) {
-      filtered = filtered.filter(asset => {
-        // Find the asset type by name to get the ID
-        const assetType = assetTypes.find(type => type.name === asset.asset_type_name);
-        return assetType && selectedAssetTypes.has(assetType.id);
-      });
+    // Filter assets based on search term and selected asset types
+    let filtered = assets;
+    
+    // Apply text search filter
+    if (searchTerm) {
+      filtered = filtered.filter(asset =>
+        asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        asset.asset_type_name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-
+    
+    // Apply asset type filter
+    if (selectedAssetTypes.size > 0) {
+      filtered = filtered.filter(asset =>
+        selectedAssetTypes.has(asset.asset_type_id)
+      );
+    }
+    
     setFilteredAssets(filtered);
-  }, [assets, searchTerm, selectedAssetTypes, showAllAssetTypes, assetTypes]);
+  }, [assets, searchTerm, selectedAssetTypes]);
 
   const fetchAssets = async () => {
+    if (!currentOrganization) return;
+    
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -98,9 +102,11 @@ export default function QRCodePrintManager() {
           id,
           name,
           barcode,
+          asset_type_id,
           organization_id,
-          asset_types(name)
+          asset_types(id, name)
         `)
+        .eq('organization_id', currentOrganization.id)
         .eq('is_deleted', false)
         .order('name');
 
@@ -110,6 +116,7 @@ export default function QRCodePrintManager() {
         id: asset.id,
         name: asset.name,
         barcode: asset.barcode || '',
+        asset_type_id: asset.asset_type_id || '',
         asset_type_name: asset.asset_types?.name || 'Unknown',
         organization_id: asset.organization_id
       })) || [];
@@ -122,16 +129,19 @@ export default function QRCodePrintManager() {
       setLoading(false);
     }
   };
-
+  
   const fetchAssetTypes = async () => {
+    if (!currentOrganization) return;
+    
     try {
-      if (!organization?.id) return;
-      
-      const assetTypesList = await getAssetTypes(organization.id);
-      setAssetTypes(assetTypesList);
+      setLoadingAssetTypes(true);
+      const types = await getAssetTypes(currentOrganization.id);
+      setAssetTypes(types);
     } catch (error) {
       console.error('Error fetching asset types:', error);
       toast.error('Failed to load asset types');
+    } finally {
+      setLoadingAssetTypes(false);
     }
   };
 
@@ -161,20 +171,20 @@ export default function QRCodePrintManager() {
       newSelected.add(assetTypeId);
     }
     setSelectedAssetTypes(newSelected);
-    setShowAllAssetTypes(false);
   };
 
   const selectAllAssetTypes = () => {
-    setShowAllAssetTypes(true);
+    setSelectedAssetTypes(new Set(assetTypes.map(type => type.id)));
+  };
+
+  const clearAssetTypeSelection = () => {
     setSelectedAssetTypes(new Set());
   };
 
-  const selectNoAssetTypes = () => {
-    setShowAllAssetTypes(false);
+  const clearAllFilters = () => {
+    setSearchTerm('');
     setSelectedAssetTypes(new Set());
   };
-
-
 
   const calculateLayout = () => {
     const paper = PAPER_SIZES.find(p => p.value === paperSize)!;
@@ -316,36 +326,36 @@ export default function QRCodePrintManager() {
         <body>
       `;
 
-              // Generate pages
-        for (let page = 0; page < totalPages; page++) {
-          const startIndex = page * layout.codesPerPage;
-          const endIndex = Math.min(startIndex + layout.codesPerPage, qrCodeData.length);
-          const pageQRCodes = qrCodeData.slice(startIndex, endIndex);
+      // Generate pages
+      for (let page = 0; page < totalPages; page++) {
+        const startIndex = page * layout.codesPerPage;
+        const endIndex = Math.min(startIndex + layout.codesPerPage, qrCodeData.length);
+        const pageQRCodes = qrCodeData.slice(startIndex, endIndex);
 
+        html += `
+          <div class="page">
+            <div class="page-header">
+              QR Code Print Sheet - Page ${page + 1} of ${totalPages} - ${qrSize}" × ${qrSize}" codes
+            </div>
+            <div class="grid">
+        `;
+
+        pageQRCodes.forEach(({ asset, qrSvg }) => {
           html += `
-            <div class="page">
-              <div class="page-header">
-                QR Code Print Sheet - Page ${page + 1} of ${totalPages} - ${qrSize}" × ${qrSize}" codes
+            <div class="qr-item">
+              <div class="qr-code">
+                ${qrSvg}
               </div>
-              <div class="grid">
+              ${showAssetNames ? `<div class="asset-name">${asset.name}</div>` : ''}
+            </div>
           `;
+        });
 
-          pageQRCodes.forEach(({ asset, qrSvg }) => {
-            html += `
-              <div class="qr-item">
-                <div class="qr-code">
-                  ${qrSvg}
-                </div>
-                ${showAssetNames ? `<div class="asset-name">${asset.name}</div>` : ''}
-              </div>
-            `;
-          });
-
-                  // Fill remaining grid slots with empty cells
-          const remainingSlots = layout.codesPerPage - pageQRCodes.length;
-          for (let i = 0; i < remainingSlots; i++) {
-            html += '<div class="qr-item" style="border: none;"></div>';
-          }
+        // Fill remaining grid slots with empty cells
+        const remainingSlots = layout.codesPerPage - pageQRCodes.length;
+        for (let i = 0; i < remainingSlots; i++) {
+          html += '<div class="qr-item" style="border: none;"></div>';
+        }
 
         html += `
             </div>
@@ -417,75 +427,101 @@ export default function QRCodePrintManager() {
                 />
               </div>
             </div>
-
+            
             {/* Asset Type Filter */}
             <div>
-              <Label className="text-xs font-medium">Asset Types</Label>
-              <Popover>
+              <Label className="text-xs mb-2 block">Filter by Asset Type</Label>
+              <Popover open={filterDropdownOpen} onOpenChange={setFilterDropdownOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 mt-1 w-full justify-between"
+                    size="sm"
+                    className="w-full justify-between h-8"
+                    disabled={loadingAssetTypes}
                   >
-                    <span className="truncate">
-                      {showAllAssetTypes 
-                        ? "All Types"
-                        : selectedAssetTypes.size === 0
-                        ? "No Types"
-                        : selectedAssetTypes.size === 1
-                        ? assetTypes.find(t => selectedAssetTypes.has(t.id))?.name || "1 Type"
-                        : `${selectedAssetTypes.size} Types`
+                    <span className="flex items-center gap-2">
+                      <Filter className="h-3 w-3" />
+                      {selectedAssetTypes.size === 0 
+                        ? 'All Types' 
+                        : selectedAssetTypes.size === 1 
+                        ? assetTypes.find(t => selectedAssetTypes.has(t.id))?.name || '1 selected'
+                        : `${selectedAssetTypes.size} types selected`
                       }
                     </span>
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <ChevronDown className="h-3 w-3" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="start">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2 p-2 hover:bg-muted rounded border-b">
-                      <Checkbox
-                        id="all-types"
-                        checked={showAllAssetTypes}
-                        onCheckedChange={() => selectAllAssetTypes()}
-                      />
-                      <Label htmlFor="all-types" className="flex-1 cursor-pointer font-medium">
-                        All Asset Types
-                      </Label>
-                    </div>
-                    {assetTypes.map(assetType => (
-                      <div key={assetType.id} className="flex items-center space-x-2 p-2 hover:bg-muted rounded">
-                        <Checkbox
-                          id={`type-${assetType.id}`}
-                          checked={!showAllAssetTypes && selectedAssetTypes.has(assetType.id)}
-                          onCheckedChange={() => toggleAssetTypeSelection(assetType.id)}
-                          disabled={showAllAssetTypes}
-                        />
-                        <Label 
-                          htmlFor={`type-${assetType.id}`} 
-                          className="flex-1 cursor-pointer text-sm"
-                          style={{ color: assetType.color || undefined }}
-                        >
-                          {assetType.name}
-                        </Label>
-                      </div>
-                    ))}
-                    {!showAllAssetTypes && selectedAssetTypes.size > 0 && (
-                      <div className="pt-2 border-t">
+                <PopoverContent className="w-64 p-0" align="start">
+                  <div className="p-3 border-b">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Asset Types</span>
+                      {selectedAssetTypes.size > 0 && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={selectNoAssetTypes}
-                          className="w-full text-xs"
+                          onClick={clearAssetTypeSelection}
+                          className="h-6 px-2 text-xs"
                         >
-                          Clear Selection
+                          Clear
                         </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllAssetTypes}
+                        className="flex-1 h-7 text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearAssetTypeSelection}
+                        className="flex-1 h-7 text-xs"
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {loadingAssetTypes ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        Loading asset types...
                       </div>
+                    ) : assetTypes.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No asset types found
+                      </div>
+                    ) : (
+                      assetTypes.map(assetType => (
+                        <div
+                          key={assetType.id}
+                          className="flex items-center space-x-2 p-2 hover:bg-accent cursor-pointer"
+                          onClick={() => toggleAssetTypeSelection(assetType.id)}
+                        >
+                          <Checkbox
+                            checked={selectedAssetTypes.has(assetType.id)}
+                            onCheckedChange={() => toggleAssetTypeSelection(assetType.id)}
+                          />
+                          <div className="flex items-center gap-2 flex-1">
+                            {assetType.color && (
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: assetType.color }}
+                              />
+                            )}
+                            <span className="text-sm">{assetType.name}</span>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </PopoverContent>
               </Popover>
             </div>
-
+            
             {/* QR Size */}
             <div>
               <Label className="text-xs font-medium">QR Size</Label>
@@ -526,7 +562,7 @@ export default function QRCodePrintManager() {
                 <Checkbox
                   id="show-names"
                   checked={showAssetNames}
-                  onCheckedChange={setShowAssetNames}
+                  onCheckedChange={(checked) => setShowAssetNames(checked === true)}
                 />
                 <Label htmlFor="show-names" className="text-xs">Names</Label>
               </div>
@@ -547,7 +583,7 @@ export default function QRCodePrintManager() {
               <div className="flex items-center space-x-2">
                 <Badge variant="outline">{filteredAssets.length} assets</Badge>
                 <Badge variant="secondary">{selectedAssets.size} selected</Badge>
-                {!showAllAssetTypes && selectedAssetTypes.size > 0 && (
+                {selectedAssetTypes.size > 0 && (
                   <Badge variant="default" className="text-xs">
                     {selectedAssetTypes.size} type{selectedAssetTypes.size !== 1 ? 's' : ''}
                   </Badge>

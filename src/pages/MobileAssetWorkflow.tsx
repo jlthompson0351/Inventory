@@ -188,19 +188,19 @@ const MobileAssetWorkflow = () => {
         workflow_options: [
           {
             type: 'intake',
-            label: 'Asset Intake',
+            label: 'Intake',
             form_id: intakeFormId,
             available: !!intakeFormId
           },
           {
             type: 'inventory',
-            label: 'Inventory Check', 
+            label: 'Inventory', 
             form_id: inventoryFormId,
             available: !!inventoryFormId
           },
           {
             type: 'continue_inventory',
-            label: 'Continue Current Inventory',
+            label: 'Continue Inventory',
             form_id: inventoryFormId,
             available: !!inventoryFormId
           }
@@ -318,9 +318,9 @@ const MobileAssetWorkflow = () => {
 
   const getOptionDescription = (type: string) => {
     switch (type) {
-      case 'intake': return 'Record new items coming into inventory';
-      case 'inventory': return 'Perform a fresh inventory count';
-      case 'continue_inventory': return 'Update existing inventory for this month';
+      case 'intake': return 'Add new items';
+      case 'inventory': return 'Count inventory';
+      case 'continue_inventory': return 'Update this month';
       default: return '';
     }
   };
@@ -339,24 +339,6 @@ const MobileAssetWorkflow = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Asset Workflow</h1>
             <p className="text-sm text-gray-600">Mobile QR Code Access</p>
           </div>
-
-          {/* Asset Card */}
-          {assetData && (
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4">
-                    <Package className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <h2 className="font-bold text-lg text-gray-900 mb-1">{assetData.asset_name}</h2>
-                  <p className="text-sm text-gray-600 mb-2">{assetData.asset_type_name}</p>
-                  <div className="inline-block bg-gray-100 px-3 py-1 rounded-full">
-                    <p className="text-xs text-gray-500">QR: {assetData.barcode}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Loading Step */}
           {step === 'loading' && (
@@ -446,77 +428,6 @@ const MobileAssetWorkflow = () => {
             </Card>
           )}
 
-          {/* Workflow Options Step */}
-          {step === 'options' && authSession && assetData && (
-            <>
-              <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader className="text-center pb-4">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                  <CardTitle className="text-xl text-gray-900">
-                    Welcome, {authSession.full_name}
-                  </CardTitle>
-                  <p className="text-sm text-gray-600 mt-2">
-                    Choose an action for this asset
-                  </p>
-                </CardHeader>
-              </Card>
-
-              <div className="space-y-4">
-                {assetData.workflow_options.map((option, index) => {
-                  const Icon = getOptionIcon(option.type);
-                  const colorClass = getOptionColor(option.type);
-                  const description = getOptionDescription(option.type);
-                  
-                  return (
-                    <Button
-                      key={index}
-                      onClick={() => handleWorkflowOption(option)}
-                      disabled={!option.available}
-                      className={`w-full h-auto p-6 ${
-                        option.available 
-                          ? `${colorClass} shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200` 
-                          : 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed'
-                      } text-white rounded-xl`}
-                      variant="default"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center">
-                          <div className="bg-white/20 p-2 rounded-lg mr-4">
-                            <Icon className="h-6 w-6" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-semibold text-base">{option.label}</div>
-                            <div className="text-sm opacity-90 mt-1">
-                              {option.available ? description : 'Not configured'}
-                            </div>
-                          </div>
-                        </div>
-                        <ArrowRight className="h-5 w-5 opacity-70" />
-                      </div>
-                    </Button>
-                  );
-                })}
-              </div>
-
-              {/* Help Section */}
-              <Card className="shadow-lg border-0 bg-white/60 backdrop-blur-sm mt-8">
-                <CardContent className="p-4 text-center">
-                  <p className="text-xs text-gray-600 mb-2">Need assistance?</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/assets/${assetData.asset_id}`)}
-                    className="text-blue-600 hover:text-blue-700 text-sm"
-                  >
-                    View full asset details
-                  </Button>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
           {/* Footer */}
           <div className="text-center pt-8 pb-4">
             <p className="text-xs text-gray-500">
@@ -542,8 +453,8 @@ const MobileAssetWorkflow = () => {
           <p className="text-sm text-gray-600">Mobile QR Code Access</p>
         </div>
 
-        {/* Asset Card */}
-        {assetData && (
+        {/* Asset & Welcome Card - Options Step Only */}
+        {assetData && step === 'options' && authSession && (
           <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="text-center">
@@ -551,7 +462,19 @@ const MobileAssetWorkflow = () => {
                   <Package className="h-6 w-6 text-blue-600" />
                 </div>
                 <h2 className="font-bold text-lg text-gray-900 mb-1">{assetData.asset_name}</h2>
-                <p className="text-sm text-gray-600 mb-2">{assetData.asset_type_name}</p>
+                <p className="text-sm text-gray-600 mb-3">{assetData.asset_type_name}</p>
+                
+                {/* Welcome message - only show if authenticated */}
+                {authSession && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                    <div className="flex items-center justify-center mb-1">
+                      <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                      <span className="text-sm font-medium text-green-800">Welcome, {authSession.full_name}</span>
+                    </div>
+                    <p className="text-xs text-green-700">Choose an action for this asset</p>
+                  </div>
+                )}
+                
                 <div className="inline-block bg-gray-100 px-3 py-1 rounded-full">
                   <p className="text-xs text-gray-500">QR: {assetData.barcode}</p>
                 </div>
@@ -578,19 +501,22 @@ const MobileAssetWorkflow = () => {
         {/* PIN Entry Step */}
         {step === 'pin' && (
           <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="text-center pb-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
-                <Lock className="h-8 w-8 text-green-600" />
+            <CardContent className="p-6">
+              {/* Asset name at top */}
+              <div className="text-center mb-4">
+                <h2 className="font-bold text-lg text-gray-900 mb-1">{assetData?.asset_name}</h2>
+                <p className="text-sm text-gray-600">{assetData?.asset_type_name}</p>
               </div>
-              <CardTitle className="text-xl text-gray-900">Enter Your PIN</CardTitle>
-              <p className="text-sm text-gray-600 mt-2">
-                Use your 4-digit PIN for quick access
-              </p>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
+
+              {/* PIN Entry Section */}
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Enter Your PIN</h3>
+                <p className="text-sm text-gray-600">Use your 4-digit PIN for quick access</p>
+              </div>
+
               <form onSubmit={handlePinSubmit} className="space-y-6">
                 <div className="space-y-4">
-                  <Label htmlFor="pin" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="pin" className="text-sm font-medium text-gray-700 text-center block">
                     4-Digit PIN Code
                   </Label>
                   <Input
@@ -646,59 +572,43 @@ const MobileAssetWorkflow = () => {
           </Card>
         )}
 
-        {/* Workflow Options Step */}
+        {/* Workflow Options Step - Action Buttons */}
         {step === 'options' && authSession && assetData && (
-          <>
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="text-center pb-4">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mx-auto mb-4">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
-                </div>
-                <CardTitle className="text-xl text-gray-900">
-                  Welcome, {authSession.full_name}
-                </CardTitle>
-                <p className="text-sm text-gray-600 mt-2">
-                  Choose an action for this asset
-                </p>
-              </CardHeader>
-            </Card>
-
-            <div className="space-y-4">
-              {assetData.workflow_options.map((option, index) => {
-                const Icon = getOptionIcon(option.type);
-                const colorClass = getOptionColor(option.type);
-                const description = getOptionDescription(option.type);
-                
-                return (
-                  <Button
-                    key={index}
-                    onClick={() => handleWorkflowOption(option)}
-                    disabled={!option.available}
-                    className={`w-full h-auto p-6 ${
-                      option.available 
-                        ? `${colorClass} shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200` 
-                        : 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed'
-                    } text-white rounded-xl`}
-                    variant="default"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center">
-                        <div className="bg-white/20 p-2 rounded-lg mr-4">
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <div className="text-left">
-                          <div className="font-semibold text-base">{option.label}</div>
-                          <div className="text-sm opacity-90 mt-1">
-                            {option.available ? description : 'Not configured'}
-                          </div>
+          <div className="space-y-4">
+            {assetData.workflow_options.map((option, index) => {
+              const Icon = getOptionIcon(option.type);
+              const colorClass = getOptionColor(option.type);
+              const description = getOptionDescription(option.type);
+              
+              return (
+                <Button
+                  key={index}
+                  onClick={() => handleWorkflowOption(option)}
+                  disabled={!option.available}
+                  className={`w-full h-auto p-6 ${
+                    option.available 
+                      ? `${colorClass} shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200` 
+                      : 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed'
+                  } text-white rounded-xl`}
+                  variant="default"
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center">
+                      <div className="bg-white/20 p-2 rounded-lg mr-4">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-semibold text-base">{option.label}</div>
+                        <div className="text-sm opacity-90 mt-1">
+                          {option.available ? description : 'Not configured'}
                         </div>
                       </div>
-                      <ArrowRight className="h-5 w-5 opacity-70" />
                     </div>
-                  </Button>
-                );
-              })}
-            </div>
+                    <ArrowRight className="h-5 w-5 opacity-70" />
+                  </div>
+                </Button>
+              );
+            })}
 
             {/* Help Section */}
             <Card className="shadow-lg border-0 bg-white/60 backdrop-blur-sm mt-8">
@@ -714,7 +624,7 @@ const MobileAssetWorkflow = () => {
                 </Button>
               </CardContent>
             </Card>
-          </>
+          </div>
         )}
 
         {/* Footer */}
