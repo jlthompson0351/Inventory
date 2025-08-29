@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,8 +11,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from 'qrcode.react';
 import QRCode from 'qrcode';
-import { Download, Printer, Search, Grid, List, ChevronUp, ChevronDown, Filter, X } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { Printer, Search, Grid, List, ChevronUp, ChevronDown, Filter } from "lucide-react";
 import { useOrganization } from "@/hooks/useOrganization";
 import { getAssetTypes, type AssetType } from "@/services/assetTypeService";
 
@@ -44,7 +43,6 @@ const PAPER_SIZES = [
 ];
 
 export default function QRCodePrintManager() {
-  const { user } = useAuth();
   const { currentOrganization } = useOrganization();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
@@ -181,10 +179,7 @@ export default function QRCodePrintManager() {
     setSelectedAssetTypes(new Set());
   };
 
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setSelectedAssetTypes(new Set());
-  };
+  
 
   const calculateLayout = () => {
     const paper = PAPER_SIZES.find(p => p.value === paperSize)!;
@@ -503,7 +498,7 @@ export default function QRCodePrintManager() {
                         >
                           <Checkbox
                             checked={selectedAssetTypes.has(assetType.id)}
-                            onCheckedChange={() => toggleAssetTypeSelection(assetType.id)}
+                            onCheckedChange={() => {}}
                           />
                           <div className="flex items-center gap-2 flex-1">
                             {assetType.color && (
