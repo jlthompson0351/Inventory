@@ -45,6 +45,14 @@ export default function InventoryHistoryCorrection() {
   const [originalData, setOriginalData] = useState<any>(null);
   const [assetIsDeleted, setAssetIsDeleted] = useState(false);
   const [assetName, setAssetName] = useState<string>('');
+  const [priceData, setPriceData] = useState<{
+    captured_price: number;
+    captured_currency: string;
+    captured_unit_type: string;
+    current_asset_price: string;
+    current_asset_unit_type: string;
+    current_asset_currency: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -54,7 +62,8 @@ export default function InventoryHistoryCorrection() {
     quantity: 0,
     location: '',
     notes: '',
-    reason: ''
+    reason: '',
+    price: 0
   });
 
   useEffect(() => {
@@ -72,18 +81,37 @@ export default function InventoryHistoryCorrection() {
           return;
         }
         
-        const { history_record, asset_is_deleted, asset_name } = historyWithStatus;
+        const { 
+          history_record, 
+          asset_is_deleted, 
+          asset_name,
+          captured_price,
+          captured_currency,
+          captured_unit_type,
+          current_asset_price,
+          current_asset_unit_type,
+          current_asset_currency
+        } = historyWithStatus;
         
         setOriginalData(history_record);
         setAssetIsDeleted(asset_is_deleted);
         setAssetName(asset_name);
+        setPriceData({
+          captured_price,
+          captured_currency,
+          captured_unit_type,
+          current_asset_price,
+          current_asset_unit_type,
+          current_asset_currency
+        });
         
         // Pre-fill form with original values
         setFormData({
           quantity: history_record.quantity || 0,
           location: history_record.location || '',
           notes: history_record.notes || '',
-          reason: '' // User must provide correction reason
+          reason: '', // User must provide correction reason
+          price: parseFloat(captured_price) || 0  // Safe string-to-number conversion
         });
         
       } catch (err) {
@@ -145,10 +173,26 @@ export default function InventoryHistoryCorrection() {
       return;
     }
     
+    // Validate price if provided
+    if (formData.price !== undefined && formData.price < 0) {
+      toast({
+        title: "Error",
+        description: "Price cannot be negative",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       setSaving(true);
       
-      const result = await applyInventoryCorrection(historyId, formData);
+      // Pass price context to preserve original currency/unit type
+      const priceContext = priceData ? {
+        currency: priceData.captured_currency,
+        unit_type: priceData.captured_unit_type
+      } : undefined;
+      
+      const result = await applyInventoryCorrection(historyId, formData, priceContext);
       
       if (result.success) {
         toast({
@@ -285,6 +329,14 @@ export default function InventoryHistoryCorrection() {
                   <span className="text-muted-foreground">Quantity:</span>
                   <span className="font-semibold">{originalData.quantity}</span>
                 </div>
+                {priceData && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Price:</span>
+                    <span className="font-semibold">
+                      {priceData.captured_currency} {parseFloat(priceData.captured_price).toFixed(2)} per {priceData.captured_unit_type}
+                    </span>
+                  </div>
+                )}
                 {originalData.location && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Location:</span>
@@ -365,6 +417,50 @@ export default function InventoryHistoryCorrection() {
                   )}
                 </div>
               </div>
+
+              {/* Corrected Price */}
+              {priceData && (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Corrected Price per {priceData.captured_unit_type}</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-muted-foreground">{priceData.captured_currency}</span>
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.price}
+                        onChange={(e) => {
+                          const newPrice = parseFloat(e.target.value) || 0;
+                          handleInputChange('price', newPrice);
+                          
+                          // Show toast notification about updating asset price if price changed
+                          const originalPrice = parseFloat(priceData.captured_price);
+                          if (newPrice !== originalPrice && newPrice > 0) {
+                            setTimeout(() => {
+                              toast({
+                                title: "💡 Price Update Reminder",
+                                description: `Current asset price is ${priceData.current_asset_currency} ${priceData.current_asset_price} per ${priceData.current_asset_unit_type}. Consider updating the asset's price setting if this correction should be the new standard price.`,
+                                duration: 8000
+                              });
+                            }, 1000);
+                          }
+                        }}
+                        className={parseFloat(priceData.captured_price) !== formData.price ? 'border-yellow-400 bg-yellow-50' : ''}
+                      />
+                    </div>
+                    {parseFloat(priceData.captured_price) !== formData.price && (
+                      <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
+                        Changed: {parseFloat(priceData.captured_price).toFixed(2)} → {formData.price?.toFixed(2) || '0.00'}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Current asset price: {priceData.current_asset_currency} {priceData.current_asset_price} per {priceData.current_asset_unit_type}
+                  </p>
+                </div>
+              )}
 
               {/* Corrected Location */}
               <div className="space-y-2">

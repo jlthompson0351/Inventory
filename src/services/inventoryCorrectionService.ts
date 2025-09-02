@@ -34,6 +34,7 @@ export interface CorrectionFormData {
   notes?: string;
   response_data?: Record<string, any>;
   reason: string;
+  price?: number;
 }
 
 export interface HistoryWithAssetStatus {
@@ -41,6 +42,12 @@ export interface HistoryWithAssetStatus {
   asset_is_deleted: boolean;
   asset_id: string;
   asset_name: string;
+  captured_price: string;  // Database returns as string
+  captured_currency: string;
+  captured_unit_type: string;
+  current_asset_price: string;
+  current_asset_unit_type: string;
+  current_asset_currency: string;
 }
 
 /**
@@ -71,7 +78,11 @@ export const getHistoryWithAssetStatus = async (historyId: string): Promise<Hist
  */
 export const applyInventoryCorrection = async (
   originalHistoryId: string,
-  correctionData: CorrectionFormData
+  correctionData: CorrectionFormData,
+  priceContext?: {
+    currency: string;
+    unit_type: string;
+  }
 ): Promise<{ success: boolean; message: string; correction_id?: string }> => {
   try {
     // Get current user ID
@@ -90,7 +101,10 @@ export const applyInventoryCorrection = async (
       p_corrected_response_data: correctionData.response_data || null,
       p_correction_reason: correctionData.reason,
       p_user_id: userId, // Pass user_id explicitly
-      p_auto_approve: true // Auto-approve for now, can add approval workflow later
+      p_auto_approve: true, // Auto-approve for now, can add approval workflow later
+      p_corrected_price: correctionData.price || null,
+      p_corrected_currency: priceContext?.currency || 'USD',
+      p_corrected_unit_type: priceContext?.unit_type || 'each'
     });
 
     if (error) {

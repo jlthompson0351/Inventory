@@ -28,7 +28,7 @@ export interface AssetWithInventory {
   last_check_date: string | null;
   inventory_status: string | null;
   created_at?: string | null;
-  unit_type?: string | null; // The unit type for display
+  unit_type: string; // Unit type from asset metadata (now always provided)
 }
 
 export interface InventoryCheckData {
@@ -80,47 +80,8 @@ export const getOrganizationAssetsWithInventory = async (
       throw error;
     }
 
-    const assets = data || [];
-
-    // If we have assets with inventory, fetch their unit types
-    if (assets.length > 0) {
-      const inventoryItemIds = assets
-        .filter(asset => asset.inventory_item_id)
-        .map(asset => asset.inventory_item_id);
-
-      if (inventoryItemIds.length > 0) {
-        // Fetch latest unit types for all inventory items
-        const { data: priceHistoryData } = await supabase
-          .from('inventory_price_history')
-          .select('inventory_item_id, unit_type, effective_date, created_at')
-          .in('inventory_item_id', inventoryItemIds)
-          .eq('is_deleted', false)
-          .order('effective_date', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        // Create a map of inventory_item_id to latest unit_type
-        const unitTypeMap = new Map<string, string>();
-        if (priceHistoryData) {
-          // Group by inventory_item_id and get the latest unit_type for each
-          priceHistoryData.forEach(record => {
-            if (record.unit_type && !unitTypeMap.has(record.inventory_item_id)) {
-              unitTypeMap.set(record.inventory_item_id, record.unit_type);
-            }
-          });
-        }
-
-        // Add unit types to assets
-        return assets.map(asset => ({
-          ...asset,
-          unit_type: asset.inventory_item_id ? 
-            (unitTypeMap.get(asset.inventory_item_id) || 'units') : 
-            'units'
-        }));
-      }
-    }
-
-    // Return assets with default 'units' if no price history
-    return assets.map(asset => ({ ...asset, unit_type: 'units' }));
+    // RPC function now returns unit_type directly from asset metadata
+    return data || [];
   } catch (error) {
     console.error('Failed to get organization assets with inventory:', error);
     return [];

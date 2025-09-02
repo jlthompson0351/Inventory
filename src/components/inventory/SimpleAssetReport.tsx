@@ -293,6 +293,74 @@ const SimpleAssetReport: React.FC = () => {
         return;
       }
 
+      // Get price data for all assets in the report
+      const assetIds = filteredData.map((asset: any) => asset.id);
+      let priceDataMap: Record<string, any> = {};
+      
+      try {
+        // Query price data for the date range
+        const { data: priceData, error: priceError } = await supabase
+          .from('assets')
+          .select(`
+            id,
+            inventory_items!inner(
+              id,
+              current_price,
+              currency,
+              inventory_price_history(
+                price,
+                currency,
+                unit_type,
+                effective_date
+              )
+            )
+          `)
+          .in('id', assetIds)
+          .eq('inventory_items.is_deleted', false);
+
+        if (priceError) {
+          console.warn('Price data query error:', priceError);
+        } else if (priceData) {
+          // Process price data into lookup map
+          priceData.forEach((asset: any) => {
+            if (asset.inventory_items && asset.inventory_items.length > 0) {
+              const inventoryItem = asset.inventory_items[0]; // Use first inventory item
+              let effectivePrice = inventoryItem.current_price || '0.00';
+              let effectiveCurrency = inventoryItem.currency || 'USD';
+              let effectiveUnitType = 'each';
+              
+              // Find the most appropriate price for the date range
+              if (inventoryItem.inventory_price_history && inventoryItem.inventory_price_history.length > 0) {
+                // Filter price history by date range
+                const relevantPrices = inventoryItem.inventory_price_history.filter((ph: any) => {
+                  const effectiveDate = new Date(ph.effective_date);
+                  return effectiveDate <= endDate;
+                }).sort((a: any, b: any) => 
+                  new Date(b.effective_date).getTime() - new Date(a.effective_date).getTime()
+                );
+                
+                if (relevantPrices.length > 0) {
+                  const mostRecentPrice = relevantPrices[0];
+                  effectivePrice = mostRecentPrice.price || '0.00';
+                  effectiveCurrency = mostRecentPrice.currency || 'USD';
+                  effectiveUnitType = mostRecentPrice.unit_type || 'each';
+                }
+              }
+              
+              priceDataMap[asset.id] = {
+                price: effectivePrice,
+                currency: effectiveCurrency,
+                unit_type: effectiveUnitType,
+                formatted_price: `$${parseFloat(effectivePrice).toFixed(2)}`
+              };
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to load price data:', error);
+        // Continue without price data
+      }
+
       // Get form schemas to map field IDs to labels
       const formIds = Array.from(new Set(filteredData?.map((asset: any) => asset.asset_types?.inventory_form_id).filter(Boolean)));
               // Form IDs found
@@ -325,6 +393,14 @@ const SimpleAssetReport: React.FC = () => {
       const processedData: AssetReportData[] = [];
       const fieldSet = new Set<string>();
       const fieldLabelMap: Record<string, string> = {};
+
+      // Add price fields to field definitions
+      fieldSet.add('asset_current_price');
+      fieldSet.add('asset_unit_type');
+      fieldSet.add('asset_price_display');
+      fieldLabelMap['asset_current_price'] = 'Current Price';
+      fieldLabelMap['asset_unit_type'] = 'Unit Type';
+      fieldLabelMap['asset_price_display'] = 'Price per Unit';
 
       // Calculate date range for last month total (always needed)
       const now = new Date();
@@ -399,18 +475,46 @@ const SimpleAssetReport: React.FC = () => {
               fieldSet.add(key);
             });
 
+            // Get price data for this asset
+            const assetPriceData = priceDataMap[asset.id] || {
+              price: '0.00',
+              currency: 'USD',
+              unit_type: 'each',
+              formatted_price: '$0.00'
+            };
+
+            // Merge submission data with price data
+            const enrichedSubmissionData = {
+              ...(latestSubmission.submission_data || {}),
+              asset_current_price: assetPriceData.price,
+              asset_unit_type: assetPriceData.unit_type,
+              asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
+            };
+
             processedData.push({
               asset_name: asset.name,
               asset_type: asset.asset_types.name,
-              latest_submission: latestSubmission.submission_data || {},
+              latest_submission: enrichedSubmissionData,
               submission_date: latestSubmission.created_at,
               last_month_total: lastMonthTotal
             });
           } else {
+            // Get price data for this asset even if no submission
+            const assetPriceData = priceDataMap[asset.id] || {
+              price: '0.00',
+              currency: 'USD',
+              unit_type: 'each',
+              formatted_price: '$0.00'
+            };
+
             processedData.push({
               asset_name: asset.name,
               asset_type: asset.asset_types.name,
-              latest_submission: {},
+              latest_submission: {
+                asset_current_price: assetPriceData.price,
+                asset_unit_type: assetPriceData.unit_type,
+                asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
+              },
               submission_date: '',
               last_month_total: lastMonthTotal
             });
@@ -428,10 +532,26 @@ const SimpleAssetReport: React.FC = () => {
                 fieldSet.add(key);
               });
 
+              // Get price data for this asset (for the submission date)
+              const assetPriceData = priceDataMap[asset.id] || {
+                price: '0.00',
+                currency: 'USD',
+                unit_type: 'each',
+                formatted_price: '$0.00'
+              };
+
+              // Merge submission data with price data
+              const enrichedSubmissionData = {
+                ...(submission.submission_data || {}),
+                asset_current_price: assetPriceData.price,
+                asset_unit_type: assetPriceData.unit_type,
+                asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
+              };
+
               processedData.push({
                 asset_name: asset.name,
                 asset_type: asset.asset_types.name,
-                latest_submission: submission.submission_data || {},
+                latest_submission: enrichedSubmissionData,
                 submission_date: submission.created_at,
                 all_submissions: relevantSubmissions
               });
