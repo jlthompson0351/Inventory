@@ -550,7 +550,12 @@ export default function SubmitForm() {
                     }
                     
                     // Create inventory history record using RPC to avoid user_id error
-                    const userId = (await supabase.auth.getUser()).data.user?.id;
+                    // For mobile QR workflow, use user ID from mobile auth session
+                    let userId = location.state?.authSession?.user_id;
+                    if (!userId) {
+                      // Fall back to regular Supabase auth for desktop users
+                      userId = (await supabase.auth.getUser()).data.user?.id;
+                    }
                     const { error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
                       organization_id: workingOrganization.id,
                       inventory_item_id: inventoryItem.id,
@@ -673,7 +678,12 @@ export default function SubmitForm() {
                   }
                   
                   // Create inventory history record using RPC to avoid user_id error
-                  const userId = (await supabase.auth.getUser()).data.user?.id;
+                  // For mobile QR workflow, use user ID from mobile auth session
+                  let userId = location.state?.authSession?.user_id;
+                  if (!userId) {
+                    // Fall back to regular Supabase auth for desktop users
+                    userId = (await supabase.auth.getUser()).data.user?.id;
+                  }
                   const { error: historyError } = await (supabase as any).rpc('insert_inventory_history_simple', {
                     organization_id: workingOrganization.id,
                     inventory_item_id: inventoryItem.id,

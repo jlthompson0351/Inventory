@@ -203,7 +203,7 @@ export default function QRCodePrintManager() {
   };
 
   const generateQRUrl = (assetId: string) => {
-    return `${window.location.origin}/mobile/asset/${assetId}`;
+    return `${window.location.origin}/mobile-test/asset/${assetId}`;
   };
 
   const generatePrintDocument = async () => {

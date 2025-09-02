@@ -353,10 +353,10 @@ export default function AssetQRManager() {
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => {
+                        <Button variant="outline" size="sm"                         onClick={() => {
                           // Copy URL logic
                           const baseUrl = window.location.origin;
-                          const mobileUrl = `${baseUrl}/mobile/asset/${asset.id}`;
+                          const mobileUrl = `${baseUrl}/mobile-test/asset/${asset.id}`;
                           navigator.clipboard.writeText(mobileUrl);
                           toast({ title: "URL Copied", description: "Mobile URL copied to clipboard." });
                         }}>
@@ -365,7 +365,7 @@ export default function AssetQRManager() {
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => {
                           const baseUrl = window.location.origin;
-                          const mobileUrl = `${baseUrl}/mobile/asset/${asset.id}`;
+                          const mobileUrl = `${baseUrl}/mobile-test/asset/${asset.id}`;
                           window.open(mobileUrl, '_blank');
                         }}>
                           <ExternalLink className="h-3 w-3 mr-1" />

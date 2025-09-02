@@ -362,7 +362,7 @@ export async function submitForm(
           inventory_item_id: inventoryItem.id,
           check_type: checkType,
           quantity: finalQuantity,
-          created_by: userId,
+          created_by: userId || null,
           condition: null,
           notes: notesWithChanges,
           status: 'active',

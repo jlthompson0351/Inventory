@@ -80,7 +80,7 @@ const MobileAssetWorkflow = () => {
       session_token: 'mobile_session',
       expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       full_name: profileData.full_name || 'Mobile User',
-      organization_id: 'current',
+      organization_id: profileData.organization_id,
       role: 'user'
     };
     

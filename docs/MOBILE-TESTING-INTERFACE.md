@@ -118,10 +118,12 @@ The interface includes a realistic mobile device frame:
 
 ## 🔧 **Technical Implementation**
 
+**Updated:** September 2, 2025 - Replaced with comprehensive diagnostic tool
+
 ### **Components**
-- **Primary**: `MobileTestWorkflow.tsx` - Main testing interface
-- **Embedded**: `MobileAssetWorkflow.tsx` - Actual mobile workflow component
+- **Primary**: `MobileTestWorkflow.tsx` - **Mobile workflow diagnostic tool** (replaces old simulator)
 - **Integration**: Added to `MobileQRCodeDisplay.tsx` as "Mobile" button
+- **Capabilities**: Database testing, PIN authentication validation, error detection
 
 ### **Route Configuration**
 ```typescript
