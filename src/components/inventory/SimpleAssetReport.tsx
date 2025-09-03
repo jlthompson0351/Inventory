@@ -495,9 +495,11 @@ const SimpleAssetReport: React.FC = () => {
         const formId = asset.asset_types?.inventory_form_id;
         const formFieldsForAsset = formSchemas[formId] || [];
 
-        // Build field label map
+        // Build field label map and ADD ALL FORM FIELDS to fieldSet (even if empty)
         formFieldsForAsset.forEach((field: FormField) => {
           fieldLabelMap[field.id] = field.label;
+          // IMPORTANT: Add all defined form fields to fieldSet, regardless of whether they have data
+          fieldSet.add(field.id);
         });
 
         if (viewMode === 'history' && selectedAssetForHistory && asset.id !== selectedAssetForHistory) {
@@ -566,13 +568,21 @@ const SimpleAssetReport: React.FC = () => {
               formatted_price: '$0.00'
             };
 
-            // Merge submission data with price data
+            // Merge submission data with price data and ensure all form fields are present
+            const baseSubmissionData = latestSubmission.submission_data || {};
             const enrichedSubmissionData = {
-              ...(latestSubmission.submission_data || {}),
+              ...baseSubmissionData,
               asset_current_price: assetPriceData.price,
               asset_unit_type: assetPriceData.unit_type,
               asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
             };
+            
+            // Ensure all form fields are present in the data (with empty string if no value)
+            formFieldsForAsset.forEach((field: FormField) => {
+              if (!(field.id in enrichedSubmissionData)) {
+                enrichedSubmissionData[field.id] = '';
+              }
+            });
 
             processedData.push({
               asset_name: asset.name,
@@ -590,14 +600,21 @@ const SimpleAssetReport: React.FC = () => {
               formatted_price: '$0.00'
             };
 
+            const emptySubmissionData = {
+              asset_current_price: assetPriceData.price,
+              asset_unit_type: assetPriceData.unit_type,
+              asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
+            };
+            
+            // Add empty form fields for this asset type
+            formFieldsForAsset.forEach((field: FormField) => {
+              emptySubmissionData[field.id] = '';
+            });
+
             processedData.push({
               asset_name: asset.name,
               asset_type: asset.asset_types.name,
-              latest_submission: {
-                asset_current_price: assetPriceData.price,
-                asset_unit_type: assetPriceData.unit_type,
-                asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
-              },
+              latest_submission: emptySubmissionData,
               submission_date: '',
               last_month_total: lastMonthTotal
             });
@@ -623,13 +640,21 @@ const SimpleAssetReport: React.FC = () => {
                 formatted_price: '$0.00'
               };
 
-              // Merge submission data with price data
+              // Merge submission data with price data and ensure all form fields are present
+              const baseSubmissionData = submission.submission_data || {};
               const enrichedSubmissionData = {
-                ...(submission.submission_data || {}),
+                ...baseSubmissionData,
                 asset_current_price: assetPriceData.price,
                 asset_unit_type: assetPriceData.unit_type,
                 asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
               };
+              
+              // Ensure all form fields are present in history data too
+              formFieldsForAsset.forEach((field: FormField) => {
+                if (!(field.id in enrichedSubmissionData)) {
+                  enrichedSubmissionData[field.id] = '';
+                }
+              });
 
               processedData.push({
                 asset_name: asset.name,
@@ -644,31 +669,27 @@ const SimpleAssetReport: React.FC = () => {
       });
 
       // Processed data
-
+      
       // Convert field set to sorted array with labels - only if no template is loaded
       if (!currentTemplate || formFields.length === 0) {
-        // Filter out system fields that we handle specially - be more aggressive with filtering
+        // Filter out system fields that we handle specially - LESS aggressive filtering
         const systemFields = ['asset_type', 'asset_name', 'last_updated', 'last_month_total'];
         const filteredFieldSet = Array.from(fieldSet).filter(fieldId => {
           const lowerFieldId = fieldId.toLowerCase();
           
-          // Filter out exact matches
+          // Filter out exact matches for known system fields
           if (systemFields.includes(lowerFieldId)) return false;
           
-          // Filter out any variation of asset_name
-          if (lowerFieldId.includes('asset') && lowerFieldId.includes('name')) return false;
-          if (lowerFieldId.includes('assetname')) return false;
-          if (lowerFieldId.includes('asset_name')) return false;
+          // Filter out pricing fields we handle separately
+          if (fieldId.startsWith('asset_current_price') || fieldId.startsWith('asset_unit_type') || fieldId.startsWith('asset_price_display')) return false;
           
-          // Filter out any variation of asset_type  
-          if (lowerFieldId.includes('asset') && lowerFieldId.includes('type')) return false;
-          if (lowerFieldId.includes('assettype')) return false;
-          if (lowerFieldId.includes('asset_type')) return false;
+          // Only filter out obvious system metadata fields, not form data fields
+          if (lowerFieldId.includes('updated') && (lowerFieldId.includes('_at') || lowerFieldId.includes('timestamp'))) return false;
+          if (lowerFieldId.includes('created') && (lowerFieldId.includes('_at') || lowerFieldId.includes('timestamp'))) return false;
           
-          // Filter out other system-like fields
-          if (lowerFieldId.includes('updated')) return false;
-          if (lowerFieldId.includes('created')) return false;
-          if (lowerFieldId.includes('timestamp')) return false;
+          // Don't filter out form fields that might contain "asset" or "type" in their labels
+          // Only filter if it's clearly a system field like "asset_type_id" 
+          if (fieldId === 'asset_type_id' || fieldId === 'asset_name' || fieldId === 'assettype' || fieldId === 'assetname') return false;
           
           return true;
         });
