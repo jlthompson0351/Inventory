@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getAssetDataDefinitions } from './mappedAssetDataService';
 
 export interface MappedField {
   id?: string;
@@ -221,10 +222,11 @@ export const getMappedFieldsForReporting = async (
 };
 
 /**
- * Get ALL mapped fields available for an asset type (conversion fields + form mapped fields)
+ * Get ALL mapped fields available for an asset type (conversion fields + form mapped fields + asset data fields)
  * This includes:
  * - Conversion fields defined directly on the asset type
  * - Mapped fields from all forms linked to this asset type
+ * - Asset data fields from the asset data definitions table
  */
 export const getAllMappedFieldsForAssetType = async (
   assetTypeId: string,
@@ -246,6 +248,15 @@ export const getAllMappedFieldsForAssetType = async (
     form_name: string;
     form_id: string;
     source: 'form';
+    description?: string;
+  }>;
+  assetDataFields: Array<{
+    id: string;
+    field_id: string;
+    field_label: string;
+    field_type: string;
+    form_name: string;
+    source: 'asset_data';
     description?: string;
   }>;
 }> => {
@@ -306,15 +317,35 @@ export const getAllMappedFieldsForAssetType = async (
         }));
     }
     
+    // 4. Get asset data fields from asset data definitions
+    let assetDataFields: any[] = [];
+    try {
+      const assetDataDefinitions = await getAssetDataDefinitions(organizationId);
+      assetDataFields = assetDataDefinitions.map(def => ({
+        id: def.id,
+        field_id: def.field_name,
+        field_label: def.field_label,
+        field_type: def.field_type,
+        form_name: 'Asset Data',
+        source: 'asset_data',
+        description: def.default_value ? `Live ${def.field_label} from asset data (default: ${def.default_value})` : `Live ${def.field_label} from asset data`
+      }));
+    } catch (assetDataError) {
+      console.error('Error fetching asset data definitions:', assetDataError);
+      // Continue without asset data fields - graceful degradation
+    }
+    
     return {
       conversionFields,
-      formMappedFields
+      formMappedFields,
+      assetDataFields
     };
   } catch (error) {
     console.error('Error fetching all mapped fields for asset type:', error);
     return {
       conversionFields: [],
-      formMappedFields: []
+      formMappedFields: [],
+      assetDataFields: []
     };
   }
 }; 

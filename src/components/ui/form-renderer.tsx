@@ -11,6 +11,7 @@ import { Form } from '@/services/formService';
 import { FormValidationRule, FormFieldDependency } from '@/services/formService';
 import { z } from 'zod';
 import { FormBuilderEvaluator } from '@/utils/safeEvaluator';
+import { getCachedAssetDataValues } from '@/services/mappedAssetDataService';
 
 // FormulaContext interface for compatibility
 interface FormulaContext {
@@ -46,6 +47,8 @@ interface FormRendererProps {
   submitButtonIconProps?: any;
   mappedFields?: Record<string, any>;
   assetName?: string;
+  assetId?: string; // NEW: Asset ID for live data resolution
+  organizationId?: string; // NEW: Organization ID for asset data fetching
   showCalculatedFields?: boolean;
   isMobile?: boolean;
 }
@@ -63,6 +66,8 @@ export function FormRenderer({
   submitButtonIconProps,
   mappedFields = {},
   assetName,
+  assetId, // NEW: Asset ID for live data resolution
+  organizationId, // NEW: Organization ID for asset data fetching
   showCalculatedFields = false,
   isMobile = false
 }: FormRendererProps) {
@@ -74,9 +79,89 @@ export function FormRenderer({
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inventoryWarning, setInventoryWarning] = useState<string | null>(null);
+  const [enhancedMappedFields, setEnhancedMappedFields] = useState<Record<string, any>>(mappedFields);
+  const [forceRecalculation, setForceRecalculation] = useState(0); // Trigger for recalculation
   
   // Extract fields from form.form_data
   const fields: FormField[] = (form.form_data as any)?.fields || [];
+
+  // NEW: Fetch live asset data values and merge with mapped fields
+  useEffect(() => {
+    const loadAssetData = async () => {
+      if (!assetId || !organizationId) {
+        // No asset context - just use the provided mapped fields
+        setEnhancedMappedFields(mappedFields);
+        return;
+      }
+      
+      try {
+        // Fetch live asset data values
+        console.log('🔍 FormRenderer fetching asset data for:', assetId);
+        const assetDataValues = await getCachedAssetDataValues(assetId, organizationId);
+        
+        // Merge with existing mapped fields (conversion fields, etc.)
+        const mergedMappedFields = {
+          ...mappedFields, // Existing mapped fields from props
+          ...assetDataValues // Live asset data (price_per_unit, currency, etc.)
+        };
+        
+        console.log('🔍 FormRenderer merged mapped fields:', mergedMappedFields);
+        setEnhancedMappedFields(mergedMappedFields);
+        
+        // CRITICAL: Trigger recalculation of formula fields after asset data loads
+        setForceRecalculation(prev => prev + 1);
+        
+        // CRITICAL: Snapshot these values for historical integrity
+        setFormData(prev => ({
+          ...prev,
+          _captured_asset_data: assetDataValues,
+          _captured_at: new Date().toISOString()
+        }));
+        
+      } catch (error) {
+        console.error('Error loading asset data in FormRenderer:', error);
+        // Form still works, just without live asset data
+        setEnhancedMappedFields(mappedFields);
+      }
+    };
+    
+    loadAssetData();
+  }, [assetId, organizationId, mappedFields]);
+
+  // CRITICAL: Recalculate all formula fields when asset data loads or form data changes
+  useEffect(() => {
+    if (!fields.length) return;
+    
+    const recalculateFormulas = () => {
+      console.log('🔄 Triggering formula recalculation after asset data load');
+      const updatedData = { ...formData };
+      let hasChanges = false;
+      
+      fields.forEach(field => {
+        if (field.type === 'calculated' && field.formula) {
+          const calculatedValue = calculateFieldValue(field);
+          if (updatedData[field.id] !== calculatedValue) {
+            updatedData[field.id] = calculatedValue;
+            hasChanges = true;
+            console.log(`🔄 Recalculated ${field.label}: ${calculatedValue} (was: ${updatedData[field.id]})`);
+          }
+        }
+      });
+      
+      if (hasChanges) {
+        console.log('✅ Updating form data with recalculated values');
+        setFormData(updatedData);
+      } else {
+        console.log('⚠️ No changes in calculated values after asset data load');
+      }
+    };
+    
+    // Small delay to ensure enhancedMappedFields are fully updated
+    const timer = setTimeout(recalculateFormulas, 100);
+    return () => clearTimeout(timer);
+  }, [forceRecalculation, enhancedMappedFields]); // Triggers when asset data loads
+
+
 
   // Update form data when initialData changes (but preserve user edits)
   useEffect(() => {
@@ -269,8 +354,8 @@ export function FormRenderer({
       });
       
       // Add mapped fields from props with advanced mapping logic (same as backend)
-      console.log('🔍 FormRenderer raw mappedFields:', mappedFields);
-      Object.entries(mappedFields).forEach(([key, value]) => {
+      console.log('🔍 FormRenderer raw enhancedMappedFields:', enhancedMappedFields);
+      Object.entries(enhancedMappedFields).forEach(([key, value]) => {
         // Strategy 1: Direct field name mapping
         context.mappedFields[`mapped.${key}`] = Number(value) || 0;
         
@@ -309,6 +394,10 @@ export function FormRenderer({
       // DEBUG: Show final result for calculated fields
       if (field.type === 'formula' || field.type === 'calculated') {
         console.log(`🎯 FormRenderer Formula Result for ${field.label}: ${result} (formula: ${field.formula})`);
+        if (field.label.toLowerCase().includes('cost')) {
+          console.log(`💰 COST CALCULATION: ${field.formula} = ${result}`);
+          console.log('💰 Available mapped fields:', Object.keys(enhancedMappedFields));
+        }
       }
             if (result !== 'Error' && result !== 'Calculation Error') {
                       // Return the result (already formatted)
@@ -332,8 +421,8 @@ export function FormRenderer({
     const totalGallons = Number(updatedData[totalField.id]) || 0;
     
     // Get starting inventory from asset metadata (inventory at the beginning of the period)
-    const startingInventory = Number(mappedFields.starting_inventory) || Number(mappedFields.current_inventory) || 0;
-    const currentInventory = Number(mappedFields.current_inventory) || 0;
+    const startingInventory = Number(enhancedMappedFields.starting_inventory) || Number(enhancedMappedFields.current_inventory) || 0;
+    const currentInventory = Number(enhancedMappedFields.current_inventory) || 0;
     
     // Check if we have any intake fields that add to inventory
     const intakeFields = fields.filter(field => field.inventory_action === 'add');
@@ -415,8 +504,8 @@ export function FormRenderer({
               context.fields[f.id] = (currentValue === '' || currentValue === null || currentValue === undefined) ? 0 : Number(currentValue) || 0;
             });
             
-            // Add mapped fields from props
-            Object.entries(mappedFields).forEach(([key, value]) => {
+            // CRITICAL FIX: Use enhancedMappedFields that includes live asset data
+            Object.entries(enhancedMappedFields).forEach(([key, value]) => {
               // The formulas expect {mapped.field_name} so we need to set the key as 'mapped.field_name'
               context.mappedFields[`mapped.${key}`] = Number(value) || 0;
             });
@@ -584,8 +673,8 @@ export function FormRenderer({
                   context.fields[f.id] = (currentValue === '' || currentValue === null || currentValue === undefined) ? 0 : Number(currentValue) || 0;
                 });
                 
-                // Add mapped fields from props
-                Object.entries(mappedFields).forEach(([key, value]) => {
+                // CRITICAL FIX: Use enhancedMappedFields that includes live asset data
+                Object.entries(enhancedMappedFields).forEach(([key, value]) => {
                   context.mappedFields[`mapped.${key}`] = Number(value) || 0;
                 });
                 
@@ -640,9 +729,16 @@ export function FormRenderer({
           }
         });
         
+        // CRITICAL: Add asset data snapshot for historical integrity
+        const submissionData = {
+          ...finalFormData,
+          _asset_data_snapshot: formData._captured_asset_data || {},
+          _asset_data_captured_at: formData._captured_at || new Date().toISOString()
+        };
+        
         // Final form data being submitted
         
-        await onSubmit(finalFormData);
+        await onSubmit(submissionData);
       } catch (error) {
         // Form submission error
         // Could set a general form error here

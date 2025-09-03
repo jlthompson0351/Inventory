@@ -898,6 +898,8 @@ export default function SubmitForm() {
             submitButtonIconProps={submitting ? { className: 'animate-spin' } : undefined}
             mappedFields={assetMetadata}
             assetName={assetName}
+            assetId={assetId} // NEW: Pass asset ID for live data resolution
+            organizationId={currentOrganization?.id} // NEW: Pass organization ID for asset data fetching
             showCalculatedFields={showCalculatedFields}
             isMobile={fromMobileQR}
           />

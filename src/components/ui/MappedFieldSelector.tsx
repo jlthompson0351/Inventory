@@ -22,9 +22,10 @@ interface MappedField {
 
 interface MappedFieldSelectorProps {
   onSelectField: (fieldId: string, fieldLabel: string, formName?: string) => void;
+  fields?: MappedField[]; // NEW: Allow passing fields as props for integration with FormBuilder
 }
 
-export function MappedFieldSelector({ onSelectField }: MappedFieldSelectorProps) {
+export function MappedFieldSelector({ onSelectField, fields: propFields }: MappedFieldSelectorProps) {
   const [fields, setFields] = useState<MappedField[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -45,10 +46,29 @@ export function MappedFieldSelector({ onSelectField }: MappedFieldSelectorProps)
   }, {} as Record<string, { formName: string; fields: MappedField[] }>);
 
   useEffect(() => {
-    if (currentOrganization?.id) {
+    if (propFields) {
+      // Use fields passed as props (from FormBuilder with asset data fields)
+      setFields(propFields);
+      initializeExpandedForms(propFields);
+    } else if (currentOrganization?.id) {
+      // Fallback to fetching data for backward compatibility
       loadMappedFields();
     }
-  }, [currentOrganization?.id]);
+  }, [propFields, currentOrganization?.id]);
+
+  const initializeExpandedForms = (fieldsData: MappedField[]) => {
+    // Initially expand all forms if there are just a few
+    if (fieldsData.length > 0) {
+      const uniqueFormIds = [...new Set(fieldsData.map(field => field.form_id))];
+      if (uniqueFormIds.length <= 3) {
+        const initialExpanded = uniqueFormIds.reduce((acc, formId) => {
+          acc[formId] = true;
+          return acc;
+        }, {} as Record<string, boolean>);
+        setExpandedForms(initialExpanded);
+      }
+    }
+  };
 
   const loadMappedFields = async () => {
     if (!currentOrganization?.id) return;
@@ -57,18 +77,7 @@ export function MappedFieldSelector({ onSelectField }: MappedFieldSelectorProps)
     try {
       const data = await getMappedFields(currentOrganization.id);
       setFields(data);
-      
-      // Initially expand all forms if there are just a few
-      if (data.length > 0) {
-        const uniqueFormIds = [...new Set(data.map(field => field.form_id))];
-        if (uniqueFormIds.length <= 3) {
-          const initialExpanded = uniqueFormIds.reduce((acc, formId) => {
-            acc[formId] = true;
-            return acc;
-          }, {} as Record<string, boolean>);
-          setExpandedForms(initialExpanded);
-        }
-      }
+      initializeExpandedForms(data);
     } catch (error) {
       console.error("Error loading mapped fields:", error);
     } finally {

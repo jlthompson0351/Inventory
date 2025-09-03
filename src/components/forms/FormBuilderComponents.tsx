@@ -259,6 +259,7 @@ export function FormulaManager({
             ) : (
               <div className="border rounded-md p-2 overflow-y-auto max-h-48 w-64 bg-white">
                 <MappedFieldSelector 
+                  fields={mappedFields} // Pass the mapped fields from FormBuilder (includes asset data)
                   onSelectField={(fieldId, fieldLabel, formName) => {
                     const formulaInput = document.getElementById(`formula-${field.id}`) as HTMLTextAreaElement;
                     if (formulaInput) {

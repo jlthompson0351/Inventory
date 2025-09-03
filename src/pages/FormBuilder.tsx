@@ -1034,12 +1034,12 @@ const FormBuilder = () => {
       
       if (effectiveAssetTypeId) {
         // Get comprehensive mapped fields for the selected asset type
-        const { conversionFields, formMappedFields } = await getAllMappedFieldsForAssetType(
+        const { conversionFields, formMappedFields, assetDataFields } = await getAllMappedFieldsForAssetType(
           effectiveAssetTypeId, 
           currentOrganization.id
         );
         
-        // Combine conversion fields and form mapped fields into a unified format
+        // Combine conversion fields, form mapped fields, and asset data fields into a unified format
         const allFields = [
           // Conversion fields from asset type - ensure they all have the right format
           ...conversionFields.map((field, index) => ({
@@ -1056,6 +1056,11 @@ const FormBuilder = () => {
           ...formMappedFields.map(field => ({
             ...field,
             source: 'form' as const
+          })),
+          // NEW: Asset data fields from asset data definitions
+          ...assetDataFields.map(field => ({
+            ...field,
+            source: 'asset_data' as const
           }))
         ];
         

@@ -221,7 +221,7 @@ export default function ExcelFormulaBuilder({
 
   // Group mapped fields by source
   const conversionFields = mappedFields.filter(f => f.source === 'conversion');
-  const formMappedFields = mappedFields.filter(f => f.source === 'form');
+  const assetDataFields = mappedFields.filter(f => f.source === 'asset_data'); // NEW: Show asset data instead of form mapped fields
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -358,11 +358,11 @@ export default function ExcelFormulaBuilder({
               </Select>
             </div>
 
-            {/* Other Forms Dropdown */}
+            {/* Asset Data Dropdown */}
             <div className="space-y-1">
-              <Label className="text-sm font-medium">Other Forms ({formMappedFields.length})</Label>
+              <Label className="text-sm font-medium">Asset Data ({assetDataFields.length})</Label>
               <Select onValueChange={(value) => {
-                const field = formMappedFields.find(f => f.field_id === value);
+                const field = assetDataFields.find(f => f.field_id === value);
                 if (field) {
                   clickToInsertField({
                     insertText: `[${field.form_name}.${field.field_label}]`,
@@ -371,10 +371,10 @@ export default function ExcelFormulaBuilder({
                 }
               }}>
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Click to insert mapped field" />
+                  <SelectValue placeholder="Click to insert asset data" />
                 </SelectTrigger>
                 <SelectContent>
-                  {formMappedFields.map(field => (
+                  {assetDataFields.map(field => (
                     <SelectItem key={field.id} value={field.field_id}>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
@@ -382,14 +382,14 @@ export default function ExcelFormulaBuilder({
                         </Badge>
                         <div>
                           <div className="text-sm">{field.field_label}</div>
-                          <div className="text-xs text-muted-foreground">{field.form_name}</div>
+                          <div className="text-xs text-muted-foreground">{field.form_name} (Live Data)</div>
                         </div>
                       </div>
                     </SelectItem>
                   ))}
-                  {formMappedFields.length === 0 && (
+                  {assetDataFields.length === 0 && (
                     <SelectItem value="none" disabled>
-                      No mapped fields available
+                      No asset data fields available
                     </SelectItem>
                   )}
                 </SelectContent>

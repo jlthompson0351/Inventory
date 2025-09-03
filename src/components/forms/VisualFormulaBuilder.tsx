@@ -224,7 +224,7 @@ export default function VisualFormulaBuilder({
   };
 
   const conversionFields = mappedFields.filter(f => f.source === 'conversion');
-  const formMappedFields = mappedFields.filter(f => f.source === 'form');
+  const assetDataFields = mappedFields.filter(f => f.source === 'asset_data'); // NEW: Show asset data instead of form mapped fields
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -490,21 +490,21 @@ export default function VisualFormulaBuilder({
                   </div>
                 </div>
 
-                {/* Mapped Fields from Forms */}
-                {formMappedFields.length > 0 && (
+                {/* Asset Data Fields */}
+                {assetDataFields.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-sm">Mapped Fields (from other forms)</Label>
+                    <Label className="text-sm">Asset Data (live values)</Label>
                     <Select onValueChange={(value) => {
-                      const field = formMappedFields.find(f => f.field_id === value);
+                      const field = assetDataFields.find(f => f.field_id === value);
                       if (field) {
                         addElement('mapped', value, field.field_label, field.form_name);
                       }
                     }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Add mapped field" />
+                        <SelectValue placeholder="Add asset data field" />
                       </SelectTrigger>
                       <SelectContent>
-                        {formMappedFields.map(field => (
+                        {assetDataFields.map(field => (
                           <SelectItem key={field.id} value={field.field_id}>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-[10px]">
@@ -512,7 +512,7 @@ export default function VisualFormulaBuilder({
                               </Badge>
                               {field.field_label}
                               <span className="text-xs text-muted-foreground">
-                                from {field.form_name}
+                                {field.form_name} (Live Data)
                               </span>
                             </div>
                           </SelectItem>
