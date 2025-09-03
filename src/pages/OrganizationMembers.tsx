@@ -4,6 +4,7 @@ import { useOrganizationMembers } from '@/hooks/useOrganizationMembers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MembersList } from '@/components/organization/MembersList';
 import DirectUserAddForm from '@/components/organization/DirectUserAddForm';
+import { Users, Plus } from 'lucide-react';
 
 // This component will render the main content for member management.
 // It can be used directly in a tab or wrapped by a page component if needed.
@@ -25,9 +26,9 @@ const OrganizationMembersContent: React.FC = () => {
 
   // Main layout for member management content
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header Section */}
-      <div className="flex flex-col space-y-2">
+      <div className="flex flex-col space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold tracking-tight">Members Settings</h2>
           <div className="text-sm text-muted-foreground">
@@ -39,31 +40,42 @@ const OrganizationMembersContent: React.FC = () => {
         </p>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Current Members Section */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border rounded-xl shadow-sm">
-            <div className="p-6 border-b">
-              <h3 className="text-lg font-semibold">Current Members</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {members?.length || 0} member{(members?.length || 0) !== 1 ? 's' : ''} in your organization
-              </p>
-            </div>
-            <div className="p-6">
-              <MembersList />
+      {/* Current Members Section - Priority First */}
+      <div className="space-y-8">
+        <div className="bg-card border rounded-xl shadow-sm">
+          <div className="p-6 border-b bg-primary/5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">Current Members</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {members?.length || 0} member{(members?.length || 0) !== 1 ? 's' : ''} in your organization
+                </p>
+              </div>
             </div>
           </div>
+          <div className="p-6">
+            <MembersList />
+          </div>
         </div>
-        
-        {/* Right Sidebar */}
-        <div className="lg:col-span-1 space-y-6">
+
+        {/* Add New Member Section - Secondary */}
+        <div className="grid lg:grid-cols-2 gap-8">
           <div className="bg-card border rounded-xl shadow-sm">
-            <div className="p-6 border-b">
-              <h3 className="text-lg font-semibold">Add New Member</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create user accounts directly
-              </p>
+            <div className="p-6 border-b bg-green-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <Plus className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Add New Member</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Create user accounts directly
+                  </p>
+                </div>
+              </div>
             </div>
             
             <div className="p-6">
@@ -73,6 +85,18 @@ const OrganizationMembersContent: React.FC = () => {
                   refreshMembers();
                 }}
               />
+            </div>
+          </div>
+          
+          {/* Future expansion space or help content */}
+          <div className="bg-muted/30 border border-dashed rounded-xl p-6 flex items-center justify-center">
+            <div className="text-center space-y-2">
+              <div className="p-3 rounded-lg bg-muted/50 inline-block">
+                <Users className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Member management tools and analytics will appear here
+              </p>
             </div>
           </div>
         </div>

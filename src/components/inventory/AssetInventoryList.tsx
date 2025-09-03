@@ -151,154 +151,128 @@ export default function AssetInventoryList({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {filteredAssets.map((asset) => {
         const stockLevel = getStockLevel(asset.current_quantity);
         
-        // Create dynamic gradient based on asset type color
-        const assetTypeColor = asset.asset_type_color;
-        const gradientStyle = assetTypeColor ? {
-          background: `linear-gradient(135deg, ${assetTypeColor}, ${assetTypeColor}dd, ${assetTypeColor}ee)`
-        } : {
-          background: 'linear-gradient(135deg, #6E56CF, #6E56CF)'
-        };
-
-        // Get quantity display with creative styling
+        // Get quantity display with subtle color coding
         const getQuantityDisplay = () => {
           if (!asset.has_inventory) {
-            return { text: 'No Inventory', icon: '📋', colorClass: 'text-amber-100' };
+            return { text: 'No Inventory', colorClass: 'text-amber-600' };
           }
           
           const quantity = asset.current_quantity;
           const unitType = asset.unit_type || 'units';
-          if (stockLevel === 'out') return { text: `${quantity} ${unitType}`, icon: '🔴', colorClass: 'text-red-100' };
-          if (stockLevel === 'low') return { text: `${quantity} ${unitType}`, icon: '🟡', colorClass: 'text-orange-100' };
-          if (stockLevel === 'high') return { text: `${quantity} ${unitType}`, icon: '🟢', colorClass: 'text-green-100' };
-          return { text: `${quantity} ${unitType}`, icon: '📦', colorClass: 'text-blue-100' };
+          if (stockLevel === 'out') return { text: `${quantity} ${unitType}`, colorClass: 'text-red-600' };
+          if (stockLevel === 'low') return { text: `${quantity} ${unitType}`, colorClass: 'text-orange-600' };
+          if (stockLevel === 'high') return { text: `${quantity} ${unitType}`, colorClass: 'text-green-600' };
+          return { text: `${quantity} ${unitType}`, colorClass: 'text-blue-600' };
         };
 
         const quantityDisplay = getQuantityDisplay();
         
+        // Add subtle left border color based on asset type
+        const borderColor = asset.asset_type_color 
+          ? `border-l-4 border-l-[${asset.asset_type_color}]` 
+          : 'border-l-4 border-l-blue-500';
+
         return (
-          <div key={asset.asset_id} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/50 overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-            {/* Dynamic Gradient Header */}
-            <div style={gradientStyle}>
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-lg flex-shrink-0">
-                      <Package className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-lg font-bold text-white leading-tight" title={asset.asset_name}>
-                        {asset.asset_name}
-                      </h3>
-                      {asset.asset_type_name && (
-                        <p className="text-white/80 text-xs mt-1">
-                          {asset.asset_type_name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Status Icon */}
-                  <div className="flex-shrink-0">
-                    {stockLevel === 'out' && (
-                      <div className="p-1 bg-red-500/20 rounded-full">
-                        <AlertTriangle className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                    {stockLevel === 'low' && (
-                      <div className="p-1 bg-orange-500/20 rounded-full">
-                        <TrendingDown className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                    {stockLevel === 'high' && (
-                      <div className="p-1 bg-green-500/20 rounded-full">
-                        <TrendingUp className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                  </div>
+          <Card key={asset.asset_id} className={`hover:shadow-md transition-shadow ${borderColor}`}>
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-base font-semibold line-clamp-1" title={asset.asset_name}>
+                    {asset.asset_name}
+                  </CardTitle>
+                  {asset.asset_type_name && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {asset.asset_type_name}
+                    </p>
+                  )}
                 </div>
                 
-                {/* Quantity Display in Header */}
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
-                  <span className="text-lg">{quantityDisplay.icon}</span>
-                  <span className={`font-bold text-white ${quantityDisplay.colorClass}`}>
-                    {quantityDisplay.text}
-                  </span>
+                {/* Subtle status indicator */}
+                <div className="flex-shrink-0">
+                  {stockLevel === 'out' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                  {stockLevel === 'low' && <TrendingDown className="h-4 w-4 text-orange-500" />}
+                  {stockLevel === 'high' && <TrendingUp className="h-4 w-4 text-green-500" />}
                 </div>
               </div>
-            </div>
+              
+              {/* Prominent quantity display */}
+              <div className="mt-2">
+                <Badge 
+                  variant="outline"
+                  className={`${getStockLevelColor(stockLevel)} w-fit font-semibold`}
+                >
+                  <Package className="h-3 w-3 mr-1" />
+                  {quantityDisplay.text}
+                </Badge>
+              </div>
+            </CardHeader>
             
-            {/* Enhanced Card Content */}
-            <div className="p-4 space-y-4">
-              {/* Metadata Section with Enhanced Styling */}
-              <div className="grid grid-cols-1 gap-3">
-                {asset.asset_location && (
-                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                    <div className="p-1 bg-blue-100 rounded">
-                      <MapPin className="h-3 w-3 text-blue-600" />
-                    </div>
-                    <span className="text-sm text-gray-700 truncate">{asset.asset_location}</span>
-                  </div>
-                )}
+            <CardContent className="pt-0 space-y-3">
+              {/* Clean metadata section */}
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">
+                    {asset.asset_location && asset.asset_location !== 'Location TBD' 
+                      ? asset.asset_location 
+                      : 'Location not set'
+                    }
+                  </span>
+                </div>
                 
-                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div className="flex items-center justify-between">
                   {asset.last_check_date ? (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3 text-gray-500" />
-                      <span className="text-xs text-gray-600">Updated {format(new Date(asset.last_check_date), 'MMM d, yyyy')}</span>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-xs">Updated {format(new Date(asset.last_check_date), 'MMM d')}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3 text-gray-400" />
-                      <span className="text-xs text-gray-400">No updates yet</span>
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-xs">No updates</span>
                     </div>
                   )}
                   
                   <Badge 
-                    variant="outline" 
-                    className={`text-xs ${
-                      asset.asset_status === 'active' 
-                        ? 'bg-green-50 text-green-700 border-green-200' 
-                        : 'bg-gray-50 text-gray-600 border-gray-200'
-                    }`}
+                    variant={asset.asset_status === 'active' ? 'default' : 'secondary'} 
+                    className="text-xs"
                   >
                     {asset.asset_status || 'Active'}
                   </Badge>
                 </div>
               </div>
               
-              {/* Description with Better Styling */}
+              {/* Compact description */}
               {asset.asset_description && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800 line-clamp-2" title={asset.asset_description}>
-                    {asset.asset_description}
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2" title={asset.asset_description}>
+                  {asset.asset_description}
+                </p>
               )}
               
-              {/* Enhanced Action Buttons */}
-              <div className="space-y-2 pt-2">
+              {/* Streamlined action buttons */}
+              <div className="space-y-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleViewAsset(asset)}
-                  className="w-full h-9 text-sm border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                  className="w-full"
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   View Asset
                 </Button>
                 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex gap-2">
                   {asset.has_inventory ? (
                     <>
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => handleInventoryCheck(asset)}
-                        className="h-9 text-sm border-2 border-green-200 hover:border-green-300 hover:bg-green-50 transition-all duration-200"
+                        className="flex-1"
                       >
                         <Calendar className="h-4 w-4 mr-1" />
                         Check
@@ -308,7 +282,7 @@ export default function AssetInventoryList({
                         variant="outline" 
                         size="sm"
                         onClick={() => handleViewHistory(asset)}
-                        className="h-9 text-sm border-2 border-purple-200 hover:border-purple-300 hover:bg-purple-50 transition-all duration-200"
+                        className="flex-1"
                       >
                         <History className="h-4 w-4 mr-1" />
                         History
@@ -319,16 +293,16 @@ export default function AssetInventoryList({
                       variant="default" 
                       size="sm"
                       onClick={() => handleCreateInventory(asset)}
-                      className="h-9 text-sm col-span-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                      className="flex-1"
                     >
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Inventory
+                      Add Inventory
                     </Button>
                   )}
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

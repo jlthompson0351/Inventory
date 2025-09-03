@@ -8,6 +8,7 @@ interface CreateUserRequest {
   fullName: string;
   role: 'admin' | 'member' | 'viewer';
   organizationId?: string; // Optional - will use admin's org if not provided
+  quickAccessPin?: string; // Optional 4-digit PIN for QR code access
 }
 
 interface CreateUserResponse {
@@ -68,7 +69,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Parse request body
     const body: CreateUserRequest = await req.json();
-    const { email, password, fullName, role } = body;
+    const { email, password, fullName, role, quickAccessPin } = body;
     const organizationId = body.organizationId || auth.organizationId;
 
     // Validate required fields
@@ -91,6 +92,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           success: false, 
           error: 'Invalid role. Must be admin, member, or viewer' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Validate PIN format if provided
+    if (quickAccessPin && !/^[0-9]{4}$/.test(quickAccessPin)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Quick access PIN must be exactly 4 digits' 
         }),
         { 
           status: 400, 
@@ -163,6 +178,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
           // User added to organization
+
+    // Set quick access PIN if provided
+    if (quickAccessPin) {
+      const { error: pinError } = await serviceSupabase
+        .from('profiles')
+        .update({ quick_access_pin: quickAccessPin })
+        .eq('id', authData.user.id);
+
+      if (pinError) {
+        console.error('Failed to set PIN for user:', pinError);
+        // Don't fail the entire operation for PIN error, just log it
+        // The user account is still created successfully
+      }
+    }
 
     // Return success response
     const response: CreateUserResponse = {

@@ -31,6 +31,7 @@ const userSchema = z.object({
   full_name: z.string().min(2, { message: "Full name must be at least 2 characters" }),
   role: z.enum(['admin', 'member', 'viewer']),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
+  quick_access_pin: z.string().regex(/^\d{4}$/, { message: "PIN must be exactly 4 digits" }).optional().or(z.literal("")),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
@@ -50,6 +51,7 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
       full_name: '',
       password: '',
       role: 'member',
+      quick_access_pin: '',
     },
   });
 
@@ -62,6 +64,7 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
         fullName: values.full_name,
         role: values.role,
         organizationId: organizationId,
+        quickAccessPin: values.quick_access_pin || null,
       };
 
       // Calling admin-create-user edge function
@@ -174,6 +177,29 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="quick_access_pin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>QR Access PIN (Optional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="text" 
+                      placeholder="1234" 
+                      maxLength={4}
+                      pattern="[0-9]{4}"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    4-digit PIN for QR code scanning and mobile inventory access. Leave empty to skip.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <Button type="submit" disabled={loading} className="w-full">
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -185,6 +211,7 @@ const DirectUserAddForm: React.FC<DirectUserAddFormProps> = ({ organizationId, o
         <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
           <p className="text-sm text-blue-700">
             <strong>Note:</strong> The new user will receive immediate access and must change their password on first login.
+            If you set a PIN, they can also scan QR codes for quick inventory access without logging into the full app.
           </p>
         </div>
       </CardContent>

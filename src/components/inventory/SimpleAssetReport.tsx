@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar, Download, RefreshCw, FileText, Clock, Users, Settings, Eye, EyeOff, Save, FolderOpen, CalendarDays, Filter, History, Target } from 'lucide-react';
+import { Calendar, Download, RefreshCw, FileText, Clock, Users, Settings, Eye, EyeOff, Save, FolderOpen, CalendarDays, Filter, History, Target, Plus, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/hooks/useOrganization';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 
 interface AssetReportData {
   asset_name: string;
@@ -32,6 +33,12 @@ interface FormField {
   type: string;
   selected: boolean;
   order?: number;
+  // Enhanced field types for visual and calculated columns
+  fieldType?: 'data' | 'color_fill' | 'calculated';
+  color?: string; // For color_fill columns
+  formula?: string; // For calculated columns
+  sourceColumns?: string[]; // For calculated columns
+  width?: string; // For custom column widths
 }
 
 interface ReportTemplate {
@@ -131,6 +138,11 @@ const SimpleAssetReport: React.FC = () => {
   const [viewMode, setViewMode] = useState<'latest' | 'history' | 'comparison'>('latest');
   const [selectedAssetForHistory, setSelectedAssetForHistory] = useState<string>('');
 
+  // Color column builder state
+  const [showColorColumnBuilder, setShowColorColumnBuilder] = useState(false);
+  const [newColorColumnName, setNewColorColumnName] = useState('');
+  const [newColorColumnColor, setNewColorColumnColor] = useState('#3B82F6');
+
   // Load asset types and templates
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -138,6 +150,8 @@ const SimpleAssetReport: React.FC = () => {
       loadSavedTemplates();
     }
   }, [currentOrganization?.id]);
+
+
 
   const loadAssetTypes = async () => {
     try {
@@ -180,7 +194,7 @@ const SimpleAssetReport: React.FC = () => {
       name: newTemplateName.trim(),
       description: newTemplateDescription.trim(),
       asset_type_filter: selectedAssetTypes[0] || 'all',
-      selected_fields: formFields.filter(f => f.selected),
+      selected_fields: formFields, // Save all fields including color columns
       date_range_type: dateRangeType,
       custom_start_date: customStartDate,
       custom_end_date: customEndDate,
@@ -218,6 +232,75 @@ const SimpleAssetReport: React.FC = () => {
     setSavedTemplates(newTemplates);
     localStorage.setItem(`report_templates_${currentOrganization!.id}`, JSON.stringify(newTemplates));
     toast.success('Template deleted');
+  };
+
+  // Add color column to report
+  const addColorColumn = () => {
+    if (!newColorColumnName.trim()) {
+      toast.error('Please enter a column name');
+      return;
+    }
+
+    const colorColumn: FormField = {
+      id: `color_${Date.now()}`,
+      label: newColorColumnName.trim(),
+      type: 'color',
+      fieldType: 'color_fill',
+      color: newColorColumnColor,
+      selected: true,
+      order: 1, // Add to top, user can reorder
+      width: '80px' // Wider for better visibility as separator
+    };
+
+    // Add to main formFields array and reorder everything
+    setFormFields(prev => {
+      const newFields = [colorColumn, ...prev];
+      return newFields.map((field, index) => ({
+        ...field,
+        order: field.selected ? index + 1 : undefined
+      }));
+    });
+
+    setNewColorColumnName('');
+    setNewColorColumnColor('#3B82F6');
+    setShowColorColumnBuilder(false);
+    toast.success(`Color column "${colorColumn.label}" added! Use arrows to reorder.`);
+  };
+
+  // Simplified column reordering
+  const moveColumn = (columnId: string, direction: 'up' | 'down') => {
+    const allSelectedColumns = getSelectedFields();
+    const currentIndex = allSelectedColumns.findIndex(col => col.id === columnId);
+    
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= allSelectedColumns.length) return;
+
+    // Swap order numbers
+    const currentColumn = allSelectedColumns[currentIndex];
+    const targetColumn = allSelectedColumns[newIndex];
+    const tempOrder = currentColumn.order;
+    
+    setFormFields(prev => prev.map(field => 
+      field.id === columnId ? { ...field, order: targetColumn.order } :
+      field.id === targetColumn.id ? { ...field, order: tempOrder } :
+      field
+    ));
+  };
+
+  const deleteColumn = (columnId: string) => {
+    setFormFields(prev => {
+      const filtered = prev.filter(f => f.id !== columnId);
+      // Reorder remaining selected columns
+      const selected = filtered.filter(f => f.selected).sort((a, b) => (a.order || 0) - (b.order || 0));
+      return filtered.map(field => {
+        if (!field.selected) return field;
+        const newOrder = selected.findIndex(f => f.id === field.id) + 1;
+        return { ...field, order: newOrder };
+      });
+    });
+    toast.success('Column removed');
   };
 
   const generateReport = async () => {
@@ -681,9 +764,9 @@ const SimpleAssetReport: React.FC = () => {
     );
   };
 
-  const getSelectedFields = () => formFields
-    .filter(f => f.selected)
-    .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
+  const getSelectedFields = () => {
+    return formFields.filter(f => f.selected).sort((a, b) => (a.order || 0) - (b.order || 0));
+  };
 
   const exportToCSV = () => {
     if (reportData.length === 0) {
@@ -706,7 +789,9 @@ const SimpleAssetReport: React.FC = () => {
       const rows = reportData.map(row => [
         row.asset_name,
         ...selectedFields.map(field => {
-          if (field.id === 'asset_type') {
+          if (field.fieldType === 'color_fill') {
+            return `--- ${field.label} ---`; // Text separator for CSV
+          } else if (field.id === 'asset_type') {
             return row.asset_type;
           } else if (field.id === 'last_updated') {
             return row.submission_date ? new Date(row.submission_date).toLocaleDateString() : 'No data';
@@ -735,9 +820,85 @@ const SimpleAssetReport: React.FC = () => {
       link.download = `Monthly_Inventory_${assetTypeName}_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
 
-      toast.success('Report exported successfully!');
+      toast.success('CSV exported successfully!');
     } catch (error: any) {
-      toast.error('Failed to export report: ' + error.message);
+      toast.error('Failed to export CSV: ' + error.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToExcel = async () => {
+    if (reportData.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+
+    const selectedFields = getSelectedFields();
+    if (selectedFields.length === 0) {
+      toast.error('Please select at least one column to export');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Prepare data for Excel - simpler approach first
+      const headers = ['Asset Name', ...selectedFields.map(f => f.label)];
+      const excelData = [headers];
+      
+      // Add rows
+      reportData.forEach(row => {
+        const excelRow = [
+          row.asset_name,
+          ...selectedFields.map(field => {
+            if (field.fieldType === 'color_fill') {
+              return `[${field.label}]`; // Text label for color columns in Excel
+            } else if (field.id === 'asset_type') {
+              return row.asset_type;
+            } else if (field.id === 'last_updated') {
+              return row.submission_date ? new Date(row.submission_date).toLocaleDateString() : 'No data';
+            } else if (field.id === 'last_month_total') {
+              return row.last_month_total || 'No data';
+            } else {
+              return renderFieldValue(row.latest_submission[field.id]);
+            }
+          })
+        ];
+        excelData.push(excelRow);
+      });
+
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+
+      // Set column widths for better visibility
+      const colWidths = headers.map((header, index) => {
+        const field = selectedFields[index - 1]; // -1 because first column is Asset Name
+        if (field?.fieldType === 'color_fill') {
+          return { wch: 15 }; // Wider for color columns
+        }
+        return { wch: 20 }; // Standard width
+      });
+      worksheet['!cols'] = [{ wch: 25 }, ...colWidths]; // Asset Name gets 25 width
+
+      // Note: Color styling removed for stability - colors show in web interface only
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
+
+      // Generate filename
+      const assetTypeName = selectedAssetTypes.length > 1 ? 'Multiple_Assets' : selectedAssetTypes[0] === 'all' ? 'All_Assets' : 
+        assetTypes.find(t => t.id === selectedAssetTypes[0])?.name || 'Assets';
+      const filename = `Monthly_Inventory_${assetTypeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Save file with styling support
+      XLSX.writeFile(workbook, filename);
+
+      const colorColumnCount = selectedFields.filter(f => f.fieldType === 'color_fill').length;
+      toast.success(`Excel exported successfully! ${colorColumnCount > 0 ? `(${colorColumnCount} color columns show as text)` : ''}`);
+    } catch (error: any) {
+      console.error('Excel export error:', error);
+      toast.error('Failed to export Excel: ' + error.message);
     } finally {
       setIsExporting(false);
     }
@@ -828,10 +989,12 @@ const SimpleAssetReport: React.FC = () => {
               </div>
             )}
             
+            <div className="flex gap-2">
             <Button
               onClick={exportToCSV}
               disabled={isExporting || reportData.length === 0 || selectedFields.length === 0}
-              className="h-11 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                variant="outline"
+                className="h-11 bg-white border-2 border-purple-300 hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 flex items-center gap-2"
             >
               {isExporting ? (
                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -840,6 +1003,19 @@ const SimpleAssetReport: React.FC = () => {
               )}
               Export CSV
             </Button>
+              <Button
+                onClick={exportToExcel}
+                disabled={isExporting || reportData.length === 0 || selectedFields.length === 0}
+                className="h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+              >
+                {isExporting ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Export Excel
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -887,6 +1063,71 @@ const SimpleAssetReport: React.FC = () => {
               <Button 
                 variant="outline" 
                 onClick={() => setShowSaveTemplate(false)}
+                className="px-8 py-3 rounded-xl border-2 border-gray-300 hover:border-gray-400"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Color Column Builder Modal */}
+      {showColorColumnBuilder && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6">
+            <div className="flex items-center gap-3">
+              <div className="h-6 w-6 bg-white rounded"></div>
+              <h3 className="text-xl font-bold text-white">Create Color Separator</h3>
+            </div>
+            <p className="text-purple-100 mt-2">Add a visual column to break up your report data</p>
+          </div>
+          
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label htmlFor="color-column-name" className="text-base font-semibold text-gray-800">Column Name *</Label>
+              <Input
+                id="color-column-name"
+                value={newColorColumnName}
+                onChange={(e) => setNewColorColumnName(e.target.value)}
+                placeholder="e.g., Section Break, Divider"
+                className="h-12 border-2 border-gray-200 focus:border-purple-400"
+              />
+            </div>
+            <div className="space-y-3">
+              <Label htmlFor="color-picker" className="text-base font-semibold text-gray-800">Color</Label>
+              <div className="flex items-center gap-4">
+                <input
+                  id="color-picker"
+                  type="color"
+                  value={newColorColumnColor}
+                  onChange={(e) => setNewColorColumnColor(e.target.value)}
+                  className="h-12 w-20 border-2 border-gray-200 rounded cursor-pointer"
+                />
+                <div className="flex gap-2">
+                  {['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'].map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setNewColorColumnColor(color)}
+                      className="w-8 h-8 rounded border-2 border-gray-200 hover:border-gray-400 transition-colors"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <Button 
+                onClick={addColorColumn}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Column
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowColorColumnBuilder(false)}
                 className="px-8 py-3 rounded-xl border-2 border-gray-300 hover:border-gray-400"
               >
                 Cancel
@@ -1166,16 +1407,38 @@ const SimpleAssetReport: React.FC = () => {
                   className="border-white"
                 />
                 <label htmlFor="select-all" className="text-white font-medium cursor-pointer">
-                  Select All ({formFields.length} columns)
+                  Select All Data ({formFields.length} columns)
                 </label>
               </div>
             </div>
           </div>
           
           <div className="p-6">
+            {/* All Columns Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-800">📊 Report Columns</h4>
+                  <span className="text-sm text-gray-500">({formFields.filter(f => f.selected).length} selected)</span>
+                </div>
+                <Button
+                  onClick={() => setShowColorColumnBuilder(true)}
+                  variant="outline"
+                  size="sm"
+                  className="bg-purple-50 border-purple-300 hover:bg-purple-100 text-purple-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Color Column
+                </Button>
+              </div>
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {formFields.map((field) => (
-                <div key={field.id} className="bg-white rounded-xl border-2 border-gray-200 hover:border-orange-300 p-4 transition-all duration-200 hover:shadow-md">
+                {formFields.map((field, index) => (
+                  <div key={field.id} className={`bg-white rounded-xl border-2 ${field.fieldType === 'color_fill' ? 'border-purple-200 hover:border-purple-300' : 'border-gray-200 hover:border-orange-300'} p-4 transition-all duration-200 hover:shadow-md`}>
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       id={field.id}
@@ -1184,29 +1447,69 @@ const SimpleAssetReport: React.FC = () => {
                       className="w-5 h-5"
                     />
                     {field.selected && field.order && (
-                      <span className="flex items-center justify-center w-7 h-7 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-bold rounded-full shadow-md">
+                        <span className={`flex items-center justify-center w-7 h-7 ${field.fieldType === 'color_fill' ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'} text-white text-sm font-bold rounded-full shadow-md`}>
                         {field.order}
                       </span>
                     )}
+                      {field.fieldType === 'color_fill' && (
+                        <div 
+                          className="w-4 h-4 rounded border shadow-sm"
+                          style={{ backgroundColor: field.color }}
+                        ></div>
+                      )}
                     <label
                       htmlFor={field.id}
                       className="text-sm font-medium text-gray-800 cursor-pointer flex-1 leading-relaxed"
                       onClick={() => toggleColumn(field.id)}
                     >
-                      {field.label}
+                        {field.label} {field.fieldType === 'color_fill' && <span className="text-purple-600 text-xs">(Color)</span>}
                     </label>
+                      {field.selected && (
+                        <div className="flex flex-col">
+                          <Button
+                            onClick={() => moveColumn(field.id, 'up')}
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-blue-50"
+                            title="Move up"
+                          >
+                            <ChevronUp className="h-3 w-3 text-blue-600" />
+                          </Button>
+                          <Button
+                            onClick={() => moveColumn(field.id, 'down')}
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 hover:bg-blue-50"
+                            title="Move down"
+                          >
+                            <ChevronDown className="h-3 w-3 text-blue-600" />
+                          </Button>
+                        </div>
+                      )}
+                      {field.fieldType === 'color_fill' && (
+                        <Button
+                          onClick={() => deleteColumn(field.id)}
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-600"
+                          title="Delete color column"
+                        >
+                          ×
+                        </Button>
+                      )}
                   </div>
                 </div>
               ))}
+              </div>
             </div>
             
             <div className="mt-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-4 bg-orange-50 rounded-xl border border-orange-200">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-orange-800">
-                  📊 Selected: {selectedFields.length} of {formFields.length} columns
+                  📊 Selected: {selectedFields.length} columns total ({formFields.filter(f => f.selected && f.fieldType !== 'color_fill').length} data + {formFields.filter(f => f.selected && f.fieldType === 'color_fill').length} color)
                 </p>
                 <p className="text-xs text-orange-600">
-                  Click columns to select them. Numbers show the order they'll appear in your report.
+                  Use checkboxes to select columns. Use ⬆️⬇️ arrows to reorder. Numbers show final order.
                 </p>
               </div>
               <Button
@@ -1286,18 +1589,37 @@ const SimpleAssetReport: React.FC = () => {
                         <th className="text-left p-4 font-bold text-gray-800 text-sm">Submission Date</th>
                       )}
                       {selectedFields.map((field) => (
-                        <th key={field.id} className="text-left p-4 font-bold text-gray-800 text-sm">
+                        <th 
+                          key={field.id} 
+                          className={field.fieldType === 'color_fill' ? "text-center p-0 font-bold text-sm" : "text-left p-4 font-bold text-gray-800 text-sm"}
+                          style={{ 
+                            width: field.width,
+                            backgroundColor: field.fieldType === 'color_fill' ? field.color : 'transparent'
+                          }}
+                        >
+                          {field.fieldType === 'color_fill' ? (
+                            <div 
+                              className="h-full w-full py-3 px-2 flex items-center justify-center text-white text-xs font-bold"
+                              style={{ 
+                                backgroundColor: field.color,
+                                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                              }}
+                            >
                           {field.label}
+                            </div>
+                          ) : (
+                            field.label
+                          )}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {previewData.map((row, index) => (
-                      <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150">
-                        <td className="p-4 font-semibold text-blue-700">{row.asset_name}</td>
+                      <tr key={index} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-150 min-h-[60px]">
+                        <td className="p-4 font-semibold text-blue-700 align-middle">{row.asset_name}</td>
                         {viewMode === 'history' && (
-                          <td className="p-4 text-gray-600">
+                          <td className="p-4 text-gray-600 align-middle">
                             {row.submission_date ? 
                               new Date(row.submission_date).toLocaleString() : 
                               <span className="text-red-500 font-medium">No data</span>
@@ -1305,8 +1627,26 @@ const SimpleAssetReport: React.FC = () => {
                           </td>
                         )}
                         {selectedFields.map((field) => (
-                          <td key={field.id} className="p-4">
-                            {field.id === 'asset_type' ? (
+                          <td 
+                            key={field.id} 
+                            className={field.fieldType === 'color_fill' ? "p-0 relative align-middle" : "p-4 align-middle"}
+                            style={{ 
+                              width: field.width,
+                              backgroundColor: field.fieldType === 'color_fill' ? field.color : 'transparent'
+                            }}
+                          >
+                            {field.fieldType === 'color_fill' ? (
+                              <div 
+                                className="h-full w-full min-h-[60px] flex items-center justify-center text-white text-xs font-medium text-shadow"
+                                style={{ 
+                                  backgroundColor: field.color,
+                                  textShadow: '1px 1px 2px rgba(0,0,0,0.7)'
+                                }}
+                                title={field.label}
+                              >
+                                {field.label}
+                              </div>
+                            ) : field.id === 'asset_type' ? (
                               <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700">
                                 {row.asset_type}
                               </Badge>

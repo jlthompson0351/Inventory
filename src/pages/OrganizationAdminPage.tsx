@@ -89,7 +89,7 @@ const OrganizationAdminContent: React.FC = () => {
   }
   
   return (
-    <div className="container mx-auto max-w-7xl space-y-6">
+    <div className="container mx-auto max-w-full px-6 lg:px-8 space-y-8">
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -149,11 +149,11 @@ const OrganizationAdminContent: React.FC = () => {
       <Separator />
       
       {/* Main Settings Content */}
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid gap-8 lg:grid-cols-5">
         {/* Settings Navigation Sidebar */}
         <Card className="lg:col-span-1 h-fit">
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Settings Categories</CardTitle>
+            <CardTitle className="text-lg">Settings Categories</CardTitle>
             <CardDescription className="text-sm">
               Choose a category to configure
             </CardDescription>
@@ -165,18 +165,20 @@ const OrganizationAdminContent: React.FC = () => {
                 onClick={() => setActiveTab(tab.value)}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all hover:bg-muted/50 ${
                   activeTab === tab.value 
-                    ? 'bg-primary/10 text-primary border border-primary/20' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <div className={`p-1.5 rounded-md ${
-                  activeTab === tab.value ? 'bg-primary/20' : 'bg-muted'
+                  activeTab === tab.value ? 'bg-primary-foreground/20' : 'bg-muted'
                 }`}>
                   {tab.icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">{tab.label}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-1">
+                  <div className={`text-xs line-clamp-1 ${
+                    activeTab === tab.value ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                  }`}>
                     {tab.description}
                   </div>
                 </div>
@@ -186,19 +188,23 @@ const OrganizationAdminContent: React.FC = () => {
         </Card>
         
         {/* Settings Content Area */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              {settingsTabs.find(tab => tab.value === activeTab)?.icon}
-              <CardTitle>
-                {settingsTabs.find(tab => tab.value === activeTab)?.label} Settings
-              </CardTitle>
+        <Card className="lg:col-span-4">
+          <CardHeader className="pb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                {settingsTabs.find(tab => tab.value === activeTab)?.icon}
+              </div>
+              <div>
+                <CardTitle className="text-xl">
+                  {settingsTabs.find(tab => tab.value === activeTab)?.label} Settings
+                </CardTitle>
+                <CardDescription className="text-base mt-1">
+                  {settingsTabs.find(tab => tab.value === activeTab)?.description}
+                </CardDescription>
+              </div>
             </div>
-            <CardDescription>
-              {settingsTabs.find(tab => tab.value === activeTab)?.description}
-            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {activeTab === "general" && <OrganizationGeneralSettings />}
             {activeTab === "members" && <OrganizationMembersSettings />}
             {activeTab === "appearance" && <OrganizationAppearanceSettings />}
@@ -210,12 +216,16 @@ const OrganizationAdminContent: React.FC = () => {
       </div>
       
       {/* Help Text Footer */}
-      <Card className="bg-muted/30">
-        <CardContent className="p-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Organization settings affect all members and are saved automatically when you click "Save Changes".
-            Need help? Contact your system administrator.
-          </p>
+      <Card className="bg-muted/30 border-dashed">
+        <CardContent className="p-6">
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Organization settings affect all members and are saved automatically when you click "Save Changes".
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Need help? Contact your system administrator.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
