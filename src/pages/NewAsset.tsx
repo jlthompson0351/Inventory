@@ -295,6 +295,7 @@ export default function NewAsset() {
         .from('assets')
         .select('id, name, asset_type_id')
         .eq('organization_id', currentOrganization.id)
+        .eq('is_deleted', false)
         .order('name');
       
       if (error) {
