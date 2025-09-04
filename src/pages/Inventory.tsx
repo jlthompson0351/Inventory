@@ -3,10 +3,13 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, RefreshCw, Package } from "lucide-react";
+import { Plus, Search, RefreshCw, Package, BarChart3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AssetInventoryList from "@/components/inventory/AssetInventoryList";
+import MonthlySnapshotHistory from "@/components/inventory/MonthlySnapshotHistory";
+import MonthlySnapshotTable from "@/components/inventory/MonthlySnapshotTable";
 import { getAssetTypes, type AssetType } from "@/services/assetTypeService";
 
 // Inventory management page focused on inventory items, not assets
@@ -174,14 +177,35 @@ export default function Inventory() {
           </div>
         </div>
 
-        {/* Enhanced Inventory List */}
+        {/* Enhanced Inventory List with Tabs */}
         <div id="inventory-list">
-          <AssetInventoryList 
-            key={refreshKey}
-            organizationId={currentOrganization.id}
-            searchTerm={searchTerm}
-            categoryFilter={assetTypeFilter === "all" ? "" : assetTypeFilter}
-          />
+          <Tabs defaultValue="inventory" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="inventory" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Current Inventory
+              </TabsTrigger>
+              <TabsTrigger value="monthly-history" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Monthly History
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="inventory" className="mt-6">
+              <AssetInventoryList 
+                key={refreshKey}
+                organizationId={currentOrganization.id}
+                searchTerm={searchTerm}
+                categoryFilter={assetTypeFilter === "all" ? "" : assetTypeFilter}
+              />
+            </TabsContent>
+            
+            <TabsContent value="monthly-history" className="mt-6">
+              <MonthlySnapshotTable
+                organizationId={currentOrganization.id}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

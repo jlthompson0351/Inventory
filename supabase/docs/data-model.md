@@ -196,6 +196,37 @@
   - Flexible unit type definitions
 - **RLS**: Organization-based access with mobile QR support
 
+### Monthly Inventory Snapshots
+- **Table**: `monthly_inventory_snapshots`
+- **Description**: Automated monthly snapshots of inventory state for historical tracking and reporting
+- **Key Fields**:
+  - `id`: UUID Primary Key
+  - `inventory_item_id`: Reference to inventory item
+  - `organization_id`: Organization this record belongs to
+  - `asset_id`: Reference to the physical asset
+  - `asset_name`: Asset name at time of snapshot
+  - `item_name`: Item name at time of snapshot
+  - `quantity`: Quantity at time of snapshot (numeric, constraint: >= 0)
+  - `location`: Location at time of snapshot
+  - `status`: Status at time of snapshot (active, low_stock, out_of_stock)
+  - `current_price`: Price at time of snapshot (numeric, constraint: >= 0)
+  - `currency`: Currency at time of snapshot (default: 'USD')
+  - `snapshot_date`: Date when snapshot was taken (default: now())
+  - `month_year`: Month and year in YYYY-MM format
+  - `created_at`: Creation timestamp
+  - Standard soft-delete fields (`deleted_at`, `is_deleted`)
+- **Features**:
+  - Automated monthly capture via pg_cron scheduling
+  - Complete inventory state preservation
+  - Historical trend analysis support
+  - Soft delete for data retention management
+  - Unique constraint on (inventory_item_id, month_year) to prevent duplicates
+- **Indexes**:
+  - `idx_monthly_snapshots_org_month` on (organization_id, month_year)
+  - `idx_monthly_snapshots_asset` on (asset_id)
+  - `idx_monthly_snapshots_is_deleted` on (is_deleted)
+- **RLS**: Organization-based access with role permissions
+
 ### Additional Inventory Tables
 
 #### Inventory Transactions
@@ -349,6 +380,17 @@
 - **update_inventory_atomic()**: Thread-safe inventory updates
 - **verify_inventory_balance()**: Inventory reconciliation and validation
 
+#### Monthly Snapshot System
+- **capture_monthly_inventory_snapshot()**: Captures current inventory state for all active items
+- **capture_monthly_snapshot_if_last_day()**: Wrapper function for pg_cron to ensure last-day-of-month execution
+- **get_asset_complete_history()**: Retrieves complete historical data for an asset (unlimited history)
+- **get_inventory_item_complete_history()**: Retrieves complete historical data for an inventory item
+- **get_asset_history_last_n_months()**: Retrieves historical data for last N months
+- **get_asset_history_by_date_range()**: Retrieves historical data within custom date range
+- **get_monthly_snapshot_stats()**: Utility function to get snapshot statistics
+- **trigger_manual_snapshot()**: Manually trigger a monthly snapshot
+- **cleanup_old_snapshots()**: Soft delete old snapshots for data retention management
+
 #### Form Processing & Calculations  
 - **calculate_form_formulas()**: Dynamic formula field calculations
 - **process_form_submission()**: Complete form submission workflow
@@ -440,6 +482,7 @@
 - ✅ **Reporting Infrastructure**: Caching, performance monitoring, and analytics
 - ✅ **Background Job System**: Asynchronous processing with progress tracking
 - ✅ **Platform Administration**: System-wide admin tools and user management
+- ✅ **Monthly Snapshot System**: Automated monthly inventory snapshots with historical tracking and reporting
 
 ### Production Features
 - **Enterprise-grade Security**: Complete RLS implementation with organization isolation

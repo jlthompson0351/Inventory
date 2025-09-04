@@ -29,6 +29,7 @@ export interface AssetWithInventory {
   inventory_status: string | null;
   created_at?: string | null;
   unit_type: string; // Unit type from asset metadata (now always provided)
+  organization_id: string; // Organization ID for the asset
 }
 
 export interface InventoryCheckData {

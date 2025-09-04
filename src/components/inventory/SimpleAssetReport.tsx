@@ -342,27 +342,34 @@ const SimpleAssetReport: React.FC = () => {
         );
       }
 
-      // Apply date filtering and sorting for submissions
+      // Sort form submissions by created_at DESC and filter out deleted ones
+      // Optimize: Only keep the 3 most recent submissions per asset for performance
+      if (filteredData) {
+        filteredData = filteredData.map((asset: any) => ({
+          ...asset,
+          form_submissions: asset.form_submissions
+            ?.filter((sub: any) => !sub.is_deleted)
+            ?.sort((a: any, b: any) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            )
+            ?.slice(0, 3) || [] // Only keep 3 most recent for performance
+        }));
+      }
+
+      // Apply date filtering for submissions (already sorted above)
       if (filteredData && viewMode !== 'latest') {
         filteredData = filteredData.map((asset: any) => ({
           ...asset,
           form_submissions: asset.form_submissions?.filter((submission: any) => {
             const submissionDate = new Date(submission.created_at);
             return submissionDate >= startDate && submissionDate <= endDate;
-          }).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        }));
-      } else if (filteredData) {
-        // For latest mode, just sort submissions by date
-        filteredData = filteredData.map((asset: any) => ({
-          ...asset,
-          form_submissions: asset.form_submissions?.sort((a: any, b: any) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )
+          })
         }));
       }
       
       if (error) {
         console.error('Query error:', error);
+        toast.error(`Database query failed: ${error.message || 'Unknown error'}`);
         throw error;
       }
 
@@ -457,6 +464,7 @@ const SimpleAssetReport: React.FC = () => {
 
         if (formError) {
           console.error('Form schema error:', formError);
+          toast.warning('Could not load form schemas. Column labels may be generic.');
         } else {
           // Form schemas loaded
           forms?.forEach((form: any) => {
@@ -508,7 +516,23 @@ const SimpleAssetReport: React.FC = () => {
 
         if (viewMode === 'latest') {
           // Latest submission mode (original behavior)
-          const latestSubmission = asset.form_submissions?.[0];
+          // Find the most recent complete submission
+          // A complete submission should have at least 5 key fields including field_13 (total)
+          const latestSubmission = asset.form_submissions?.find(sub => {
+            if (!sub.submission_data) return false;
+            const data = sub.submission_data;
+            // Check for key indicators of a complete submission
+            const hasMultipleFields = Object.keys(data).filter(key => 
+              key.startsWith('field_') && data[key] !== '' && data[key] !== null && data[key] !== undefined
+            ).length >= 5;
+            const hasTotal = data.field_13 !== undefined && data.field_13 !== '' && data.field_13 !== null;
+            return hasMultipleFields && hasTotal;
+          }) || asset.form_submissions?.[0]; // Fallback to first available
+          
+          if (!latestSubmission) {
+            console.warn('No form submissions found for asset:', asset.name);
+            return; // Skip this asset if no submissions
+          }
           
           // ENHANCED: Improved last month total calculation with better fallback logic
           let lastMonthTotal = '';
@@ -577,10 +601,18 @@ const SimpleAssetReport: React.FC = () => {
               asset_price_display: `${assetPriceData.formatted_price} per ${assetPriceData.unit_type}`
             };
             
+            // Production logging (only log issues, not all data)
+            const fieldCount = Object.keys(baseSubmissionData).filter(k => k.startsWith('field_')).length;
+            if (fieldCount < 5) {
+              console.warn(`Asset "${asset.name}" has incomplete submission (${fieldCount} fields). Using anyway.`);
+            }
+            
             // Ensure all form fields are present in the data (with empty string if no value)
             formFieldsForAsset.forEach((field: FormField) => {
               if (!(field.id in enrichedSubmissionData)) {
-                enrichedSubmissionData[field.id] = '';
+                // Check if the field exists in the raw submission data
+                const rawValue = latestSubmission.submission_data?.[field.id];
+                enrichedSubmissionData[field.id] = rawValue !== undefined ? rawValue : '';
               }
             });
 
@@ -652,7 +684,9 @@ const SimpleAssetReport: React.FC = () => {
               // Ensure all form fields are present in history data too
               formFieldsForAsset.forEach((field: FormField) => {
                 if (!(field.id in enrichedSubmissionData)) {
-                  enrichedSubmissionData[field.id] = '';
+                  // Check if the field exists in the raw submission data
+                  const rawValue = submission.submission_data?.[field.id];
+                  enrichedSubmissionData[field.id] = rawValue !== undefined ? rawValue : '';
                 }
               });
 
@@ -1445,7 +1479,8 @@ const SimpleAssetReport: React.FC = () => {
                   <h4 className="text-lg font-semibold text-gray-800">📊 Report Columns</h4>
                   <span className="text-sm text-gray-500">({formFields.filter(f => f.selected).length} selected)</span>
                 </div>
-                <Button
+                {/* Temporarily hidden - Add Color Column functionality not yet complete */}
+                {/* <Button
                   onClick={() => setShowColorColumnBuilder(true)}
                   variant="outline"
                   size="sm"
@@ -1453,7 +1488,7 @@ const SimpleAssetReport: React.FC = () => {
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Color Column
-                </Button>
+                </Button> */}
               </div>
 
 

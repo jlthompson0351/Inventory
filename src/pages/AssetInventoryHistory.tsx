@@ -30,10 +30,12 @@ import {
   Package,
   Filter,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  BarChart3
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getAssetWithInventory, getAssetInventoryHistory } from '@/services/assetInventoryService';
+import MonthlySnapshotHistory from '@/components/inventory/MonthlySnapshotHistory';
 import { format } from 'date-fns';
 
 export default function AssetInventoryHistory() {
@@ -49,6 +51,7 @@ export default function AssetInventoryHistory() {
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [filterType, setFilterType] = useState<string>('all');
   const [showAnomaliesOnly, setShowAnomaliesOnly] = useState(false);
+  const [showMonthlySnapshots, setShowMonthlySnapshots] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -285,6 +288,66 @@ export default function AssetInventoryHistory() {
             </div>
           </div>
         </CardContent>
+      </Card>
+
+      {/* Monthly Snapshots Section - Collapsible */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Monthly Snapshots
+              </CardTitle>
+              <CardDescription>
+                End-of-month inventory snapshots for {asset.asset_name}
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMonthlySnapshots(!showMonthlySnapshots)}
+              className="flex items-center gap-2"
+            >
+              {showMonthlySnapshots ? (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Hide Snapshots
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-4 w-4" />
+                  Show Snapshots
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        {showMonthlySnapshots ? (
+          <CardContent>
+            <MonthlySnapshotHistory
+              assetName={asset.asset_name}
+              organizationId={asset.organization_id}
+              showAssetFilter={false}
+              showDateRange={true}
+              maxMonths={24}
+            />
+          </CardContent>
+        ) : (
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>Click "Show Snapshots" to view monthly inventory history</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMonthlySnapshots(true)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                View Snapshots
+              </Button>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Compact Event History with Filters */}
