@@ -111,6 +111,7 @@ export default function NewAsset() {
     cost: z.number().default(0),
     unit_type: z.string().optional(),
     current_inventory: z.number().default(0),
+    distributor: z.string().optional(),
   });
 
   // Initialize form
@@ -128,6 +129,7 @@ export default function NewAsset() {
       cost: 0,
       unit_type: "",
       current_inventory: 0,
+      distributor: "",
     },
   });
 
@@ -398,6 +400,11 @@ export default function NewAsset() {
         metadata.current_inventory = values.current_inventory;
       }
       
+      // Add distributor to metadata
+      if (values.distributor) {
+        metadata.distributor = values.distributor;
+      }
+      
       // Add all conversion field values from the dynamic form to metadata
       // This ensures conversion values are saved when editing an asset
       if (Object.keys(formValues).length > 0) {
@@ -576,6 +583,7 @@ export default function NewAsset() {
         cost: metadataObject.cost || 0,
         unit_type: metadataObject.unit_type || "",
         current_inventory: metadataObject.current_inventory || 0,
+        distributor: metadataObject.distributor || "",
       });
       
       // Set selected asset type
@@ -637,6 +645,7 @@ export default function NewAsset() {
         form.setValue('cost', metadataObject.cost || 0);
         form.setValue('unit_type', metadataObject.unit_type || "");
         form.setValue('current_inventory', metadataObject.current_inventory || 0);
+        form.setValue('distributor', metadataObject.distributor || "");
 
         const dynamicFormValues = { ...metadataObject };
         // Remove fields we handle separately
@@ -645,6 +654,7 @@ export default function NewAsset() {
         delete dynamicFormValues.cost;
         delete dynamicFormValues.unit_type;
         delete dynamicFormValues.current_inventory;
+        delete dynamicFormValues.distributor;
         
         // The conversion field values are already included in metadataObject
         // so they'll be in dynamicFormValues by default
@@ -657,6 +667,7 @@ export default function NewAsset() {
         form.setValue('cost', 0);
         form.setValue('unit_type', "");
         form.setValue('current_inventory', 0);
+        form.setValue('distributor', "");
         setFormValues({});
       }
       
@@ -1098,8 +1109,29 @@ export default function NewAsset() {
                       
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="distributor"
                         render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Distributor</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="Enter distributor name" 
+                                {...field} 
+                                value={field.value || ""}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Name of the distributor or vendor for this asset
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
                           <FormItem>
                             <FormLabel>Status</FormLabel>
                             <FormControl>
