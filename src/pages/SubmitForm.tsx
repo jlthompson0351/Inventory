@@ -29,6 +29,8 @@ import { applyFormulaMappings } from '@/services/formulaMappingService';
 import { clearAssetCacheForOrg } from "@/components/inventory/AssetList";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { MobileInventorySuccessDialog } from "@/components/mobile/MobileInventorySuccessDialog";
+import { MobileAssetSelector } from "@/components/mobile/MobileAssetSelector";
 
 export default function SubmitForm() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +55,17 @@ export default function SubmitForm() {
   const [existingSubmissionId, setExistingSubmissionId] = useState<string | null>(null);
   const [existingSubmissionDate, setExistingSubmissionDate] = useState<Date | null>(null);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
+  
+  // Mobile workflow states
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [showAssetSelector, setShowAssetSelector] = useState(false);
+  const [recentAssets, setRecentAssets] = useState<{
+    id: string;
+    name: string;
+    asset_type?: { id: string; name: string; color?: string };
+    location?: string;
+    last_inventory_date?: string;
+  }[]>([]);
   
   // Parse URL query parameters
   const searchParams = new URLSearchParams(location.search);
@@ -721,15 +734,21 @@ export default function SubmitForm() {
       // Clear asset cache to refresh inventory quantities
       clearAssetCacheForOrg(workingOrganization.id);
       
-      // Navigate based on form type
-      if (formType === 'intake') {
-        navigate('/inventory');
-      } else if (formType === 'inventory') {
-        navigate('/inventory');
-      } else if (assetId) {
-        navigate(`/assets/${assetId}`);
+      // Handle mobile workflow vs desktop workflow
+      if (fromMobileQR) {
+        // For mobile users, show success dialog with "Next Asset" option
+        setShowSuccessDialog(true);
       } else {
-        navigate('/forms');
+        // Desktop workflow - navigate based on form type
+        if (formType === 'intake') {
+          navigate('/inventory');
+        } else if (formType === 'inventory') {
+          navigate('/inventory');
+        } else if (assetId) {
+          navigate(`/assets/${assetId}`);
+        } else {
+          navigate('/forms');
+        }
       }
     } catch (error) {
       console.error('Form submission error:', error);
@@ -741,6 +760,67 @@ export default function SubmitForm() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Mobile workflow handlers
+  const handleNextAsset = () => {
+    setShowSuccessDialog(false);
+    setShowAssetSelector(true);
+  };
+
+  const handleComplete = () => {
+    setShowSuccessDialog(false);
+    // Navigate back to mobile workflow or main page
+    if (fromMobileQR) {
+      navigate('/mobile/asset/' + assetId);
+    } else {
+      navigate('/inventory');
+    }
+  };
+
+  const handleAssetSelect = (selectedAsset: {
+    id: string;
+    name: string;
+    asset_type?: {
+      id: string;
+      name: string;
+      color?: string;
+    };
+    barcode?: string;
+  }) => {
+    setShowAssetSelector(false);
+    
+    // Navigate to the selected asset's inventory form
+    const navigationState = {
+      assetId: selectedAsset.id,
+      assetName: selectedAsset.name,
+      assetTypeId: selectedAsset.asset_type?.id,
+      formType: formType,
+      fromMobileQR: true,
+      authSession: location.state?.authSession,
+      prefillData: {
+        asset_id: selectedAsset.id,
+        asset_name: selectedAsset.name,
+        asset_type: selectedAsset.asset_type?.name,
+        barcode: selectedAsset.barcode
+      }
+    };
+
+    // Navigate to the same form for the new asset
+    const queryParams = new URLSearchParams({
+      fromMobileQR: 'true',
+      type: formType,
+      action: 'new'
+    });
+
+    navigate(`/forms/submit/${id}?${queryParams.toString()}`, {
+      state: navigationState
+    });
+  };
+
+  const handleCancelAssetSelection = () => {
+    setShowAssetSelector(false);
+    setShowSuccessDialog(true);
   };
   
   if (loading) {
@@ -905,6 +985,30 @@ export default function SubmitForm() {
           />
         </CardContent>
       </Card>
+
+      {/* Mobile Success Dialog */}
+      {fromMobileQR && (
+        <MobileInventorySuccessDialog
+          isOpen={showSuccessDialog}
+          onNextAsset={handleNextAsset}
+          onComplete={handleComplete}
+          assetName={assetName || 'Unknown Asset'}
+          formType={formType || 'inventory'}
+          isLoading={submitting}
+        />
+      )}
+
+      {/* Mobile Asset Selector - Full Screen Mobile Component */}
+      {fromMobileQR && showAssetSelector && (
+        <MobileAssetSelector
+          organizationId={currentOrganization?.id || location.state?.authSession?.organization_id}
+          currentAssetTypeId={assetTypeId}
+          onAssetSelect={handleAssetSelect}
+          onCancel={handleCancelAssetSelection}
+          authSession={location.state?.authSession}
+          recentAssets={recentAssets}
+        />
+      )}
     </div>
   );
 } 

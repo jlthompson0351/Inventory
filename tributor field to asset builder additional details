@@ -1,0 +1,95 @@
+[1mdiff --git a/src/pages/NewAsset.tsx b/src/pages/NewAsset.tsx[m
+[1mindex 414e0c1..c504476 100644[m
+[1m--- a/src/pages/NewAsset.tsx[m
+[1m+++ b/src/pages/NewAsset.tsx[m
+[36m@@ -111,6 +111,7 @@[m [mexport default function NewAsset() {[m
+     cost: z.number().default(0),[m
+     unit_type: z.string().optional(),[m
+     current_inventory: z.number().default(0),[m
+[32m+[m[32m    distributor: z.string().optional(),[m
+   });[m
+ [m
+   // Initialize form[m
+[36m@@ -128,6 +129,7 @@[m [mexport default function NewAsset() {[m
+       cost: 0,[m
+       unit_type: "",[m
+       current_inventory: 0,[m
+[32m+[m[32m      distributor: "",[m
+     },[m
+   });[m
+ [m
+[36m@@ -398,6 +400,11 @@[m [mexport default function NewAsset() {[m
+         metadata.current_inventory = values.current_inventory;[m
+       }[m
+       [m
+[32m+[m[32m      // Add distributor to metadata[m
+[32m+[m[32m      if (values.distributor) {[m
+[32m+[m[32m        metadata.distributor = values.distributor;[m
+[32m+[m[32m      }[m
+[32m+[m[41m      [m
+       // Add all conversion field values from the dynamic form to metadata[m
+       // This ensures conversion values are saved when editing an asset[m
+       if (Object.keys(formValues).length > 0) {[m
+[36m@@ -576,6 +583,7 @@[m [mexport default function NewAsset() {[m
+         cost: metadataObject.cost || 0,[m
+         unit_type: metadataObject.unit_type || "",[m
+         current_inventory: metadataObject.current_inventory || 0,[m
+[32m+[m[32m        distributor: metadataObject.distributor || "",[m
+       });[m
+       [m
+       // Set selected asset type[m
+[36m@@ -637,6 +645,7 @@[m [mexport default function NewAsset() {[m
+         form.setValue('cost', metadataObject.cost || 0);[m
+         form.setValue('unit_type', metadataObject.unit_type || "");[m
+         form.setValue('current_inventory', metadataObject.current_inventory || 0);[m
+[32m+[m[32m        form.setValue('distributor', metadataObject.distributor || "");[m
+ [m
+         const dynamicFormValues = { ...metadataObject };[m
+         // Remove fields we handle separately[m
+[36m@@ -645,6 +654,7 @@[m [mexport default function NewAsset() {[m
+         delete dynamicFormValues.cost;[m
+         delete dynamicFormValues.unit_type;[m
+         delete dynamicFormValues.current_inventory;[m
+[32m+[m[32m        delete dynamicFormValues.distributor;[m
+         [m
+         // The conversion field values are already included in metadataObject[m
+         // so they'll be in dynamicFormValues by default[m
+[36m@@ -657,6 +667,7 @@[m [mexport default function NewAsset() {[m
+         form.setValue('cost', 0);[m
+         form.setValue('unit_type', "");[m
+         form.setValue('current_inventory', 0);[m
+[32m+[m[32m        form.setValue('distributor', "");[m
+         setFormValues({});[m
+       }[m
+       [m
+[36m@@ -1098,8 +1109,29 @@[m [mexport default function NewAsset() {[m
+                       [m
+                       <FormField[m
+                         control={form.control}[m
+[31m-                        name="status"[m
+[32m+[m[32m                        name="distributor"[m
+                         render={({ field }) => ([m
+[32m+[m[32m                          <FormItem>[m
+[32m+[m[32m                            <FormLabel>Distributor</FormLabel>[m
+[32m+[m[32m                            <FormControl>[m
+[32m+[m[32m                              <Input[m[41m [m
+[32m+[m[32m                                placeholder="Enter distributor name"[m[41m [m
+[32m+[m[32m                                {...field}[m[41m [m
+[32m+[m[32m                                value={field.value || ""}[m
+[32m+[m[32m                              />[m
+[32m+[m[32m                            </FormControl>[m
+[32m+[m[32m                            <FormDescription>[m
+[32m+[m[32m                              Name of the distributor or vendor for this asset[m
+[32m+[m[32m                            </FormDescription>[m
+[32m+[m[32m                            <FormMessage />[m
+[32m+[m[32m                          </FormItem>[m
+[32m+[m[32m                        )}[m
+[32m+[m[32m                      />[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    <FormField[m
+[32m+[m[32m                      control={form.control}[m
+[32m+[m[32m                      name="status"[m
+[32m+[m[32m                      render={({ field }) => ([m
+                           <FormItem>[m
+                             <FormLabel>Status</FormLabel>[m
+                             <FormControl>[m

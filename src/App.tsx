@@ -143,6 +143,7 @@ const AppRoutes = () => {
         {/* Mobile Testing Interface - accessible to authenticated users for debugging */}
         <Route path="/mobile-test/asset/:assetId" element={<MobileTestWorkflow />} />
         
+        
         {/* Redirect organization-setup to dashboard - no longer needed in single organization mode */}
         <Route path="/organization-setup" element={user ? <Navigate to="/" /> : <Navigate to="/login" />} />
         
